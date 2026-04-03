@@ -363,22 +363,9 @@ export default function App() {
         if (Array.isArray(p) && p.length) setPaths(p); if (s) setSettings(s); if (Array.isArray(bul) && bul.length) setBulletins(bul);
         // Load company logo
         try { const logoData = await DB.get("km-logo", null); if (logoData) setCompanyLogo(logoData); } catch (e2) { }
-        // Restore session from Supabase Auth
-        try {
-          const { data: { session: authSession } } = await supabase.auth.getSession();
-          if (authSession) {
-            const { data: profile } = await supabase.from("profiles").select("*").eq("id", authSession.user.id).single();
-            if (profile) {
-              if (profile.emp_id === "admin") { setRole("admin"); setScreen("admin_home"); }
-              else {
-                const acc = profileToCamel(profile);
-                setCurrentUser(acc); setRole("employee");
-                const uiSession = await Session.get("km-session", null);
-                setScreen((uiSession && uiSession.screen) || "emp_home");
-              }
-            }
-          }
-        } catch (e2) { }
+        // Always sign out on page load so users see the login screen
+        try { await supabase.auth.signOut(); } catch (e2) { }
+        Session.clear("km-session");
       } catch (e) { console.log("Init error:", e); }
       clearTimeout(fallback);
       setReady(true);
@@ -1733,7 +1720,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleAvatarUpload(e, currentUser.id)} />
               </div>
             )}
-            {role && <button onClick={() => { setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); Session.set("km-session", null); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
+            {role && <button onClick={async () => { await supabase.auth.signOut(); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); Session.clear("km-session"); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
           </div>
         </div>
         {/* ═══ MENU BAR ═══ */}
