@@ -2244,7 +2244,31 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div><label style={lbl}>Cấp bậc</label><select value={formData.accRole || "employee"} onChange={e => setFormData({ ...formData, accRole: e.target.value })} style={inp}>{ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select></div>
                   <div><label style={lbl}>Mật khẩu</label><input value={formData.pw || "123456"} onChange={e => setFormData({ ...formData, pw: e.target.value })} style={inp} /></div>
                 </div>
-                <button onClick={() => { if (!(formData.name || "").trim() || !(formData.empId || "").trim()) return; updAccounts([...accounts, { id: uid(), name: formData.name, empId: formData.empId, dept: formData.dept || DEPTS[0], team: formData.team || "", accRole: formData.accRole || "employee", password: formData.pw || "123456", xp: 0, streak: 0, checkIns: [], readLessons: [], createdAt: new Date().toISOString() }]); setFormData({}); setSubScreen(null); }} style={btnG}>Tạo tài khoản</button>
+                <button onClick={async () => {
+                  const name = (formData.name || "").trim(); const empId = (formData.empId || "").trim();
+                  if (!name || !empId) return;
+                  const email = empId.toLowerCase() + "@kingsmen.internal";
+                  const password = (formData.pw || "123456");
+                  // Step 1: create Supabase Auth user to get a real UUID
+                  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
+                  if (signUpErr) { alert("Lỗi tạo Auth: " + signUpErr.message); return; }
+                  const userId = signUpData.user?.id;
+                  if (!userId) { alert("Không lấy được user ID từ Supabase"); return; }
+                  // Step 2: insert profile row with the real auth UUID
+                  const { error: profileErr } = await supabase.from("profiles").insert({ id: userId, name, emp_id: empId, dept: formData.dept || DEPTS[0], team: formData.team || "", acc_role: formData.accRole || "employee", xp: 0, streak: 0, check_ins: [], read_lessons: [], path_progress: {}, status: "active" });
+                  if (profileErr) { alert("Lỗi tạo hồ sơ: " + profileErr.message); return; }
+                  // Step 3: reload accounts list from DB
+                  const newAccounts = await DB.get("km-accounts", []);
+                  setAccounts(newAccounts); accountsRef.current = newAccounts;
+                  setFormData({}); setSubScreen(null);
+                  // signUp may have replaced admin session — force re-login if so
+                  const { data: { session: curSession } } = await supabase.auth.getSession();
+                  if (curSession && curSession.user?.email !== "admin@kingsmen.internal") {
+                    await supabase.auth.signOut();
+                    alert("Tài khoản NV \"" + name + "\" đã tạo thành công! Vui lòng đăng nhập lại Admin.");
+                    setRole(null); setScreen("login"); setCurrentUser(null); Session.set("km-session", null);
+                  }
+                }} style={btnG}>Tạo tài khoản</button>
               </div>
             )}
             {/* Department Management */}
