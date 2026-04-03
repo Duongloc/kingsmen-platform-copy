@@ -1,0 +1,168 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.accounts (
+  id text NOT NULL,
+  emp_id text NOT NULL UNIQUE,
+  name text NOT NULL,
+  dept text NOT NULL,
+  password text NOT NULL,
+  acc_role text DEFAULT 'employee'::text CHECK (acc_role = ANY (ARRAY['employee'::text, 'manager'::text, 'director'::text])),
+  xp integer DEFAULT 0,
+  streak integer DEFAULT 0,
+  status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text])),
+  last_check_in date,
+  last_xp_gain_date date,
+  check_ins jsonb DEFAULT '[]'::jsonb,
+  read_lessons jsonb DEFAULT '[]'::jsonb,
+  path_progress jsonb DEFAULT '{}'::jsonb,
+  team text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT accounts_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.bulletins (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  title text NOT NULL,
+  content text DEFAULT ''::text,
+  type text DEFAULT 'announce'::text CHECK (type = ANY (ARRAY['announce'::text, 'policy'::text, 'news'::text, 'event'::text])),
+  pinned boolean DEFAULT false,
+  author text DEFAULT ''::text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT bulletins_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.challenge_completions (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  challenge_id text NOT NULL,
+  emp_id uuid NOT NULL,
+  won_rewards jsonb DEFAULT '[]'::jsonb,
+  delivered boolean DEFAULT false,
+  completed_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT challenge_completions_pkey PRIMARY KEY (id),
+  CONSTRAINT challenge_completions_challenge_id_fkey FOREIGN KEY (challenge_id) REFERENCES public.challenges(id),
+  CONSTRAINT challenge_completions_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.challenges (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  title text NOT NULL,
+  quiz_id text,
+  min_score integer DEFAULT 70,
+  deadline timestamp with time zone,
+  assign_to text DEFAULT 'all'::text,
+  assign_dept text,
+  rewards jsonb DEFAULT '[]'::jsonb,
+  active boolean DEFAULT true,
+  xp_bonus integer DEFAULT 50,
+  created_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT challenges_pkey PRIMARY KEY (id),
+  CONSTRAINT challenges_quiz_id_fkey FOREIGN KEY (quiz_id) REFERENCES public.quizzes(id),
+  CONSTRAINT challenges_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.kingsmen_data (
+  id text NOT NULL,
+  value jsonb,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT kingsmen_data_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.knowledge (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  title text NOT NULL,
+  content text,
+  depts ARRAY DEFAULT '{"Tất cả"}'::text[],
+  doc_url text DEFAULT ''::text,
+  has_pdf boolean DEFAULT false,
+  interactive jsonb,
+  video_url text DEFAULT ''::text,
+  audio_url text DEFAULT ''::text,
+  images jsonb DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT knowledge_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.notifications (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  emp_id uuid NOT NULL,
+  msg text NOT NULL,
+  type text DEFAULT 'info'::text,
+  read boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.paths (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  title text NOT NULL,
+  description text DEFAULT ''::text,
+  stages jsonb NOT NULL DEFAULT '[]'::jsonb,
+  assigned_to ARRAY DEFAULT '{}'::text[],
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT paths_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.profiles (
+  id uuid NOT NULL,
+  name text NOT NULL,
+  emp_id text NOT NULL UNIQUE,
+  dept text NOT NULL DEFAULT 'Kinh doanh'::text,
+  team text DEFAULT ''::text,
+  acc_role text NOT NULL DEFAULT 'employee'::text CHECK (acc_role = ANY (ARRAY['employee'::text, 'manager'::text, 'director'::text])),
+  xp integer DEFAULT 0,
+  streak integer DEFAULT 0,
+  check_ins jsonb DEFAULT '[]'::jsonb,
+  read_lessons ARRAY DEFAULT '{}'::text[],
+  path_progress jsonb DEFAULT '{}'::jsonb,
+  avatar text,
+  last_check_in date,
+  last_xp_gain_date date,
+  status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  deactivated_at timestamp with time zone,
+  CONSTRAINT profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.quizzes (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  knowledge_id text,
+  title text NOT NULL,
+  questions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  time_limit integer DEFAULT 2400,
+  depts ARRAY DEFAULT '{"Tất cả"}'::text[],
+  ai_generated boolean DEFAULT false,
+  difficulty text DEFAULT 'medium'::text,
+  quiz_type text DEFAULT 'mc'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT quizzes_pkey PRIMARY KEY (id),
+  CONSTRAINT quizzes_knowledge_id_fkey FOREIGN KEY (knowledge_id) REFERENCES public.knowledge(id)
+);
+CREATE TABLE public.recognitions (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  emp_id uuid NOT NULL,
+  type text DEFAULT 'excellent'::text,
+  message text DEFAULT ''::text,
+  given_by text DEFAULT ''::text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT recognitions_pkey PRIMARY KEY (id),
+  CONSTRAINT recognitions_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.results (
+  id text NOT NULL DEFAULT (gen_random_uuid())::text,
+  emp_id uuid NOT NULL,
+  quiz_id text,
+  quiz_title text,
+  score integer DEFAULT 0,
+  total integer DEFAULT 0,
+  pct real DEFAULT 0,
+  passed boolean DEFAULT false,
+  time_taken integer DEFAULT 0,
+  answers jsonb DEFAULT '[]'::jsonb,
+  quiz_type text DEFAULT 'mc'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT results_pkey PRIMARY KEY (id),
+  CONSTRAINT results_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.profiles(id),
+  CONSTRAINT results_quiz_id_fkey FOREIGN KEY (quiz_id) REFERENCES public.quizzes(id)
+);
+CREATE TABLE public.settings (
+  id integer NOT NULL DEFAULT 1 CHECK (id = 1),
+  config jsonb NOT NULL DEFAULT '{"idleXP": 15, "decayXP": 10, "idleDays": 7, "streakXP": 10, "correctXP": 10, "decayDays": 3, "highBonus": 20, "passBonus": 30, "passScore": 70, "perfectBonus": 50, "adminPassword": ""}'::jsonb,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT settings_pkey PRIMARY KEY (id)
+);
