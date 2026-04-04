@@ -2082,7 +2082,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <div>
                             <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{"Xác nhận xóa \"" + k.title + "\"?"}</div>
                             <div style={{ display: "flex", gap: 8 }}>
-                              <button onClick={function () { updKnowledge(knowledge.filter(function (x) { return x.id !== k.id })); setSubScreen(null); setFormData(Object.assign({}, formData, { _confirmDel: null })) }} style={{ padding: "10px 20px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>{"✅ Xác nhận xóa"}</button>
+                              <button onClick={async function () { await supabase.from("knowledge").delete().eq("id", k.id); updKnowledge(knowledge.filter(function (x) { return x.id !== k.id })); setSubScreen(null); setFormData(Object.assign({}, formData, { _confirmDel: null })) }} style={{ padding: "10px 20px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>{"✅ Xác nhận xóa"}</button>
                               <button onClick={function () { setFormData(Object.assign({}, formData, { _confirmDel: null })) }} style={{ padding: "10px 20px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 12, border: "1px solid rgba(255,255,255,0.1)" }}>{"Hủy"}</button>
                             </div>
                           </div>
@@ -2263,7 +2263,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <button onClick={() => setFormData({ ...formData, expandQ: isExpanded ? null : q.id })} style={{ padding: "5px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", fontSize: 11, border: `1px solid ${C.border}` }} title="Xem câu hỏi">{isExpanded ? "▲ Ẩn" : "▼ Xem"}</button>
                           <button onClick={() => exportQuizCSV(q)} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }} title="Xuất CSV">📥</button>
                           <button onClick={() => { const txt = buildPrompt({ type: "quiz_from_knowledge", knowledgeItem: knowledge.find(x => x.id === q.knowledgeId) || { title: q.title, content: "" }, numQ: q.questions.length, difficulty: q.difficulty || "medium", quizType: q.quizType || "mc", quizTitle: q.title }); setPromptPanel({ text: txt, title: q.title }); setPromptCopied(false); }} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.gold}15`, color: C.gold, fontSize: 11, fontWeight: 600, border: "none" }} title="Tạo lại với Claude">📋</button>
-                          <button onClick={() => { if (window.confirm("Xóa đề \"" + q.title + "\"?\nThao tác này không thể hoàn tác.")) updQuizzes(quizzes.filter(x => x.id !== q.id)); }} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }} title="Xóa">🗑️</button>
+                          <button onClick={async () => { if (window.confirm("Xóa đề \"" + q.title + "\"?\nThao tác này không thể hoàn tác.")) { await supabase.from("quizzes").delete().eq("id", q.id); updQuizzes(quizzes.filter(x => x.id !== q.id)); } }} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }} title="Xóa">🗑️</button>
                         </div>
                         {att > 0 && pr !== null && (
                           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
@@ -2651,7 +2651,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         )}
                         <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, marginTop: 4 }}>Tạo bởi {ch.createdByName || "Admin"} · {fmtDate(ch.createdAt)}</div>
                       </div>
-                      <button onClick={() => { if (window.confirm("Xóa thử thách \"" + ch.title + "\"?\nThao tác này không thể hoàn tác.")) updChallenges(challenges.filter(x => x.id !== ch.id)); }} style={{ padding: "6px 10px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }}>Xóa</button>
+                      <button onClick={async () => { if (window.confirm("Xóa thử thách \"" + ch.title + "\"?\nThao tác này không thể hoàn tác.")) { await supabase.from("challenges").delete().eq("id", ch.id); updChallenges(challenges.filter(x => x.id !== ch.id)); } }} style={{ padding: "6px 10px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }}>Xóa</button>
                     </div>
                   </div>
                 );
@@ -2767,7 +2767,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         )}
                       </div>
                       <button onClick={() => { setFormData({ editPathId: p.id }); setSubScreen("editPath"); }} style={{ padding: "6px 10px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }}>Sửa</button>
-                      <button onClick={async () => { if (!window.confirm("Xóa lộ trình \"" + p.title + "\"?\nThao tác này không thể hoàn tác.")) return; const np = paths.filter(x => x.id !== p.id); setPaths(np); await DB.set("km-paths", np); }} style={{ padding: "6px 10px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }}>Xóa</button>
+                      <button onClick={async () => { if (!window.confirm("Xóa lộ trình \"" + p.title + "\"?\nThao tác này không thể hoàn tác.")) return; await supabase.from("paths").delete().eq("id", p.id); const np = paths.filter(x => x.id !== p.id); setPaths(np); }} style={{ padding: "6px 10px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }}>Xóa</button>
                     </div>
                   </div>
                 );
@@ -3252,7 +3252,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
                       <button onClick={async () => { const nb = bulletins.map(x => x.id === b.id ? { ...x, pinned: !x.pinned } : x); setBulletins(nb); await DB.set("km-bulletins", nb); }} style={{ padding: "5px 10px", borderRadius: 4, background: b.pinned ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: b.pinned ? C.gold : "rgba(255,255,255,0.3)", fontSize: 11, border: "none" }}>📌</button>
-                      <button onClick={async () => { if (!window.confirm("Xóa bài đăng \"" + b.title + "\"?")) return; const nb = bulletins.filter(x => x.id !== b.id); setBulletins(nb); await DB.set("km-bulletins", nb); }} style={{ padding: "5px 10px", borderRadius: 4, background: `${C.red}22`, color: C.red, fontSize: 11, border: "none" }}>✕</button>
+                      <button onClick={async () => { if (!window.confirm("Xóa bài đăng \"" + b.title + "\"?")) return; await supabase.from("bulletins").delete().eq("id", b.id); const nb = bulletins.filter(x => x.id !== b.id); setBulletins(nb); }} style={{ padding: "5px 10px", borderRadius: 4, background: `${C.red}22`, color: C.red, fontSize: 11, border: "none" }}>✕</button>
                     </div>
                   </div>
                 </div>
