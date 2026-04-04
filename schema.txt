@@ -1,26 +1,6 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
-CREATE TABLE public.accounts (
-  id text NOT NULL,
-  emp_id text NOT NULL UNIQUE,
-  name text NOT NULL,
-  dept text NOT NULL,
-  password text NOT NULL,
-  acc_role text DEFAULT 'employee'::text CHECK (acc_role = ANY (ARRAY['employee'::text, 'manager'::text, 'director'::text])),
-  xp integer DEFAULT 0,
-  streak integer DEFAULT 0,
-  status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text])),
-  last_check_in date,
-  last_xp_gain_date date,
-  check_ins jsonb DEFAULT '[]'::jsonb,
-  read_lessons jsonb DEFAULT '[]'::jsonb,
-  path_progress jsonb DEFAULT '{}'::jsonb,
-  team text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT accounts_pkey PRIMARY KEY (id)
-);
 CREATE TABLE public.bulletins (
   id text NOT NULL DEFAULT (gen_random_uuid())::text,
   title text NOT NULL,
@@ -55,14 +35,15 @@ CREATE TABLE public.challenges (
   xp_bonus integer DEFAULT 50,
   created_at timestamp with time zone DEFAULT now(),
   created_by uuid,
+  completed_by jsonb DEFAULT '[]'::jsonb,
+  won_rewards jsonb DEFAULT '{}'::jsonb,
   CONSTRAINT challenges_pkey PRIMARY KEY (id),
   CONSTRAINT challenges_quiz_id_fkey FOREIGN KEY (quiz_id) REFERENCES public.quizzes(id),
   CONSTRAINT challenges_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.kingsmen_data (
   id text NOT NULL,
-  value jsonb,
-  updated_at timestamp with time zone DEFAULT now(),
+  value text,
   CONSTRAINT kingsmen_data_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.knowledge (
@@ -96,12 +77,13 @@ CREATE TABLE public.paths (
   stages jsonb NOT NULL DEFAULT '[]'::jsonb,
   assigned_to ARRAY DEFAULT '{}'::text[],
   created_at timestamp with time zone DEFAULT now(),
+  dept text,
   CONSTRAINT paths_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL,
   name text NOT NULL,
-  emp_id text NOT NULL UNIQUE,
+  emp_id text NOT NULL,
   dept text NOT NULL DEFAULT 'Kinh doanh'::text,
   team text DEFAULT ''::text,
   acc_role text NOT NULL DEFAULT 'employee'::text CHECK (acc_role = ANY (ARRAY['employee'::text, 'manager'::text, 'director'::text])),
@@ -116,8 +98,7 @@ CREATE TABLE public.profiles (
   status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text])),
   created_at timestamp with time zone DEFAULT now(),
   deactivated_at timestamp with time zone,
-  CONSTRAINT profiles_pkey PRIMARY KEY (id),
-  CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+  CONSTRAINT profiles_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.quizzes (
   id text NOT NULL DEFAULT (gen_random_uuid())::text,
@@ -140,6 +121,7 @@ CREATE TABLE public.recognitions (
   message text DEFAULT ''::text,
   given_by text DEFAULT ''::text,
   created_at timestamp with time zone DEFAULT now(),
+  emp_name text,
   CONSTRAINT recognitions_pkey PRIMARY KEY (id),
   CONSTRAINT recognitions_emp_id_fkey FOREIGN KEY (emp_id) REFERENCES public.profiles(id)
 );
