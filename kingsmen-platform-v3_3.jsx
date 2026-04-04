@@ -615,6 +615,8 @@ export default function App() {
 
   // AI call with retry
   const callAIWithRetry = async (prompt, maxRetries = 2) => {
+    // Refresh session to ensure valid JWT before calling edge function
+    await supabase.auth.getSession();
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         var body = { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] };
@@ -743,6 +745,7 @@ ${content}`);
       try {
         const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsDataURL(file); });
         const base64 = dataUrl.split(",")[1];
+        await supabase.auth.getSession(); // Refresh JWT
         const { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", {
           body: {
             model: "claude-sonnet-4-6", max_tokens: 6000,
@@ -2850,6 +2853,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                   <button onClick={async () => {
                                     if (!mod.title) return; setAiLoading(true); setAiStatus("AI đang gợi ý checklist...");
                                     try {
+                                      await supabase.auth.getSession(); // Refresh JWT
                                       const { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDept}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] } });
                                       if (fnErr) throw new Error(fnErr.message || "Edge function error");
                                       if (data && data.error) throw new Error(data.error.message || "API error");
