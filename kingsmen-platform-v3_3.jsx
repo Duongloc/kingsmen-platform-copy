@@ -617,14 +617,11 @@ export default function App() {
   const callAIWithRetry = async (prompt, maxRetries = 2) => {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        var body = { model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] };
-        var res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        var rawText = await res.text();
-        var data;
-        try { data = JSON.parse(rawText) } catch (pe) { throw new Error("Parse fail: " + rawText.slice(0, 150)) }
-        if (data.error) throw new Error("API: " + (data.error.message || data.error.type || JSON.stringify(data.error).slice(0, 100)));
-        if (!res.ok) throw new Error("HTTP " + res.status + ": " + rawText.slice(0, 100));
-        if (!data.content || !Array.isArray(data.content)) throw new Error("No content in response");
+        var body = { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] };
+        var { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body });
+        if (fnErr) throw new Error(fnErr.message || "Edge function error");
+        if (data && data.error) throw new Error("API: " + (data.error.message || data.error.type || JSON.stringify(data.error).slice(0, 100)));
+        if (!data || !data.content || !Array.isArray(data.content)) throw new Error("No content in response");
         var txt = ""; for (var ci = 0; ci < data.content.length; ci++) { if (data.content[ci].text) txt += data.content[ci].text }
         if (!txt) throw new Error("Empty response text");
         return txt;
@@ -746,20 +743,20 @@ ${content}`);
       try {
         const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsDataURL(file); });
         const base64 = dataUrl.split(",")[1];
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514", max_tokens: 1000,
+        const { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", {
+          body: {
+            model: "claude-sonnet-4-6", max_tokens: 6000,
             messages: [{
               role: "user", content: [
                 { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
                 { type: "text", text: "Trích xuất TOÀN BỘ nội dung text từ tài liệu PDF này. Giữ nguyên cấu trúc: tiêu đề viết HOA, danh sách dùng dấu -, bảng giữ format. Chỉ trả text thuần, không thêm nhận xét." }
               ]
             }]
-          })
+          }
         });
-        const data = await response.json();
-        const content = (data.content || []).map(c => c.text || "").join("") || "";
+        if (fnErr) throw new Error(fnErr.message || "Edge function error");
+        if (data && data.error) throw new Error(data.error.message || "API error");
+        const content = (data?.content || []).map(c => c.text || "").join("") || "";
         setAiLoading(false); setAiStatus(content.length > 50 ? "" : "Không đọc được nội dung PDF");
         return { title, content: content || "", fromPdf: true };
       } catch (e) { setAiLoading(false); setAiStatus("Lỗi: " + e.message); return { title, content: "", error: true }; }
@@ -2066,7 +2063,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                           <button onClick={function () { setAiLoading(true); setAiStatus("🤖 Đang tạo..."); var prompt = buildPrompt({ type: "lesson_interactive_json", knowledgeItem: k }); callAIWithRetry(prompt, 1).then(function (txt) { try { var raw = String(txt || "").replace(/```json/g, "").replace(/```/g, "").trim(); var j1 = raw.indexOf("{"); if (j1 >= 0) raw = raw.slice(j1); var j2 = raw.lastIndexOf("}"); if (j2 >= 0) raw = raw.slice(0, j2 + 1); raw = raw.replace(/[\x00-\x1F]/g, " ").replace(/,\s*([}\]])/g, "$1"); var obj = JSON.parse(raw); upd({ interactive: { slides: obj.slides || [], flashcards: obj.flashcards || [], cheatsheet: obj.cheatsheet || { title: "", rows: [] }, miniQuiz: obj.miniQuiz || [] } }); setAiStatus("✅ Tạo xong!"); setAiLoading(false) } catch (e5) { setAiStatus("❌ " + String(e5.message).slice(0, 50)); setAiLoading(false) } }).catch(function (e6) { setAiStatus("❌ " + String(e6.message || "").slice(0, 50)); setAiLoading(false) }) }} disabled={aiLoading} style={{ padding: "8px 16px", borderRadius: 8, background: C.purple + "15", color: C.purple, fontSize: 12, fontWeight: 700, border: "1px solid " + C.purple + "33" }}>{"🤖 AI Tạo"}</button>
                           <button onClick={function () { setPromptPanel({ text: buildPrompt({ type: "lesson_interactive_json", knowledgeItem: k }), title: k.title }) }} style={{ padding: "8px 16px", borderRadius: 8, background: C.green + "15", color: C.green, fontSize: 12, fontWeight: 700, border: "1px solid " + C.green + "33" }}>{"🎴 Prompt"}</button>
-                          <button onClick={function () { setFormData(Object.assign({}, formData, { _impLesson: formData._impLesson === k.id ? null : k.id })) }} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, color: formData._impLesson === k.id ? C.teal : "rgba(255,255,255,0.4)", border: "1px solid " + (formData._impLesson === k.id ? C.teal + "44" : "rgba(255,255,255,0.1)") }}>{formData._impLesson === k.id ? "▼ Đóng" : "📥 Import JSON"}</button>
+                          <button onClick={function () { setFormData(Object.assign({}, formData, { _impLesson: formData._impLesson === k.id ? null : k.id })) }} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: formData._impLesson === k.id ? C.teal + "15" : "rgba(255,255,255,0.04)", color: formData._impLesson === k.id ? C.teal : "rgba(255,255,255,0.5)", border: "1px solid " + (formData._impLesson === k.id ? C.teal + "44" : "rgba(255,255,255,0.1)") }}>{formData._impLesson === k.id ? "▼ Đóng" : "📥 Import JSON"}</button>
                         </div>
                         {formData._impLesson === k.id && (<div style={{ padding: 10, background: "rgba(0,0,0,0.2)", borderRadius: 8, marginBottom: 8 }}><textarea id={"ljson_" + k.id} defaultValue="" placeholder='{"slides":[...],"flashcards":[...],...}' style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid " + C.teal + "33", background: C.teal + "08", color: C.white, fontSize: 11, fontFamily: "monospace", minHeight: 80, resize: "vertical", boxSizing: "border-box" }} /><button onClick={function () { try { var el = document.getElementById("ljson_" + k.id); var raw = (el ? el.value : "").trim(); if (!raw) return; var j1 = raw.indexOf("{"); if (j1 > 0) raw = raw.slice(j1); var j2 = raw.lastIndexOf("}"); if (j2 >= 0) raw = raw.slice(0, j2 + 1); raw = raw.replace(/```[\s\S]*?```/g, "").replace(/[\x00-\x1F]/g, " ").replace(/,\s*([}\]])/g, "$1"); var obj = JSON.parse(raw); upd({ interactive: { slides: obj.slides || [], flashcards: obj.flashcards || [], cheatsheet: obj.cheatsheet || { title: "", rows: [] }, miniQuiz: obj.miniQuiz || [] } }); setFormData(Object.assign({}, formData, { _impLesson: null })); setAiStatus("✅ Import OK") } catch (e2) { setAiStatus("❌ " + e2.message) } }} style={{ marginTop: 6, padding: "8px 20px", borderRadius: 6, background: "linear-gradient(135deg," + C.teal + "," + C.tealD + ")", color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>{"✅ Import & Lưu"}</button></div>)}
                         {hasL && (
@@ -2846,8 +2843,10 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                   <button onClick={async () => {
                                     if (!mod.title) return; setAiLoading(true); setAiStatus("AI đang gợi ý checklist...");
                                     try {
-                                      const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDept}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] }) });
-                                      const data = await res.json(); let txt = (data.content || []).map(c => c.text || "").join("") || ""; txt = txt.replace(/```json\s*/g, "").replace(/```/g, "").trim(); const arr = JSON.parse(txt);
+                                      const { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDept}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] } });
+                                      if (fnErr) throw new Error(fnErr.message || "Edge function error");
+                                      if (data && data.error) throw new Error(data.error.message || "API error");
+                                      let txt = (data?.content || []).map(c => c.text || "").join("") || ""; txt = txt.replace(/```json\s*/g, "").replace(/```/g, "").trim(); const arr = JSON.parse(txt);
                                       const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], checklist: [...(ns[si].modules[mi].checklist || []), ...arr] }; setFormData({ ...formData, pStages: ns });
                                       setAiLoading(false); setAiStatus("");
                                     } catch (err) { setAiLoading(false); setAiStatus("Lỗi: " + err.message); }
