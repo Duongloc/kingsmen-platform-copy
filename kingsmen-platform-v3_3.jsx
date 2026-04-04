@@ -269,14 +269,41 @@ const DB = {
   },
   async set(k, v) {
     try {
+      if (!v) return false;
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      let isAdmin = false;
+      if (user) {
+         const { data: p } = await supabase.from("profiles").select("emp_id").eq("id", user.id).single();
+         isAdmin = p?.emp_id === "admin";
+      }
+
       switch (k) {
-        case "km-accounts": { if (!Array.isArray(v)) return false; const rows = v.map(profileToSnake); for (const row of rows) { const { error } = await supabase.from("profiles").upsert(row); if (error) console.error("profiles upsert error:", row.emp_id, error.message); } return true; }
+        case "km-accounts": { 
+           if (!Array.isArray(v)) return false; 
+           const rows = v.map(profileToSnake).filter(r => isAdmin || (user && r.id === user.id)); 
+           if (rows.length > 0) { const { error } = await supabase.from("profiles").upsert(rows); if (error) console.error("profiles upsert err:", error.message); } 
+           return true; 
+        }
         case "km-quizzes": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("quizzes").upsert(v.map(quizToSnake)); return !error; }
         case "km-knowledge": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("knowledge").upsert(v.map(knowledgeToSnake)); return !error; }
-        case "km-results": { if (!Array.isArray(v)) return false; const rows = v.map(resultToSnake); for (const row of rows) { const { error } = await supabase.from("results").upsert(row); if (error) console.error("results upsert error:", row.id, error.message); } return true; }
+        case "km-results": { 
+           if (!Array.isArray(v)) return false; 
+           const rows = v.map(resultToSnake).filter(r => isAdmin || (user && r.emp_id === user.id)); 
+           if (rows.length > 0) { const { error } = await supabase.from("results").upsert(rows); if (error) console.error("results upsert err:", error.message); } 
+           return true; 
+        }
         case "km-recognitions": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("recognitions").upsert(v.map(recognitionToSnake)); return !error; }
         case "km-challenges": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("challenges").upsert(v.map(challengeToSnake)); return !error; }
-        case "km-notifications": { if (!Array.isArray(v)) return false; const rows = v.map(notifToSnake); for (const row of rows) { const { error } = await supabase.from("notifications").upsert(row); if (error) console.error("notif upsert error:", row.id, error.message); } return true; }
+        case "km-notifications": { 
+           if (!Array.isArray(v)) return false; 
+           // Filter notifications to only upsert ones owned by user, OR new inserts
+           const { data: existingResp } = await supabase.from("notifications").select("id");
+           const existingIds = new Set(existingResp?.map(e => e.id) || []);
+           const rows = v.map(notifToSnake).filter(r => isAdmin || r.emp_id === user?.id || !existingIds.has(r.id)); 
+           if (rows.length > 0) { const { error } = await supabase.from("notifications").upsert(rows); if (error) console.error("notif upsert err:", error.message); } 
+           return true; 
+        }
         case "km-paths": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("paths").upsert(v.map(pathToSnake)); return !error; }
         case "km-bulletins": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("bulletins").upsert(v.map(bulletinToSnake)); return !error; }
         case "km-settings": { const { error } = await supabase.from("settings").upsert({ id: 1, config: v }); return !error; }
