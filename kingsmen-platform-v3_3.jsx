@@ -274,8 +274,8 @@ const DB = {
       const user = userData?.user;
       let isAdmin = false;
       if (user) {
-         const { data: p } = await supabase.from("profiles").select("emp_id").eq("id", user.id).single();
-         isAdmin = p?.emp_id === "admin";
+         const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+         isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
       }
 
       switch (k) {
@@ -399,7 +399,7 @@ export default function App() {
               const acc = profileToCamel(profile);
               const activeAcc = (Array.isArray(a) && a.find(x => x.id === acc.id)) || acc;
               setCurrentUser(activeAcc);
-              if (profile.emp_id === "admin") {
+              if (profile.emp_id === "admin" || profile.acc_role === "director") {
                 setRole("admin"); setScreen("admin_home");
               } else {
                 setRole("employee"); setScreen("emp_home");
@@ -563,6 +563,7 @@ export default function App() {
   // Timer
   useEffect(() => { if (qActive && qTimer > 0) { qTimerRef.current = setInterval(() => setQTimer(t => t <= 1 ? (clearInterval(qTimerRef.current), 0) : t - 1), 1000); return () => clearInterval(qTimerRef.current); }; }, [qActive]);
   useEffect(() => { if (qTimer <= 0 && qActive) finishQuiz(); }, [qTimer, qActive]);
+  useEffect(() => { if (!qActive) return; if (qTimer === 60 || qTimer === 30) { try { if (navigator.vibrate) navigator.vibrate(qTimer === 30 ? [200, 100, 200] : [150]); } catch (e) {} } }, [qTimer, qActive]);
 
   const doEmployeeLogin = async () => {
     if (!loginId || !loginPw) { setLoginErr("Nhập mã NV và mật khẩu"); return; }
@@ -572,8 +573,8 @@ export default function App() {
     const { data: profile, error: pErr } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
     if (pErr || !profile) { setLoginErr("Không tìm thấy hồ sơ nhân viên"); return; }
     if (profile.status === "inactive") { await supabase.auth.signOut(); setLoginErr("Tài khoản đã bị vô hiệu hóa. Liên hệ Admin."); return; }
-    // Admin user (emp_id === "admin") → admin panel
-    if (profile.emp_id === "admin") {
+    // Admin user (emp_id === "admin") or Director → admin panel
+    if (profile.emp_id === "admin" || profile.acc_role === "director") {
       setRole("admin"); setScreen("admin_home");
       Session.set("km-session", { role: "admin" });
       setLoginId(""); setLoginPw(""); setLoginErr("");
@@ -1576,7 +1577,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 {"Bắt đầu ngày mới! →"}
               </button>
             </div>
-            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.12)", marginTop: 24, letterSpacing: 1 }}>TAP TO CONTINUE</div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.12)", marginTop: 24, letterSpacing: 1 }}>Nhấn để tiếp tục</div>
           </div>
         </div>
       )}
@@ -1774,11 +1775,22 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: role === "admin" ? "pointer" : "default" }} onClick={() => { if (role === "admin" && logoInputRef.current) logoInputRef.current.click(); }}>
             {companyLogo ? (<img src={companyLogo} alt="Logo" style={{ width: 36, height: 36, borderRadius: 7, objectFit: "contain", background: "rgba(255,255,255,0.1)" }} />) : (<div style={{ width: 36, height: 36, background: C.gold, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 900, fontSize: 16, color: C.dark }}>K</div>)}
             <div><div style={{ fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 800, fontSize: 15, color: C.white, letterSpacing: 1 }}>KINGSMEN</div><div style={{ fontSize: 10, color: C.goldL, letterSpacing: 2 }}>Training Platform v3</div></div>
-            {role === "admin" && <div style={{ fontSize: 8, color: "rgba(255,255,255,0.2)", marginLeft: 4 }}>Click logo</div>}
+            {role === "admin" && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginLeft: 4, padding: "2px 6px", borderRadius: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>🖼 Đổi logo</div>}
             <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {saveStatus && <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, background: saveStatus === "saved" ? (C.green + "22") : (C.red + "22"), color: saveStatus === "saved" ? C.green : C.red, animation: "fadeIn .3s" }}>{saveStatus === "saved" ? "Saved" : "Error"}</span>}
+            {currentUser && (currentUser.accRole === "director" || currentUser.empId === "admin") && (
+              <button
+                onClick={() => {
+                  if (role === "admin") { setRole("employee"); setScreen("emp_home"); }
+                  else { setRole("admin"); setScreen("admin_home"); }
+                }}
+                style={{ padding: "4px 8px", background: `${C.gold}22`, borderRadius: 4, fontSize: 10, fontWeight: 700, color: C.gold, border: `1px solid ${C.gold}44`, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                {role === "admin" ? "🔄 Về học viên" : "🎩 Về trang QL"}
+              </button>
+            )}
             {currentUser && (
               <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", position: "relative" }} onClick={() => { if (avatarInputRef.current) avatarInputRef.current.click(); }}>
                 {currentUser.avatar ? (<img src={currentUser.avatar} alt="av" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "2px solid " + C.gold + "55" }} />) : (<span style={{ fontSize: 14 }}>{gL(currentUser.xp || 0).icon}</span>)}
@@ -1811,13 +1823,13 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               { i: "🏠", t: "HOME", s: "admin_home" },
               { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
               { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
-              { i: "🎯", t: "THÁCH", s: "admin_challenges" },
-              { i: "📢", t: "TIN", s: "admin_bulletins" },
-              { i: "📊", t: "NLỰC", s: "admin_analytics" },
-              { i: "🏆", t: "HẠNG", s: "admin_ranking" },
-              { i: "📈", t: "HĐỘNG", s: "admin_activity" },
-              { i: "👥", t: "TK", s: "admin_accounts" },
-              { i: "⚙️", t: "CĐ", s: "admin_settings" },
+              { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
+              { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
+              { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
+              { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
+              { i: "📈", t: "HOẠT ĐỘNG", s: "admin_activity" },
+              { i: "👥", t: "TÀI KHOẢN", s: "admin_accounts" },
+              { i: "⚙️", t: "CÀI ĐẶT", s: "admin_settings" },
               { i: "💾", t: "SAO LƯU", s: "admin_backup" },
             ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "8px 10px", fontSize: 10, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.teal : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.i + " " + m.t}</button> })}
           </div>
@@ -1842,27 +1854,32 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ fontSize: 12, color: C.goldL, fontWeight: 700, display: "block", marginBottom: 4 }}>{"Mật khẩu"}</label>
-                  <input type="password" value={formData.pw || ""} onChange={function (e) { setFormData(Object.assign({}, formData, { pw: e.target.value, loginErr: null })) }} placeholder="Mật khẩu" onKeyDown={function (e) { if (e.key === "Enter") { var btn = document.getElementById("km-login-btn"); if (btn) btn.click() } }} style={{ ...inp, fontSize: 15, padding: "14px 16px" }} />
+                  <div style={{ position: "relative" }}>
+                    <input type={formData.showPw ? "text" : "password"} value={formData.pw || ""} onChange={function (e) { setFormData(Object.assign({}, formData, { pw: e.target.value, loginErr: null })) }} placeholder="Mật khẩu" onKeyDown={function (e) { if (e.key === "Enter") { var btn = document.getElementById("km-login-btn"); if (btn) btn.click() } }} style={{ ...inp, fontSize: 15, padding: "14px 44px 14px 16px", width: "100%" }} />
+                    <button type="button" onClick={function () { setFormData(Object.assign({}, formData, { showPw: !formData.showPw })) }} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "rgba(255,255,255,0.35)", fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1 }}>{formData.showPw ? "🙈" : "👁"}</button>
+                  </div>
                 </div>
                 {formData.loginErr && <div style={{ color: C.red, fontSize: 12, marginBottom: 10, textAlign: "center" }}>{formData.loginErr}</div>}
-                <button id="km-login-btn" onClick={async function () {
+                <button id="km-login-btn" disabled={!!formData.loginLoading} onClick={async function () {
                   var id = (formData.empId || "").trim(); var pw = (formData.pw || "").trim();
                   if (!id || !pw) { setFormData(Object.assign({}, formData, { loginErr: "Nhập mã NV và mật khẩu" })); return }
+                  setFormData(Object.assign({}, formData, { loginLoading: true, loginErr: null }));
                   var email = id.toLowerCase() + "@kingsmen.internal";
                   var { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password: pw });
-                  if (authErr) { setFormData(Object.assign({}, formData, { loginErr: "Sai mã NV hoặc mật khẩu" })); return }
+                  if (authErr) { setFormData(Object.assign({}, formData, { loginErr: "Sai mã NV hoặc mật khẩu", loginLoading: false })); return }
                   var { data: profile, error: pErr } = await supabase.from("profiles").select("*").eq("id", authData.user.id).single();
-                  if (pErr || !profile) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy hồ sơ nhân viên" })); return }
-                  if (profile.status === "inactive") { await supabase.auth.signOut(); setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin." })); return }
+                  if (pErr || !profile) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy hồ sơ nhân viên", loginLoading: false })); return }
+                  if (profile.status === "inactive") { await supabase.auth.signOut(); setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin.", loginLoading: false })); return }
                   if (profile.emp_id === "admin") { setRole("admin"); setScreen("admin_home"); setFormData({}); Session.set("km-session", { role: "admin" }); return }
                   var acc = profileToCamel(profile);
                   var updated = await doCheckIn(acc);
                   setCurrentUser(updated); setRole("employee"); setScreen("emp_home"); setFormData({});
                   Session.set("km-session", { role: "employee", userId: updated.id, screen: "emp_home" });
                   setShowMotivation(getRandomQuote());
-                }} style={{ width: "100%", padding: "16px", borderRadius: 12, background: "linear-gradient(135deg," + C.teal + "," + C.tealD + ")", color: "#fff", fontSize: 16, fontWeight: 800, border: "none", cursor: "pointer" }}>{"Đăng nhập →"}</button>
+                }} style={{ width: "100%", padding: "16px", borderRadius: 12, background: "linear-gradient(135deg," + C.teal + "," + C.tealD + ")", color: "#fff", fontSize: 16, fontWeight: 800, border: "none", cursor: formData.loginLoading ? "not-allowed" : "pointer", opacity: formData.loginLoading ? 0.7 : 1 }}>{formData.loginLoading ? "Đang đăng nhập..." : "Đăng nhập →"}</button>
               </div>
-              <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "rgba(255,255,255,0.2)" }}>{accounts.length + " tài khoản · " + knowledge.length + " bài · " + quizzes.length + " đề"}</div>
+              <div style={{ textAlign: "center", marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Quên mật khẩu? Liên hệ Admin để được hỗ trợ.</div>
+              {(accounts.length > 0 || knowledge.length > 0 || quizzes.length > 0) && <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.15)" }}>{accounts.length + " tài khoản · " + knowledge.length + " bài · " + quizzes.length + " đề"}</div>}
             </div>
           </div>
         )}
@@ -1872,14 +1889,14 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {role === "admin" && screen === "admin_home" && (
           <div style={{ animation: "fadeIn .4s" }}>
             <h2 style={{ ...hd(24), marginBottom: 20 }}>🏠 Bảng Điều Khiển</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))", gap: 10, marginBottom: 16 }}>
               {[{ l: "Nhân viên", v: accounts.length, i: "👥", c: C.blue }, { l: "Bài kiến thức", v: knowledge.length, i: "📚", c: C.green }, { l: "Đề kiểm tra", v: quizzes.length, i: "📝", c: C.purple }, { l: "Lượt thi", v: results.length, i: "📊", c: C.orange }].map((s, i) => (
                 <div key={i} style={{ background: `${s.c}0a`, borderRadius: 12, padding: "14px 12px", border: `1px solid ${s.c}22`, textAlign: "center" }}>
                   <div style={{ fontSize: 20, marginBottom: 3 }}>{s.i}</div><div style={{ fontSize: 20, fontWeight: 800, color: s.c, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{s.v}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{s.l}</div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8, fontSize: 12 }}>{"QUẢN LÝ ĐÀO TẠO"}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>{"QUẢN LÝ ĐÀO TẠO"}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 8, marginBottom: 16 }}>
               {[
                 { i: "📚", t: "Bài Học & Kiến Thức", d: knowledge.length + " bài · " + knowledge.filter(function (k2) { return k2.interactive }).length + " đã tạo", s: "admin_lessons" },
@@ -1894,7 +1911,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 )
               })}
             </div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8, fontSize: 12 }}>{"BÁO CÁO & PHÂN TÍCH"}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>{"BÁO CÁO & PHÂN TÍCH"}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
               {[
                 { i: "📊", t: "Năng Lực", d: "Radar + Gap", s: "admin_analytics" },
@@ -1908,7 +1925,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 )
               })}
             </div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8, fontSize: 12 }}>{"HỆ THỐNG"}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>{"HỆ THỐNG"}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(100px,1fr))", gap: 6 }}>
               {[
                 { i: "👥", t: "Tài Khoản", s: "admin_accounts" },
@@ -2297,10 +2314,13 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div><label style={lbl}>Team / Nhóm</label><input value={formData.team || ""} onChange={e => setFormData({ ...formData, team: e.target.value })} placeholder="VD: Team A" style={inp} /></div>
                   <div><label style={lbl}>Cấp bậc</label><select value={formData.accRole || "employee"} onChange={e => setFormData({ ...formData, accRole: e.target.value })} style={inp}>{ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select></div>
                   <div><label style={lbl}>Mật khẩu</label><input value={formData.pw || "123456"} onChange={e => setFormData({ ...formData, pw: e.target.value })} style={inp} /></div>
+                  <div><label style={lbl}>Xác nhận MK</label><input value={formData.confirmPw || ""} onChange={e => setFormData({ ...formData, confirmPw: e.target.value })} placeholder="Nhập lại mật khẩu" style={{ ...inp, borderColor: formData.confirmPw && formData.confirmPw !== (formData.pw || "123456") ? C.red : undefined }} /></div>
                 </div>
+                {formData.confirmPw && formData.confirmPw !== (formData.pw || "123456") && <div style={{ color: C.red, fontSize: 11, marginBottom: 8 }}>⚠ Mật khẩu xác nhận không khớp</div>}
                 <button onClick={async () => {
                   const name = (formData.name || "").trim(); const empId = (formData.empId || "").trim();
                   if (!name || !empId) return;
+                  if (formData.confirmPw && formData.confirmPw !== (formData.pw || "123456")) { alert("Mật khẩu xác nhận không khớp!"); return; }
                   const email = empId.toLowerCase() + "@kingsmen.internal";
                   const password = (formData.pw || "123456");
                   // Step 1: create Supabase Auth user to get a real UUID
@@ -3938,7 +3958,10 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {role === "employee" && screen === "emp_quiz_play" && activeQuiz && (
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Câu <b style={{ color: C.gold }}>{qIdx + 1}</b>/{activeQuiz.questions.length}{activeQuiz.quizType === "mixed" && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>Kết hợp</span>}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Câu <b style={{ color: C.gold }}>{qIdx + 1}</b>/{activeQuiz.questions.length}{activeQuiz.quizType === "mixed" && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>Kết hợp</span>}</span>
+                <button onClick={() => { if (window.confirm("Thoát bài thi? Tiến trình sẽ không được lưu.")) { setScreen("emp_quizzes"); setActiveQuiz(null); setQActive(false); } }} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>✕ Thoát</button>
+              </div>
               <span style={{ fontSize: 14, fontWeight: 700, color: qTimer < 60 ? C.red : qTimer < 180 ? C.orange : C.gold, fontFamily: "monospace", background: "rgba(0,0,0,0.3)", padding: "5px 12px", borderRadius: 8 }}>⏱ {fmtTime(qTimer)}</span>
             </div>
             <div style={{ height: 4, background: "rgba(255,255,255,0.05)", borderRadius: 2, marginBottom: 16, overflow: "hidden" }}><div style={{ height: "100%", width: `${((qIdx + (qShowExp ? 1 : 0)) / activeQuiz.questions.length) * 100}%`, background: `linear-gradient(90deg,${C.teal},${C.greenD})`, borderRadius: 2, transition: "width .4s" }} /></div>
