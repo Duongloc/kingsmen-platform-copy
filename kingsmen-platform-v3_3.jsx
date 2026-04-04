@@ -534,7 +534,7 @@ export default function App() {
   useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } })(); } }, [screen]);
   // Auto-reload data when navigating screens
   useEffect(() => {
-    if (role && (screen === "emp_challenges" || screen === "emp_quizzes" || screen === "emp_knowledge" || screen === "emp_home" || screen === "emp_pathway" || screen === "emp_bulletins" || screen === "dir_bulletins" || screen === "admin_challenges" || screen === "admin_home" || screen === "admin_analytics" || screen === "admin_ranking" || screen === "admin_bulletins")) {
+    if (role && (screen === "emp_challenges" || screen === "emp_quizzes" || screen === "emp_knowledge" || screen === "emp_home" || screen === "emp_pathway" || screen === "emp_bulletins" || screen === "dir_bulletins" || screen === "admin_challenges" || screen === "admin_home" || screen === "admin_analytics" || screen === "admin_ranking" || screen === "admin_bulletins" || screen === "admin_activity" || screen === "admin_lessons" || screen === "admin_quizzes" || screen === "admin_accounts")) {
       (async () => {
         try {
           const [ch, q, k, r, ac, p, bul] = await Promise.all([DB.get("km-challenges", []), DB.get("km-quizzes", []), DB.get("km-knowledge", []), DB.get("km-results", []), DB.get("km-accounts", []), DB.get("km-paths", []), DB.get("km-bulletins", [])]);
@@ -1459,7 +1459,14 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
     return gaps.sort((a, b) => a.passRate - b.passRate);
   };
   const getActivityData = () => {
-    const last30 = []; for (let i = 29; i >= 0; i--) { const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10); const count = results.filter(r => r.date.slice(0, 10) === d).length; last30.push({ date: d.slice(5), count }); } return last30;
+    const last30 = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      const quizzes = results.filter(r => r.date && r.date.slice(0, 10) === d).length;
+      const logins = accounts.filter(a => (a.checkIns || []).includes(d)).length;
+      last30.push({ date: d.slice(5), quizzes, logins });
+    }
+    return last30;
   };
 
   // Styles
@@ -1868,7 +1875,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     var { data: profile, error: pErr } = await supabase.from("profiles").select("*").eq("id", authData.user.id).single();
                     if (pErr || !profile) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy hồ sơ nhân viên", loginLoading: false })); return }
                     if (profile.status === "inactive") { await supabase.auth.signOut({ scope: 'local' }); setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin.", loginLoading: false })); return }
-                    if (profile.emp_id === "admin" || profile.acc_role === "director") { setCurrentUser(profileToCamel(profile)); setRole("admin"); setScreen("admin_home"); setFormData({}); Session.set("km-session", { role: "admin" }); await loadAllData(); return }
+                    if (profile.emp_id === "admin" || profile.acc_role === "director") { var adminAcc = profileToCamel(profile); var updatedAdmin = await doCheckIn(adminAcc); setCurrentUser(updatedAdmin); setRole("admin"); setScreen("admin_home"); setFormData({}); Session.set("km-session", { role: "admin" }); await loadAllData(); return }
                     var acc = profileToCamel(profile);
                     var updated = await doCheckIn(acc);
                     setCurrentUser(updated); setRole("employee"); setScreen("emp_home"); setFormData({});
@@ -2461,7 +2468,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ width: 50, height: 50, borderRadius: 12, background: `${lv.color || C.gold}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>{lv.icon}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ color: C.white, fontWeight: 700, fontSize: 16 }}>{emp.name}</div>
-                      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{emp.dept}{emp.team ? " · " + emp.team : ""} · {emp.empId} · {lv.name} · {emp.xp || 0} XP · 🔥{emp.streak || 0}</div>
+                      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{emp.dept}{emp.team ? " · " + emp.team : ""} · {emp.empId} · {lv.name} · {emp.xp || 0} XP · 🔥{emp.streak || 0} · 📅{(emp.checkIns || []).length} lần ĐN</div>
                     </div>
                     <div style={{ textAlign: "right" }}><div style={{ fontSize: 22, fontWeight: 800, color: lv.color || C.gold, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{myR.length > 0 ? Math.round(myR.reduce((s, r) => s + r.pct, 0) / myR.length) : 0}%</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>Điểm TB</div></div>
                   </div>
@@ -2529,12 +2536,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div style={{ fontSize: 13, color: C.gold, fontWeight: 700, marginBottom: 10 }}>
                     NHÂN VIÊN {formData.anaDept ? `· ${formData.anaDept}` : ""}{formData.anaTeam ? ` · ${formData.anaTeam}` : ""}
                   </div>
-                  {accounts.filter(a => (!formData.anaDept || a.dept === formData.anaDept) && (!formData.anaTeam || a.team === formData.anaTeam)).map(a => {
+                  {accounts.filter(a => (!formData.anaDept || a.dept === formData.anaDept) && (!formData.anaTeam || a.team === formData.anaTeam)).sort((a, b) => (a.empId || "").localeCompare(b.empId || "", undefined, { numeric: true, sensitivity: "base" })).map(a => {
                     const myR = results.filter(r => r.empId === a.id); const avg = myR.length ? Math.round(myR.reduce((s, r) => s + r.pct, 0) / myR.length) : 0;
                     return (
                       <div key={a.id} onClick={() => setFormData({ ...formData, anaEmp: a.id })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}>
                         <span style={{ fontSize: 16 }}>{gL(a.xp || 0).icon}</span>
-                        <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 13, fontWeight: 600 }}>{a.name}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 10 }}>{a.dept}{a.team ? " · " + a.team : ""} · {myR.length} lượt thi · 🔥{a.streak || 0}</div></div>
+                        <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 13, fontWeight: 600 }}>{a.name}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 10 }}>{a.dept}{a.team ? " · " + a.team : ""} · {myR.length} lượt thi · 🔥{a.streak || 0} · 📅{(a.checkIns || []).length} lần đăng nhập</div></div>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <div style={{ fontSize: 15, fontWeight: 800, color: avg >= 70 ? C.green : avg > 0 ? C.orange : "rgba(255,255,255,0.15)", fontFamily: "'Be Vietnam Pro',sans-serif" }}>{avg || "—"}%</div>
                           <button onClick={e => { e.stopPropagation(); const txt = buildPrompt({ type: "analyze_results", empId: a.id, empName: a.name, dept: a.dept, resultsData: results }); setPromptPanel({ text: txt }); setPromptCopied(false); }} style={{ padding: "3px 7px", borderRadius: 5, background: `${C.gold}15`, color: C.gold, fontSize: 10, fontWeight: 700, border: `1px solid ${C.gold}33` }} title="Phân tích với Claude">📋</button>
@@ -2573,7 +2580,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <select value={formData.recType || "excellent"} onChange={e => setFormData({ ...formData, recType: e.target.value })} style={inp}><option value="excellent">🏆 Xuất sắc</option><option value="improved">📈 Tiến bộ</option><option value="star">⭐ Ngôi sao</option></select>
               </div>
               <input value={formData.recMsg || ""} onChange={e => setFormData({ ...formData, recMsg: e.target.value })} placeholder="Nội dung tuyên dương..." style={{ ...inp, marginBottom: 8 }} />
-              <button onClick={() => { if (!formData.recEmp || !(formData.recMsg || "").trim()) return; const emp = accounts.find(a => a.id === formData.recEmp); updRecognitions([...recognitions, { id: uid(), empId: formData.recEmp, empName: (emp && emp.name) || "", type: formData.recType || "excellent", message: formData.recMsg, givenBy: currentUser ? currentUser.name : "Admin" }]); addNotif(formData.recEmp, `🎖️ Bạn được tuyên dương: ${formData.recMsg}`, "recognition"); setFormData({}); }} style={btnG}>📢 Xuất bản</button>
+              <button onClick={() => { if (!formData.recEmp || !(formData.recMsg || "").trim()) return; const emp = accounts.find(a => a.id === formData.recEmp); updRecognitions([...recognitions, { id: uid(), empId: formData.recEmp, empName: (emp && emp.name) || "", type: formData.recType || "excellent", message: formData.recMsg, givenBy: currentUser ? currentUser.name : "Admin", createdAt: new Date().toISOString() }]); addNotif(formData.recEmp, `🎖️ Bạn được tuyên dương: ${formData.recMsg}`, "recognition"); setFormData({}); }} style={btnG}>📢 Xuất bản</button>
             </div>
             {/* Leaderboard */}
             <Leaderboard accounts={accounts} results={results} card={card} currentUserId={currentUser && currentUser.id} depts={DEPTS} levels={LEVELS} />
@@ -2582,7 +2589,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               {[...recognitions].reverse().slice(0, 10).map(r => (
                 <div key={r.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
                   <span style={{ fontSize: 18 }}>{r.type === "excellent" ? "🏆" : r.type === "improved" ? "📈" : "⭐"}</span>
-                  <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 13, fontWeight: 600 }}>{r.empName}</div><div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{r.message}</div><div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>{fmtDate(r.date)}</div></div>
+                  <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 13, fontWeight: 600 }}>{r.empName}</div><div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{r.message}</div><div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>{fmtDate(r.createdAt)}</div></div>
                 </div>
               ))}
             </div>}
@@ -2888,7 +2895,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             </div>
             <div style={card}>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={getActivityData()}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} /><YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} /><Tooltip contentStyle={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} /><Bar dataKey="count" fill={C.gold} radius={[4, 4, 0, 0]} /></BarChart>
+                <BarChart data={getActivityData()}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} /><YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} /><Tooltip contentStyle={{ background: C.dark, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(value, name) => [value, name === "logins" ? "Đăng nhập" : "Lượt thi"]} /><Bar dataKey="logins" fill={C.teal} radius={[4, 4, 0, 0]} name="logins" /><Bar dataKey="quizzes" fill={C.gold} radius={[4, 4, 0, 0]} name="quizzes" /></BarChart>
               </ResponsiveContainer>
             </div>
             {/* Inactive employees */}
@@ -3410,7 +3417,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <div style={{ ...card, marginTop: 10 }}>
                 <div style={{ fontSize: 12, color: C.goldL, fontWeight: 700, marginBottom: 8 }}>🎖️ TUYÊN DƯƠNG</div>
                 {recognitions.filter(r => r.empId === currentUser.id).slice(-3).reverse().map(r => (
-                  <div key={r.id} style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", padding: "4px 0" }}>{r.type === "excellent" ? "🏆" : r.type === "improved" ? "📈" : "⭐"} {r.message} · {fmtDate(r.date)}</div>
+                  <div key={r.id} style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", padding: "4px 0" }}>{r.type === "excellent" ? "🏆" : r.type === "improved" ? "📈" : "⭐"} {r.message} · {fmtDate(r.createdAt)}</div>
                 ))}
               </div>
             )}
