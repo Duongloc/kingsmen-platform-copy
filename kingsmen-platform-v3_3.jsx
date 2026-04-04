@@ -234,8 +234,8 @@ const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content 
 const knowledgeToSnake = (k) => ({ id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] });
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
-const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, minScore: r.min_score, deadline: r.deadline, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by });
-const challengeToSnake = (c) => ({ id: c.id, title: c.title, quiz_id: c.quizId || null, min_score: c.minScore || 70, deadline: c.deadline || null, assign_to: c.assignTo || "all", assign_dept: c.assignDept || null, rewards: c.rewards || [], active: c.active !== false, xp_bonus: c.xpBonus || c.xpReward || 50, created_by: c.createdBy || null });
+const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, minScore: r.min_score, deadline: r.deadline, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, completedBy: r.completed_by || [], wonRewards: r.won_rewards || {} });
+const challengeToSnake = (c) => ({ id: c.id, title: c.title, quiz_id: c.quizId || null, min_score: c.minScore || 70, deadline: c.deadline || null, assign_to: c.assignTo || "all", assign_dept: c.assignDept || null, rewards: c.rewards || [], active: c.active !== false, xp_bonus: c.xpBonus || c.xpReward || 50, created_by: c.createdBy || null, completed_by: c.completedBy || [], won_rewards: c.wonRewards || {} });
 const notifToCamel = (r) => ({ id: r.id, empId: r.emp_id, msg: r.msg, type: r.type, date: r.created_at, read: r.read });
 const notifToSnake = (n) => ({ id: n.id, emp_id: n.empId, msg: n.msg, type: n.type || "info", read: n.read || false });
 const bulletinToCamel = (r) => ({ id: r.id, title: r.title, content: r.content, type: r.type, pinned: r.pinned, author: r.author, createdAt: r.created_at });
@@ -270,13 +270,13 @@ const DB = {
   async set(k, v) {
     try {
       switch (k) {
-        case "km-accounts": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("profiles").upsert(v.map(profileToSnake)); return !error; }
+        case "km-accounts": { if (!Array.isArray(v)) return false; const rows = v.map(profileToSnake); for (const row of rows) { const { error } = await supabase.from("profiles").upsert(row); if (error) console.error("profiles upsert error:", row.emp_id, error.message); } return true; }
         case "km-quizzes": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("quizzes").upsert(v.map(quizToSnake)); return !error; }
         case "km-knowledge": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("knowledge").upsert(v.map(knowledgeToSnake)); return !error; }
-        case "km-results": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("results").upsert(v.map(resultToSnake)); return !error; }
+        case "km-results": { if (!Array.isArray(v)) return false; const rows = v.map(resultToSnake); for (const row of rows) { const { error } = await supabase.from("results").upsert(row); if (error) console.error("results upsert error:", row.id, error.message); } return true; }
         case "km-recognitions": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("recognitions").upsert(v.map(recognitionToSnake)); return !error; }
         case "km-challenges": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("challenges").upsert(v.map(challengeToSnake)); return !error; }
-        case "km-notifications": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("notifications").upsert(v.map(notifToSnake)); return !error; }
+        case "km-notifications": { if (!Array.isArray(v)) return false; const rows = v.map(notifToSnake); for (const row of rows) { const { error } = await supabase.from("notifications").upsert(row); if (error) console.error("notif upsert error:", row.id, error.message); } return true; }
         case "km-paths": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("paths").upsert(v.map(pathToSnake)); return !error; }
         case "km-bulletins": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("bulletins").upsert(v.map(bulletinToSnake)); return !error; }
         case "km-settings": { const { error } = await supabase.from("settings").upsert({ id: 1, config: v }); return !error; }
@@ -363,9 +363,25 @@ export default function App() {
         if (Array.isArray(p) && p.length) setPaths(p); if (s) setSettings(s); if (Array.isArray(bul) && bul.length) setBulletins(bul);
         // Load company logo
         try { const logoData = await DB.get("km-logo", null); if (logoData) setCompanyLogo(logoData); } catch (e2) { }
-        // Always sign out on page load so users see the login screen
-        try { await supabase.auth.signOut(); } catch (e2) { }
-        Session.clear("km-session");
+        // Check for existing session and resume auto-login
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          try {
+            const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+            if (profile && profile.status === "active") {
+              const acc = profileToCamel(profile);
+              const activeAcc = (Array.isArray(a) && a.find(x => x.id === acc.id)) || acc;
+              setCurrentUser(activeAcc);
+              if (profile.emp_id === "admin") {
+                setRole("admin"); setScreen("admin_home");
+              } else {
+                setRole("employee"); setScreen("emp_home");
+              }
+            } else {
+              await supabase.auth.signOut();
+            }
+          } catch (e3) { console.error("Session restore err:", e3); }
+        }
       } catch (e) { console.log("Init error:", e); }
       clearTimeout(fallback);
       setReady(true);
@@ -373,6 +389,28 @@ export default function App() {
   }, []);
 
   const save = async (k, d) => { const ok = await DB.set(k, d); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 1500); } else { setSaveStatus("error"); } };
+
+  // ─── Fetch ALL data from database (called after login) ───
+  const loadAllData = async () => {
+    try {
+      const [a, k, q, r, rec, ch, notif, p, s, bul] = await Promise.all([
+        DB.get("km-accounts", []), DB.get("km-knowledge", []), DB.get("km-quizzes", []),
+        DB.get("km-results", []), DB.get("km-recognitions", []), DB.get("km-challenges", []),
+        DB.get("km-notifications", []), DB.get("km-paths", []), DB.get("km-settings", null), DB.get("km-bulletins", []),
+      ]);
+      if (Array.isArray(a)) { setAccounts(a); accountsRef.current = a; }
+      if (Array.isArray(k)) setKnowledge(k);
+      if (Array.isArray(q)) setQuizzes(q);
+      if (Array.isArray(r)) setResults(r);
+      if (Array.isArray(rec)) setRecognitions(rec);
+      if (Array.isArray(ch)) setChallenges(ch);
+      if (Array.isArray(notif)) setNotifications(notif);
+      if (Array.isArray(p)) setPaths(p);
+      if (s) setSettings(s);
+      if (Array.isArray(bul)) setBulletins(bul);
+      try { const logoData = await DB.get("km-logo", null); if (logoData) setCompanyLogo(logoData); } catch (e2) { }
+    } catch (e) { console.error("loadAllData error:", e); }
+  };
   const updAccounts = (d) => { setAccounts(d); accountsRef.current = d; save("km-accounts", d); };
   const updKnowledge = (d) => {
     setKnowledge(d);
@@ -466,7 +504,7 @@ export default function App() {
   };
 
   useEffect(() => { if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth" }); }, [screen, subScreen]);
-  useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } }); } }, [screen]);
+  useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } })(); } }, [screen]);
   // Auto-reload data when navigating screens
   useEffect(() => {
     if (role && (screen === "emp_challenges" || screen === "emp_quizzes" || screen === "emp_knowledge" || screen === "emp_home" || screen === "emp_pathway" || screen === "emp_bulletins" || screen === "dir_bulletins" || screen === "admin_challenges" || screen === "admin_home" || screen === "admin_analytics" || screen === "admin_ranking" || screen === "admin_bulletins")) {
@@ -491,7 +529,7 @@ export default function App() {
           }
           if (Array.isArray(p)) setPaths(p); if (Array.isArray(bul)) setBulletins(bul);
         } catch (e) { }
-      });
+      })();
     }
   }, [screen, role]);
 
@@ -512,6 +550,7 @@ export default function App() {
       setRole("admin"); setScreen("admin_home");
       Session.set("km-session", { role: "admin" });
       setLoginId(""); setLoginPw(""); setLoginErr("");
+      await loadAllData();
       return;
     }
     const acc = profileToCamel(profile);
@@ -520,6 +559,7 @@ export default function App() {
     Session.set("km-session", { role: "employee", userId: updated.id, screen: "emp_home" });
     setLoginId(""); setLoginPw(""); setLoginErr("");
     setShowMotivation(getRandomQuote());
+    await loadAllData();
   };
   // doAdminLogin kept for any remaining UI references; routes through the unified Supabase flow
   const doAdminLogin = () => doEmployeeLogin();
@@ -2836,7 +2876,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     DB.get("km-results", []), DB.get("km-recognitions", []), DB.get("km-challenges", []),
                     DB.get("km-notifications", []), DB.get("km-paths", []), DB.get("km-settings", null), DB.get("km-bulletins", []),
                   ]);
-                  const safeAcc = (Array.isArray(a) ? a : accounts).map(ac => ({ ...ac, password: encPw(ac.password), _enc: true }));
+                  const safeAcc = (Array.isArray(a) ? a : accounts).map(ac => ({ ...ac }));
                   const d = {
                     accounts: safeAcc,
                     knowledge: Array.isArray(k) && k.length > 0 ? k : knowledge,
