@@ -1799,7 +1799,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleAvatarUpload(e, currentUser.id)} />
               </div>
             )}
-            {role && <button onClick={async () => { await supabase.auth.signOut(); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); Session.clear("km-session"); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
+            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); Session.clear("km-session"); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
           </div>
         </div>
         {/* ═══ MENU BAR ═══ */}
@@ -1864,18 +1864,20 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   var id = (formData.empId || "").trim(); var pw = (formData.pw || "").trim();
                   if (!id || !pw) { setFormData(Object.assign({}, formData, { loginErr: "Nhập mã NV và mật khẩu" })); return }
                   setFormData(Object.assign({}, formData, { loginLoading: true, loginErr: null }));
-                  var email = id.toLowerCase() + "@kingsmen.internal";
-                  var { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password: pw });
-                  if (authErr) { setFormData(Object.assign({}, formData, { loginErr: "Sai mã NV hoặc mật khẩu", loginLoading: false })); return }
-                  var { data: profile, error: pErr } = await supabase.from("profiles").select("*").eq("id", authData.user.id).single();
-                  if (pErr || !profile) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy hồ sơ nhân viên", loginLoading: false })); return }
-                  if (profile.status === "inactive") { await supabase.auth.signOut(); setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin.", loginLoading: false })); return }
-                  if (profile.emp_id === "admin") { setRole("admin"); setScreen("admin_home"); setFormData({}); Session.set("km-session", { role: "admin" }); return }
-                  var acc = profileToCamel(profile);
-                  var updated = await doCheckIn(acc);
-                  setCurrentUser(updated); setRole("employee"); setScreen("emp_home"); setFormData({});
-                  Session.set("km-session", { role: "employee", userId: updated.id, screen: "emp_home" });
-                  setShowMotivation(getRandomQuote());
+                  try {
+                    var email = id.toLowerCase() + "@kingsmen.internal";
+                    var { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password: pw });
+                    if (authErr) { setFormData(Object.assign({}, formData, { loginErr: "Sai mã NV hoặc mật khẩu", loginLoading: false })); return }
+                    var { data: profile, error: pErr } = await supabase.from("profiles").select("*").eq("id", authData.user.id).single();
+                    if (pErr || !profile) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy hồ sơ nhân viên", loginLoading: false })); return }
+                    if (profile.status === "inactive") { await supabase.auth.signOut({ scope: 'local' }); setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin.", loginLoading: false })); return }
+                    if (profile.emp_id === "admin" || profile.acc_role === "director") { setCurrentUser(profileToCamel(profile)); setRole("admin"); setScreen("admin_home"); setFormData({}); Session.set("km-session", { role: "admin" }); await loadAllData(); return }
+                    var acc = profileToCamel(profile);
+                    var updated = await doCheckIn(acc);
+                    setCurrentUser(updated); setRole("employee"); setScreen("emp_home"); setFormData({});
+                    Session.set("km-session", { role: "employee", userId: updated.id, screen: "emp_home" });
+                    setShowMotivation(getRandomQuote());
+                  } catch (e) { setFormData(Object.assign({}, formData, { loginErr: "Đã xảy ra lỗi, vui lòng thử lại.", loginLoading: false })); }
                 }} style={{ width: "100%", padding: "16px", borderRadius: 12, background: "linear-gradient(135deg," + C.teal + "," + C.tealD + ")", color: "#fff", fontSize: 16, fontWeight: 800, border: "none", cursor: formData.loginLoading ? "not-allowed" : "pointer", opacity: formData.loginLoading ? 0.7 : 1 }}>{formData.loginLoading ? "Đang đăng nhập..." : "Đăng nhập →"}</button>
               </div>
               <div style={{ textAlign: "center", marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Quên mật khẩu? Liên hệ Admin để được hỗ trợ.</div>
