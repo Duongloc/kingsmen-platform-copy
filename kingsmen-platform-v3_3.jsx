@@ -240,10 +240,10 @@ const notifToCamel = (r) => ({ id: r.id, empId: r.emp_id, msg: r.msg, type: r.ty
 const notifToSnake = (n) => ({ id: n.id, emp_id: n.empId, msg: n.msg, type: n.type || "info", read: n.read || false });
 const bulletinToCamel = (r) => ({ id: r.id, title: r.title, content: r.content, type: r.type, pinned: r.pinned, author: r.author, createdAt: r.created_at });
 const bulletinToSnake = (b) => ({ id: b.id, title: b.title, content: b.content || "", type: b.type || "announce", pinned: b.pinned || false, author: b.author || "" });
-const recognitionToCamel = (r) => ({ id: r.id, empId: r.emp_id, type: r.type, message: r.message, givenBy: r.given_by, createdAt: r.created_at });
-const recognitionToSnake = (r) => ({ id: r.id, emp_id: r.empId, type: r.type || "excellent", message: r.message || "", given_by: r.givenBy || "" });
-const pathToCamel = (r) => ({ id: r.id, title: r.title, description: r.description || "", stages: r.stages || [], assignedTo: r.assigned_to || [] });
-const pathToSnake = (p) => ({ id: p.id, title: p.title, description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [] });
+const recognitionToCamel = (r) => ({ id: r.id, empId: r.emp_id, empName: r.emp_name || "", type: r.type, message: r.message, givenBy: r.given_by, createdAt: r.created_at });
+const recognitionToSnake = (r) => ({ id: r.id, emp_id: r.empId, emp_name: r.empName || "", type: r.type || "excellent", message: r.message || "", given_by: r.givenBy || "" });
+const pathToCamel = (r) => ({ id: r.id, title: r.title, dept: r.dept || "", description: r.description || "", stages: r.stages || [], assignedTo: r.assigned_to || [], createdAt: r.created_at || null });
+const pathToSnake = (p) => ({ id: p.id, title: p.title, dept: p.dept || "", description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [] });
 
 var _pdfCache = {};
 
@@ -2573,7 +2573,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <select value={formData.recType || "excellent"} onChange={e => setFormData({ ...formData, recType: e.target.value })} style={inp}><option value="excellent">🏆 Xuất sắc</option><option value="improved">📈 Tiến bộ</option><option value="star">⭐ Ngôi sao</option></select>
               </div>
               <input value={formData.recMsg || ""} onChange={e => setFormData({ ...formData, recMsg: e.target.value })} placeholder="Nội dung tuyên dương..." style={{ ...inp, marginBottom: 8 }} />
-              <button onClick={() => { if (!formData.recEmp || !(formData.recMsg || "").trim()) return; const emp = accounts.find(a => a.id === formData.recEmp); updRecognitions([...recognitions, { id: uid(), empId: formData.recEmp, empName: (emp && emp.name) || "", type: formData.recType || "excellent", message: formData.recMsg, date: new Date().toISOString() }]); addNotif(formData.recEmp, `🎖️ Bạn được tuyên dương: ${formData.recMsg}`, "recognition"); setFormData({}); }} style={btnG}>📢 Xuất bản</button>
+              <button onClick={() => { if (!formData.recEmp || !(formData.recMsg || "").trim()) return; const emp = accounts.find(a => a.id === formData.recEmp); updRecognitions([...recognitions, { id: uid(), empId: formData.recEmp, empName: (emp && emp.name) || "", type: formData.recType || "excellent", message: formData.recMsg, givenBy: currentUser ? currentUser.name : "Admin" }]); addNotif(formData.recEmp, `🎖️ Bạn được tuyên dương: ${formData.recMsg}`, "recognition"); setFormData({}); }} style={btnG}>📢 Xuất bản</button>
             </div>
             {/* Leaderboard */}
             <Leaderboard accounts={accounts} results={results} card={card} currentUserId={currentUser && currentUser.id} depts={DEPTS} levels={LEVELS} />
@@ -2705,7 +2705,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     if (!(formData.chTitle || "").trim() || !formData.chQuiz) return;
                     const assignTo = formData.chAssign === "dept" ? "dept" : formData.chAssign === "person" ? (formData.chPerson || "all") : "all";
                     const selQuiz = quizzes.find(q => q.id === formData.chQuiz);
-                    const ch = { id: uid(), title: formData.chTitle, quizId: formData.chQuiz, quizTitle: (selQuiz && selQuiz.title) || "", minScore: formData.chMinScore || 70, xpReward: formData.chXP || 50, deadline: formData.chDeadline || "", assignTo, assignDept: formData.chDept || "", rewards: (formData.chRewards || []).filter(r => r.trim()), createdAt: new Date().toISOString(), createdByName: "Admin", active: true, completedBy: [], wonRewards: {} };
+                    const ch = { id: uid(), title: formData.chTitle, quizId: formData.chQuiz, quizTitle: (selQuiz && selQuiz.title) || "", minScore: formData.chMinScore || 70, xpReward: formData.chXP || 50, deadline: formData.chDeadline || "", assignTo, assignDept: formData.chDept || "", rewards: (formData.chRewards || []).filter(r => r.trim()), createdAt: new Date().toISOString(), createdBy: currentUser ? currentUser.id : null, createdByName: currentUser ? currentUser.name : "Admin", active: true, completedBy: [], wonRewards: {} };
                     // Reload latest from storage before appending
                     let existing = challenges;
                     try { const fromDB = await DB.get("km-challenges", []); if (Array.isArray(fromDB) && fromDB.length >= existing.length) existing = fromDB; } catch (e) { }
@@ -3270,7 +3270,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={async () => {
                     if (!(formData.bulTitle || "").trim() || !(formData.bulContent || "").trim()) return;
-                    const b = { id: uid(), title: formData.bulTitle, content: formData.bulContent, type: formData.bulType || "notice", pinned: formData.bulPinned || false, createdAt: new Date().toISOString() };
+                    const b = { id: uid(), title: formData.bulTitle, content: formData.bulContent, type: formData.bulType || "notice", pinned: formData.bulPinned || false, author: currentUser ? currentUser.name : "Admin", createdAt: new Date().toISOString() };
                     let existing = bulletins; try { const db = await DB.get("km-bulletins", []); if (Array.isArray(db)) existing = db; } catch (e) { }
                     const nb = [...existing, b]; setBulletins(nb); await DB.set("km-bulletins", nb);
                     setSaveStatus("saved"); setFormData({}); setSubScreen(null);
