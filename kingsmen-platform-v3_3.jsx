@@ -614,12 +614,12 @@ export default function App() {
   };
 
   // AI call with retry
-  const callAIWithRetry = async (prompt, maxRetries = 2) => {
+  const callAIWithRetry = async (prompt, maxRetries = 2, maxTokens = 4000) => {
     // Refresh session to ensure valid JWT before calling edge function
     await supabase.auth.getSession();
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        var body = { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] };
+        var body = { model: "claude-sonnet-4-6", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] };
         var { data: rawData, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body, responseType: "text" });
         if (fnErr) throw new Error(fnErr.message || "Edge function error");
         var data;
@@ -2075,7 +2075,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div style={{ ...card, padding: 16, marginBottom: 12 }}>
                         <div style={{ fontSize: 10, color: C.teal, letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>{"③ BÀI HỌC TƯƠNG TÁC" + (hasL ? " ✅ " + sl + "S " + fc + "F" : " ⏳")}</div>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                          <button onClick={function () { setAiLoading(true); setAiStatus("🤖 Đang tạo..."); var prompt = buildPrompt({ type: "lesson_interactive_json", knowledgeItem: k }); callAIWithRetry(prompt, 1).then(function (txt) { try { var raw = String(txt || "").replace(/```json/g, "").replace(/```/g, "").trim(); var j1 = raw.indexOf("{"); if (j1 >= 0) raw = raw.slice(j1); var j2 = raw.lastIndexOf("}"); if (j2 >= 0) raw = raw.slice(0, j2 + 1); raw = raw.replace(/[\x00-\x1F]/g, " ").replace(/,\s*([}\]])/g, "$1"); var obj = JSON.parse(raw); upd({ interactive: { slides: obj.slides || [], flashcards: obj.flashcards || [], cheatsheet: obj.cheatsheet || { title: "", rows: [] }, miniQuiz: obj.miniQuiz || [] } }); setAiStatus("✅ Tạo xong!"); setAiLoading(false) } catch (e5) { setAiStatus("❌ " + String(e5.message).slice(0, 50)); setAiLoading(false) } }).catch(function (e6) { setAiStatus("❌ " + String(e6.message || "").slice(0, 50)); setAiLoading(false) }) }} disabled={aiLoading} style={{ padding: "8px 16px", borderRadius: 8, background: C.purple + "15", color: C.purple, fontSize: 12, fontWeight: 700, border: "1px solid " + C.purple + "33" }}>{"🤖 AI Tạo"}</button>
+                          <button onClick={function () { setAiLoading(true); setAiStatus("🤖 Đang tạo..."); var prompt = buildPrompt({ type: "lesson_interactive_json", knowledgeItem: k }); callAIWithRetry(prompt, 1, 6000).then(function (txt) { try { var raw = String(txt || "").replace(/```json/g, "").replace(/```/g, "").trim(); var j1 = raw.indexOf("{"); if (j1 >= 0) raw = raw.slice(j1); var j2 = raw.lastIndexOf("}"); if (j2 >= 0) raw = raw.slice(0, j2 + 1); raw = raw.replace(/[\x00-\x1F]/g, " ").replace(/,\s*([}\]])/g, "$1"); var obj = JSON.parse(raw); upd({ interactive: { slides: obj.slides || [], flashcards: obj.flashcards || [], cheatsheet: obj.cheatsheet || { title: "", rows: [] }, miniQuiz: obj.miniQuiz || [] } }); setAiStatus("✅ Tạo xong!"); setAiLoading(false) } catch (e5) { setAiStatus("❌ " + String(e5.message).slice(0, 200)); setAiLoading(false) } }).catch(function (e6) { setAiStatus("❌ " + String(e6.message || "").slice(0, 200)); setAiLoading(false) }) }} disabled={aiLoading} style={{ padding: "8px 16px", borderRadius: 8, background: C.purple + "15", color: C.purple, fontSize: 12, fontWeight: 700, border: "1px solid " + C.purple + "33" }}>{"🤖 AI Tạo"}</button>
                           <button onClick={function () { setPromptPanel({ text: buildPrompt({ type: "lesson_interactive_json", knowledgeItem: k }), title: k.title }) }} style={{ padding: "8px 16px", borderRadius: 8, background: C.green + "15", color: C.green, fontSize: 12, fontWeight: 700, border: "1px solid " + C.green + "33" }}>{"🎴 Prompt"}</button>
                           <button onClick={function () { setFormData(Object.assign({}, formData, { _impLesson: formData._impLesson === k.id ? null : k.id })) }} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: formData._impLesson === k.id ? C.teal + "15" : "rgba(255,255,255,0.04)", color: formData._impLesson === k.id ? C.teal : "rgba(255,255,255,0.5)", border: "1px solid " + (formData._impLesson === k.id ? C.teal + "44" : "rgba(255,255,255,0.1)") }}>{formData._impLesson === k.id ? "▼ Đóng" : "📥 Import JSON"}</button>
                         </div>
