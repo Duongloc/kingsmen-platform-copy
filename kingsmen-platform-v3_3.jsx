@@ -620,16 +620,18 @@ export default function App() {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         var body = { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: prompt }] };
-        var { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body });
+        var { data: rawData, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body, responseType: "text" });
         if (fnErr) throw new Error(fnErr.message || "Edge function error");
-        if (data && data.error) throw new Error("API: " + (data.error.message || data.error.type || JSON.stringify(data.error).slice(0, 100)));
-        if (!data || !data.content || !Array.isArray(data.content)) throw new Error("No content in response");
+        var data;
+        try { data = typeof rawData === "string" ? JSON.parse(rawData) : rawData; } catch (parseErr) { throw new Error("JSON parse error: " + String(rawData).slice(0, 200)); }
+        if (data && data.error) throw new Error("API: " + (data.error.message || data.error.type || JSON.stringify(data.error).slice(0, 200)));
+        if (!data || !data.content || !Array.isArray(data.content)) throw new Error("No content: " + JSON.stringify(data).slice(0, 200));
         var txt = ""; for (var ci = 0; ci < data.content.length; ci++) { if (data.content[ci].text) txt += data.content[ci].text }
         if (!txt) throw new Error("Empty response text");
         return txt;
       } catch (e) {
         if (attempt === maxRetries) throw e;
-        setAiStatus("Lỗi: " + (e.message || "unknown").slice(0, 100) + " — thử lại (" + (attempt + 2) + "/" + (maxRetries + 1) + ")...");
+        setAiStatus("Lỗi: " + (e.message || "unknown").slice(0, 200) + " — thử lại (" + (attempt + 2) + "/" + (maxRetries + 1) + ")...");
         await new Promise(function (r) { setTimeout(r, 1000) });
       }
     }
