@@ -895,7 +895,7 @@ CHỈ JSON. KHÔNG backtick.`;
   const [backupCopied, setBackupCopied] = useState(false);
   const [rewardReveal, setRewardReveal] = useState(null); // {rewards, wonReward, chTitle}
   const exportBackup = () => {
-    const safeAccounts = accounts.map(a => ({ ...a, password: encPw(a.password), _enc: true }));
+    const safeAccounts = accounts.map(a => { const { password, _enc, ...rest } = a; return rest; });
     const data = { accounts: safeAccounts, knowledge: knowledge.map(k => ({ ...k })), quizzes, results, recognitions, challenges, notifications, paths, bulletins, settings, exportDate: new Date().toISOString(), version: "v3" };
     const jsonStr = JSON.stringify(data, null, 2);
     const fname = `kingsmen-backup-${today()}.json`;
@@ -1393,7 +1393,7 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
   };
 
   const copyBackup = () => {
-    const safeAccounts = accounts.map(a => ({ ...a, password: encPw(a.password), _enc: true }));
+    const safeAccounts = accounts.map(a => { const { password, _enc, ...rest } = a; return rest; });
     const data = { accounts: safeAccounts, knowledge: knowledge.map(k => ({ ...k })), quizzes, results, recognitions, challenges, notifications, paths, bulletins, settings, exportDate: new Date().toISOString(), version: "v3" };
     try { navigator.clipboard.writeText(JSON.stringify(data)); setBackupCopied(true); } catch (e) { }
   };
@@ -1408,9 +1408,9 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
           return;
         }
         if (data.accounts) {
-          const decoded = data.accounts.map(a => a._enc ? { ...a, password: decPw(a.password), _enc: undefined } : a);
-          setAccounts(decoded); accountsRef.current = decoded;
-          await DB.set("km-accounts", decoded);
+          const cleaned = data.accounts.map(a => { const { password, _enc, ...rest } = a; return rest; });
+          setAccounts(cleaned); accountsRef.current = cleaned;
+          await DB.set("km-accounts", cleaned);
         }
         if (data.knowledge) { setKnowledge(data.knowledge); await DB.set("km-knowledge", data.knowledge); }
         if (data.quizzes) { setQuizzes(data.quizzes); await DB.set("km-quizzes", data.quizzes); }
@@ -2034,8 +2034,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎧 Audio (hosting/link)"}</div><input value={k.audioUrl || ""} onChange={function (e) { upd({ audioUrl: e.target.value }) }} placeholder="/media/audio.mp3 hoặc link" style={{ ...inp, fontSize: 10 }} />{k.audioUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{"✓ " + (k.audioUrl.length > 35 ? k.audioUrl.slice(0, 35) + "..." : k.audioUrl)}</div>}</div>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"📄 PDF" + (k.hasPdf ? " ✅" : "")}</div>
                             <div style={{ display: "flex", gap: 4 }}>
-                              <label style={{ flex: 1, display: "block", padding: "7px", borderRadius: 6, border: "1px solid " + C.border, textAlign: "center", cursor: "pointer", fontSize: 10, color: k.hasPdf ? C.green : "rgba(255,255,255,0.4)" }}>{k.hasPdf ? "Thay" : "📎 Tải lên"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { setFormData(Object.assign({}, formData, { _upSt: "⏳..." })); var reader = new FileReader(); reader.onload = function (ev) { _pdfCache[k.id] = ev.target.result; upd({ hasPdf: true }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF OK" })) }; reader.readAsDataURL(e.target.files[0]) } }} /></label>
-                              {k.hasPdf && <button onClick={function () { delete _pdfCache[k.id]; upd({ hasPdf: false }); setFormData(Object.assign({}, formData, { _upSt: "✅ Xóa PDF" })) }} style={{ padding: "7px 10px", borderRadius: 6, fontSize: 10, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22" }}>{"🗑"}</button>}
+                              <label style={{ flex: 1, display: "block", padding: "7px", borderRadius: 6, border: "1px solid " + C.border, textAlign: "center", cursor: "pointer", fontSize: 10, color: k.hasPdf ? C.green : "rgba(255,255,255,0.4)" }}>{k.hasPdf ? "Thay" : "📎 Tải lên"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải lên..." })); var path = 'knowledge/' + k.id + '.pdf'; var { error: upErr } = await supabase.storage.from('pdfs').upload(path, file, { upsert: true, contentType: 'application/pdf' }); if (upErr) { var fb = new FileReader(); fb.onload = function (ev) { _pdfCache[k.id] = ev.target.result; upd({ hasPdf: true }); setFormData(Object.assign({}, formData, { _upSt: "⚠️ Lưu tạm (cần bucket 'pdfs' trong Supabase Storage)" })); }; fb.readAsDataURL(file); return; } var fr = new FileReader(); fr.onload = function (ev) { _pdfCache[k.id] = ev.target.result; }; fr.readAsDataURL(file); upd({ hasPdf: true }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã lưu vào DB" })); }} /></label>
+                              {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 10px", borderRadius: 6, fontSize: 10, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22" }}>{"🗑"}</button>}
                             </div>
                           </div>
                         </div>
@@ -2388,12 +2388,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Phòng ban</label><select value={formData.editDept || a.dept} onChange={e => setFormData({ ...formData, editDept: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12 }}>{DEPTS.map(d => <option key={d}>{d}</option>)}</select></div>
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Team</label><input value={(formData.editTeam || a.team) || ""} onChange={e => setFormData({ ...formData, editTeam: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12 }} /></div>
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Cấp bậc</label><select value={formData.editRole || a.accRole} onChange={e => setFormData({ ...formData, editRole: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12 }}>{ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select></div>
-                          <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Mật khẩu mới</label><input value={formData.editPw || ""} onChange={e => setFormData({ ...formData, editPw: e.target.value })} placeholder="Để trống = giữ cũ" style={{ ...inp, padding: "5px 8px", fontSize: 12 }} /></div>
+                          <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Mật khẩu mới</label><div style={{ padding: "7px 10px", borderRadius: 6, background: `${C.gold}08`, border: `1px solid ${C.gold}22`, fontSize: 10, color: C.gold }}>Đổi mật khẩu nhân viên qua Supabase Dashboard</div></div>
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button onClick={async () => {
                             if (!window.confirm("Lưu thay đổi thông tin tài khoản của " + a.name + "?")) return;
-                            const updated = accounts.map(x => x.id === a.id ? { ...x, name: formData.editName || a.name, empId: formData.editEmpId || a.empId, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", accRole: formData.editRole || a.accRole, ...(formData.editPw ? { password: formData.editPw } : {}) } : x);
+                            const updated = accounts.map(x => x.id === a.id ? { ...x, name: formData.editName || a.name, empId: formData.editEmpId || a.empId, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", accRole: formData.editRole || a.accRole } : x);
                             setAccounts(updated); accountsRef.current = updated; await DB.set("km-accounts", updated);
                             setSaveStatus("saved"); setFormData({});
                           }} style={{ ...btnG, fontSize: 11, padding: "6px 14px" }}>💾 Lưu</button>
@@ -2579,7 +2579,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <button onClick={() => { if (!formData.recEmp || !(formData.recMsg || "").trim()) return; const emp = accounts.find(a => a.id === formData.recEmp); updRecognitions([...recognitions, { id: uid(), empId: formData.recEmp, empName: (emp && emp.name) || "", type: formData.recType || "excellent", message: formData.recMsg, date: new Date().toISOString() }]); addNotif(formData.recEmp, `🎖️ Bạn được tuyên dương: ${formData.recMsg}`, "recognition"); setFormData({}); }} style={btnG}>📢 Xuất bản</button>
             </div>
             {/* Leaderboard */}
-            <Leaderboard accounts={accounts} results={results} card={card} depts={DEPTS} levels={LEVELS} />
+            <Leaderboard accounts={accounts} results={results} card={card} currentUserId={currentUser && currentUser.id} depts={DEPTS} levels={LEVELS} />
             {/* Recognitions list */}
             {recognitions.length > 0 && <div style={card}><div style={{ fontSize: 13, color: C.gold, fontWeight: 700, marginBottom: 10 }}>LỊCH SỬ TUYÊN DƯƠNG</div>
               {[...recognitions].reverse().slice(0, 10).map(r => (
@@ -3354,6 +3354,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   { i: "📢", t: "Tạo Bảng Tin", d: "Đăng thông báo/chính sách", s: "dir_bulletins" },
                 ] : []),
                 { i: "🧠", t: "Năng Lực", d: "Đánh giá & cải thiện", s: "emp_competency" },
+                { i: "🔑", t: "Đổi Mật Khẩu", d: "Cập nhật bảo mật", s: "emp_changepw" },
                 ...(currentUser.accRole === "manager" || currentUser.accRole === "director" ? [
                   { i: currentUser.accRole === "director" ? "🎩" : "👥", t: currentUser.accRole === "director" ? "Quản Lý Nhân Sự" : "Team Của Tôi", d: currentUser.accRole === "director" ? "Xem toàn bộ nhân sự" : "Quản lý nhân viên cấp dưới", s: "mgr_team" },
                 ] : []),
@@ -3590,9 +3591,14 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     {/* Resource cards */}
                     <div style={{ display: "grid", gridTemplateColumns: k.hasPdf && k.docUrl ? "1fr 1fr" : "1fr", gap: 8, marginBottom: 12 }}>
                       {k.hasPdf && (
-                        <button onClick={function () {
+                        <button onClick={async function () {
                           setFormData(Object.assign({}, formData, { docMsg: "⏳" }));
-                          (function () { var d = _pdfCache[k.id]; if (d) { var a = document.createElement("a"); a.href = d; a.download = k.title + ".pdf"; document.body.appendChild(a); a.click(); document.body.removeChild(a); setFormData(Object.assign({}, formData, { docMsg: "✅ PDF OK" })) } else { setFormData(Object.assign({}, formData, { docMsg: "❌ Tải PDF lên trong Admin trước" })) } })();
+                          var cached = _pdfCache[k.id];
+                          if (cached) { var a = document.createElement("a"); a.href = cached; a.download = k.title + ".pdf"; document.body.appendChild(a); a.click(); document.body.removeChild(a); setFormData(Object.assign({}, formData, { docMsg: "✅ PDF OK" })); return; }
+                          var { data: blob, error: dlErr } = await supabase.storage.from('pdfs').download('knowledge/' + k.id + '.pdf');
+                          if (dlErr || !blob) { setFormData(Object.assign({}, formData, { docMsg: "❌ Chưa có PDF. Admin cần tải lên trước." })); return; }
+                          var blobUrl = URL.createObjectURL(blob); var a2 = document.createElement("a"); a2.href = blobUrl; a2.download = k.title + ".pdf"; document.body.appendChild(a2); a2.click(); document.body.removeChild(a2); setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 3000);
+                          setFormData(Object.assign({}, formData, { docMsg: "✅ PDF OK" }));
                         }} style={{ padding: "20px 16px", borderRadius: 12, background: "linear-gradient(135deg," + C.purple + "12," + C.purple + "05)", border: "1px solid " + C.purple + "33", textAlign: "center" }}>
                           <div style={{ fontSize: 28, marginBottom: 6 }}>{"📄"}</div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: C.purple }}>{"Tải PDF"}</div>
@@ -4455,15 +4461,24 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </div>
               {formData.pwErr && <div style={{ color: C.red, fontSize: 12, marginBottom: 10 }}>✗ {formData.pwErr}</div>}
               {formData.pwOk && <div style={{ color: C.green, fontSize: 12, marginBottom: 10 }}>✓ {formData.pwOk}</div>}
-              <button onClick={() => {
-                if (formData.oldPw !== currentUser.password) return setFormData({ ...formData, pwErr: "Mật khẩu hiện tại không đúng" });
+              <button onClick={async () => {
+                if (!formData.oldPw) return setFormData({ ...formData, pwErr: "Nhập mật khẩu hiện tại" });
                 if (!formData.newPw || formData.newPw.length < 4) return setFormData({ ...formData, pwErr: "Mật khẩu mới tối thiểu 4 ký tự" });
                 if (formData.newPw !== formData.cfPw) return setFormData({ ...formData, pwErr: "Xác nhận mật khẩu không khớp" });
-                const updated = { ...currentUser, password: formData.newPw };
-                setCurrentUser(updated);
-                updAccounts(accounts.map(a => a.id === currentUser.id ? updated : a));
-                setFormData({ pwOk: "Đổi mật khẩu thành công!" });
-              }} style={{ ...btnG, width: "100%" }}>Đổi mật khẩu</button>
+                setFormData({ ...formData, pwErr: "", pwOk: "", pwLoading: true });
+                try {
+                  // Verify old password by attempting sign-in
+                  const email = (currentUser.empId || "").toLowerCase() + "@kingsmen.internal";
+                  const { error: verifyErr } = await supabase.auth.signInWithPassword({ email, password: formData.oldPw });
+                  if (verifyErr) return setFormData({ ...formData, pwErr: "Mật khẩu hiện tại không đúng", pwLoading: false });
+                  // Update to new password via Supabase Auth
+                  const { error: updateErr } = await supabase.auth.updateUser({ password: formData.newPw });
+                  if (updateErr) return setFormData({ ...formData, pwErr: "Lỗi: " + updateErr.message, pwLoading: false });
+                  setFormData({ pwOk: "Đổi mật khẩu thành công!", pwLoading: false });
+                } catch (e) {
+                  setFormData({ ...formData, pwErr: "Đã xảy ra lỗi, vui lòng thử lại.", pwLoading: false });
+                }
+              }} disabled={formData.pwLoading} style={{ ...btnG, width: "100%", opacity: formData.pwLoading ? 0.6 : 1 }}>{formData.pwLoading ? "Đang xử lý..." : "Đổi mật khẩu"}</button>
             </div>
           </div>
         )}
