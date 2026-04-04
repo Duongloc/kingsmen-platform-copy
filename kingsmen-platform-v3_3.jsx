@@ -748,7 +748,7 @@ ${content}`);
         const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsDataURL(file); });
         const base64 = dataUrl.split(",")[1];
         await supabase.auth.getSession(); // Refresh JWT
-        const { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", {
+        const { data: rawPdf, error: fnErr } = await supabase.functions.invoke("claude-proxy", {
           body: {
             model: "claude-sonnet-4-6", max_tokens: 6000,
             messages: [{
@@ -757,11 +757,13 @@ ${content}`);
                 { type: "text", text: "Trích xuất TOÀN BỘ nội dung text từ tài liệu PDF này. Giữ nguyên cấu trúc: tiêu đề viết HOA, danh sách dùng dấu -, bảng giữ format. Chỉ trả text thuần, không thêm nhận xét." }
               ]
             }]
-          }
+          },
+          responseType: "text"
         });
         if (fnErr) throw new Error(fnErr.message || "Edge function error");
-        if (data && data.error) throw new Error(data.error.message || "API error");
-        const content = (data?.content || []).map(c => c.text || "").join("") || "";
+        var pdfData; try { pdfData = typeof rawPdf === "string" ? JSON.parse(rawPdf) : rawPdf; } catch (pe) { throw new Error("PDF response parse error: " + String(rawPdf).slice(0, 200)); }
+        if (pdfData && pdfData.error) throw new Error(pdfData.error.message || "API error");
+        const content = (pdfData?.content || []).map(c => c.text || "").join("") || "";
         setAiLoading(false); setAiStatus(content.length > 50 ? "" : "Không đọc được nội dung PDF");
         return { title, content: content || "", fromPdf: true };
       } catch (e) { setAiLoading(false); setAiStatus("Lỗi: " + e.message); return { title, content: "", error: true }; }
@@ -2856,13 +2858,14 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                     if (!mod.title) return; setAiLoading(true); setAiStatus("AI đang gợi ý checklist...");
                                     try {
                                       await supabase.auth.getSession(); // Refresh JWT
-                                      const { data, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDept}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] } });
+                                      const { data: rawCl, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDept}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] }, responseType: "text" });
                                       if (fnErr) throw new Error(fnErr.message || "Edge function error");
-                                      if (data && data.error) throw new Error(data.error.message || "API error");
-                                      let txt = (data?.content || []).map(c => c.text || "").join("") || ""; txt = txt.replace(/```json\s*/g, "").replace(/```/g, "").trim(); const arr = JSON.parse(txt);
+                                      var clData; try { clData = typeof rawCl === "string" ? JSON.parse(rawCl) : rawCl; } catch (pe) { throw new Error("Response parse error: " + String(rawCl).slice(0, 200)); }
+                                      if (clData && clData.error) throw new Error(clData.error.message || "API error");
+                                      let txt = (clData?.content || []).map(c => c.text || "").join("") || ""; txt = txt.replace(/```json\s*/g, "").replace(/```/g, "").replace(/,\s*]/g, "]").trim(); const arr = JSON.parse(txt);
                                       const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], checklist: [...(ns[si].modules[mi].checklist || []), ...arr] }; setFormData({ ...formData, pStages: ns });
                                       setAiLoading(false); setAiStatus("");
-                                    } catch (err) { setAiLoading(false); setAiStatus("Lỗi: " + err.message); }
+                                    } catch (err) { setAiLoading(false); setAiStatus("Lỗi: " + err.message.slice(0, 200)); }
                                   }} disabled={aiLoading} style={{ ...btnO, fontSize: 10, padding: "5px 10px", color: C.green }}>{aiLoading ? "⏳" : "🤖 AI gợi ý"}</button>
                                 </div>
                               </div>
