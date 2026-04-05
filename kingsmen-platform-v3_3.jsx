@@ -1724,7 +1724,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <button onClick={() => {
                 if (!(importPreview.quiz.title || "").trim()) { setAiStatus("⚠️ Vui lòng nhập tên đề!"); return; }
                 const newQ = [...quizzes, importPreview.quiz];
-                setQuizzes(newQ); save("km-quizzes", newQ);
+                updQuizzes(newQ);
                 setImportPreview(null);
                 setAiStatus(`✅ Đã import "${importPreview.quiz.title}" — ${importPreview.quiz.questions.length} câu`);
               }} style={{ flex: 1, padding: "14px", borderRadius: 12, background: `linear-gradient(135deg,${C.teal},${C.tealD})`, color: C.white, fontSize: 15, fontWeight: 800, border: "none" }}>
