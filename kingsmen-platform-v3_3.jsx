@@ -348,7 +348,36 @@ export default function App() {
   const [qAnswers, setQAnswers] = useState({}); const [qSel, setQSel] = useState(null); const [qShowExp, setQShowExp] = useState(false);
   const [qTimer, setQTimer] = useState(0); const [qActive, setQActive] = useState(false);
   const [aiLoading, setAiLoading] = useState(false); const [aiStatus, setAiStatus] = useState("");
+  const aiStatusTimerRef = useRef(null);
+  useEffect(() => {
+    if (aiStatusTimerRef.current) clearTimeout(aiStatusTimerRef.current);
+    if (!aiStatus) return;
+    // Don't auto-clear progress/loading messages
+    if (aiStatus.includes("⏳") || aiStatus.includes("🔄") || aiStatus.includes("AI đang")) return;
+    const ms = aiStatus.includes("✅") ? 4000 : aiStatus.includes("❌") ? 6000 : aiStatus.includes("⚠️") ? 5000 : 0;
+    if (ms > 0) { aiStatusTimerRef.current = setTimeout(() => setAiStatus(""), ms); }
+    return () => { if (aiStatusTimerRef.current) clearTimeout(aiStatusTimerRef.current); };
+  }, [aiStatus]);
   const [subScreen, setSubScreen] = useState(null); const [formData, setFormData] = useState({});
+  // Auto-clear formData status fields
+  const formStatusTimerRef = useRef(null);
+  useEffect(() => {
+    if (formStatusTimerRef.current) clearTimeout(formStatusTimerRef.current);
+    const statusKeys = ["_upSt", "docMsg", "_impLessonStatus", "editPwMsg", "pwErr", "recMsg"];
+    const activeKey = statusKeys.find(k => formData[k]);
+    if (!activeKey) return;
+    const val = formData[activeKey];
+    if (typeof val !== "string") return;
+    // Don't clear loading/progress messages
+    if (val.includes("⏳") || val.includes("🔄")) return;
+    const ms = val.includes("✅") ? 4000 : val.includes("❌") ? 6000 : val.includes("⚠️") ? 5000 : 0;
+    if (ms > 0) {
+      formStatusTimerRef.current = setTimeout(() => {
+        setFormData(prev => { const next = { ...prev }; delete next[activeKey]; return next; });
+      }, ms);
+    }
+    return () => { if (formStatusTimerRef.current) clearTimeout(formStatusTimerRef.current); };
+  }, [formData._upSt, formData.docMsg, formData._impLessonStatus, formData.editPwMsg, formData.pwErr, formData.recMsg]);
   const qTimerRef = useRef(null); const qAnswersRef = useRef({}); const topRef = useRef(null);
   const accountsRef = useRef([]);
   // Essay grading state
@@ -415,7 +444,7 @@ export default function App() {
     })();
   }, []);
 
-  const save = async (k, d) => { const ok = await DB.set(k, d); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 1500); } else { setSaveStatus("error"); } };
+  const save = async (k, d) => { const ok = await DB.set(k, d); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); } else { setSaveStatus("error"); console.error("Save failed for:", k); setTimeout(() => setSaveStatus(""), 4000); } };
 
   // ─── Fetch ALL data from database (called after login) ───
   const loadAllData = async () => {
@@ -5149,8 +5178,36 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           </div>
         )}
 
+        {/* ═══ SAVE STATUS TOAST ═══ */}
+        {saveStatus && (
+          <div style={{
+            position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+            zIndex: 99999, pointerEvents: "none",
+            animation: "fadeIn .25s ease-out"
+          }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "10px 20px", borderRadius: 12,
+              background: saveStatus === "saved"
+                ? "linear-gradient(135deg, rgba(12,123,111,0.95), rgba(10,100,90,0.95))"
+                : "linear-gradient(135deg, rgba(200,50,50,0.95), rgba(170,30,30,0.95))",
+              backdropFilter: "blur(12px)",
+              boxShadow: saveStatus === "saved"
+                ? "0 4px 20px rgba(12,123,111,0.4), 0 0 0 1px rgba(12,123,111,0.3)"
+                : "0 4px 20px rgba(200,50,50,0.4), 0 0 0 1px rgba(200,50,50,0.3)",
+              color: "#fff", fontSize: 13, fontWeight: 700,
+              fontFamily: "'Be Vietnam Pro', sans-serif",
+              letterSpacing: 0.3
+            }}>
+              <span style={{ fontSize: 16 }}>{saveStatus === "saved" ? "✅" : "❌"}</span>
+              <span>{saveStatus === "saved" ? "Đã lưu vào Supabase" : "Lỗi lưu dữ liệu — kiểm tra Console"}</span>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
+    
   );
 }
 
