@@ -1982,19 +1982,24 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   var fc = hasL && k.interactive.flashcards ? k.interactive.flashcards.length : 0;
                   return (
                     <div key={k.id} onClick={function () { setSubScreen(k.id) }} style={{ ...card, cursor: "pointer", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderLeft: "3px solid " + (hasL ? C.teal : C.orange) }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: C.white, marginBottom: 3 }}>{k.title}</div>
-                        <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: C.white, marginBottom: 4 }}>{k.title}</div>
+                        <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: k.hasPdf && k.pdfName ? 4 : 0 }}>
                           {(k.depts || []).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
                           {hasL && tag(sl + "S " + fc + "F", C.teal)}
-                          {k.hasPdf && tag("📄 " + (k.pdfName ? k.pdfName.slice(0, 20) + (k.pdfName.length > 20 ? "…" : "") : "PDF"), C.purple)}
-                          {!!(k.docUrl) && tag("🔗", C.blue)}
-                          {!!(k.videoUrl) && tag("🎬", C.red)}
-                          {!!(k.audioUrl) && tag("🎧", C.purple)}
-                          {k.images && k.images.length > 0 && tag(k.images.length + "🖼️", C.gold)}
+                          {!!(k.docUrl) && tag("🔗 Link", C.blue)}
+                          {!!(k.videoUrl) && tag("🎬 Video", C.red)}
+                          {!!(k.audioUrl) && tag("🎧 Audio", "#9b59b6")}
+                          {k.images && k.images.length > 0 && tag(k.images.length + " 🖼️", C.gold)}
                         </div>
+                        {k.hasPdf && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 4, background: C.purple + "18", border: "1px solid " + C.purple + "33" }}>
+                            <span style={{ fontSize: 12 }}>{"📄"}</span>
+                            <span style={{ fontSize: 12, color: C.purple, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 240 }}>{k.pdfName || "PDF đính kèm"}</span>
+                          </div>
+                        )}
                       </div>
-                      <span style={{ fontSize: 16, color: "rgba(255,255,255,0.2)" }}>{"→"}</span>
+                      <span style={{ fontSize: 16, color: "rgba(255,255,255,0.2)", flexShrink: 0, marginLeft: 8 }}>{"→"}</span>
                     </div>
                   );
                 })}
@@ -3286,7 +3291,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <button onClick={() => setSubScreen("newBul")} style={{ ...btnG, marginBottom: 14 }}>+ Đăng bài mới</button>
               {bulletins.length === 0 && <Empty msg="Chưa có bài đăng nào." />}
               {[...bulletins].reverse().map(b => (
-                <div key={b.id} style={{ ...card, borderLeft: `4px solid ${b.type === "policy" ? C.red : b.type === "news" ? C.blue : C.gold}` }}>
+                <div key={b.id} onClick={() => setFormData({ ...formData, expandBulId: formData.expandBulId === b.id ? null : b.id })} style={{ ...card, borderLeft: `4px solid ${b.type === "policy" ? C.red : b.type === "news" ? C.blue : C.gold}`, cursor: "pointer" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
@@ -3295,10 +3300,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         {b.pinned && <span style={{ fontSize: 10, color: C.gold }}>📌 Ghim</span>}
                       </div>
                       <div style={{ color: C.white, fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{b.title}</div>
-                      <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{b.content.length > 200 ? b.content.slice(0, 200) + "..." : b.content}</div>
+                      <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{formData.expandBulId === b.id ? b.content : (b.content.length > 200 ? b.content.slice(0, 200) + "..." : b.content)}</div>
+                      {b.content.length > 200 && <div style={{ fontSize: 11, color: formData.expandBulId === b.id ? "rgba(255,255,255,0.3)" : C.teal, marginTop: 4 }}>{formData.expandBulId === b.id ? "▲ Thu gọn" : "▼ Xem thêm..."}</div>}
                       <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginTop: 6 }}>{fmtDate(b.createdAt)}</div>
                     </div>
-                    <div style={{ display: "flex", gap: 4 }}>
+                    <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
                       <button onClick={async () => { const nb = bulletins.map(x => x.id === b.id ? { ...x, pinned: !x.pinned } : x); setBulletins(nb); await DB.set("km-bulletins", nb); }} style={{ padding: "5px 10px", borderRadius: 4, background: b.pinned ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: b.pinned ? C.gold : "rgba(255,255,255,0.3)", fontSize: 11, border: "none" }}>📌</button>
                       <button onClick={async () => { if (!window.confirm("Xóa bài đăng \"" + b.title + "\"?")) return; await supabase.from("bulletins").delete().eq("id", b.id); const nb = bulletins.filter(x => x.id !== b.id); setBulletins(nb); }} style={{ padding: "5px 10px", borderRadius: 4, background: `${C.red}22`, color: C.red, fontSize: 11, border: "none" }}>✕</button>
                     </div>
@@ -3476,11 +3482,20 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   if (!isRead) { var u = Object.assign({}, currentUser, { readLessons: [].concat(currentUser.readLessons || [], [k.id]) }); setCurrentUser(u); updAccounts(accounts.map(function (a) { return a.id === u.id ? u : a })); }
                   setSubScreen(k.id); setFormData(Object.assign({}, formData, { learnTab: null }));
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                    <span style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{k.title}</span>
-                    {isRead && tag("✓ Đã đọc", C.green)}{k.interactive && tag("🎴 Tương tác", C.green)}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+                    <span style={{ color: C.white, fontWeight: 700, fontSize: 14, flex: 1 }}>{k.title}</span>
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      {isRead && tag("✓ Đã đọc", C.green)}
+                      {k.interactive && tag("🎴 Tương tác", C.teal)}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", gap: 4, marginBottom: 3 }}>{(k.depts || ["Tất cả"]).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+                    {(k.depts || ["Tất cả"]).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
+                    {k.hasPdf && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.purple + "22", color: C.purple, fontWeight: 600 }}>{"📄 " + (k.pdfName || "PDF")}</span>}
+                    {k.videoUrl && tag("🎬 Video", C.red)}
+                    {k.audioUrl && tag("🎧 Nghe", "#9b59b6")}
+                    {k.docUrl && tag("🔗 Link", C.blue)}
+                  </div>
                   <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>{(k.content || "").slice(0, 100) || "Chưa có nội dung"}</div>
                 </div>
               );
@@ -3627,75 +3642,98 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                 {/* ── TÀI LIỆU GỐC ── */}
                 {tab === "docs" && (
-                  <div style={{ ...fsBody, padding: 16 }}>
-                    {/* Hero */}
-                    <div style={{ textAlign: "center", padding: "20px 0 16px" }}>
-                      <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg," + C.teal + "22," + C.gold + "11)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 8 }}>{"📚"}</div>
-                      <h3 style={{ ...hd(18), marginBottom: 2 }}>{k.title}</h3>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{(k.depts || ["Tất cả"]).join(" · ")}</div>
-                    </div>
+                  <div style={{ ...fsBody, padding: "24px 20px", overflowY: "auto" }}>
+                    <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
 
-                    {/* Resource cards */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-                      {k.hasPdf && (
-                        <button onClick={async function () {
-                          setFormData(Object.assign({}, formData, { docMsg: "⏳" }));
-                          var cached = _pdfCache[k.id];
-                          if (cached) { var a = document.createElement("a"); a.href = cached; a.download = (k.pdfName || k.title + ".pdf"); document.body.appendChild(a); a.click(); document.body.removeChild(a); setFormData(Object.assign({}, formData, { docMsg: "✅ Đã tải xuống" })); return; }
-                          var { data: blob, error: dlErr } = await supabase.storage.from('pdfs').download('knowledge/' + k.id + '.pdf');
-                          if (dlErr || !blob) { setFormData(Object.assign({}, formData, { docMsg: "❌ Chưa có PDF. Admin cần tải lên trước." })); return; }
-                          var blobUrl = URL.createObjectURL(blob);
-                          var a2 = document.createElement("a"); a2.href = blobUrl; a2.download = (k.pdfName || k.title + ".pdf"); document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
-                          setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 3000);
-                          setFormData(Object.assign({}, formData, { docMsg: "✅ Đã tải xuống" }));
-                        }} style={{ padding: "20px 16px", borderRadius: 12, background: "linear-gradient(135deg," + C.purple + "12," + C.purple + "05)", border: "1px solid " + C.purple + "33", textAlign: "center", cursor: "pointer" }}>
-                          <div style={{ fontSize: 28, marginBottom: 6 }}>{"⬇️"}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: C.purple }}>{"Tải PDF"}</div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>{k.pdfName ? k.pdfName.slice(0, 22) + (k.pdfName.length > 22 ? "…" : "") : "Tải về máy"}</div>
-                        </button>
-                      )}
-                      {k.hasPdf && (
-                        <button onClick={async function () {
-                          setFormData(Object.assign({}, formData, { docMsg: "⏳ Đang mở..." }));
-                          var cached = _pdfCache[k.id];
-                          if (cached) { var byteStr = atob(cached.split(',')[1]); var bytes = new Uint8Array(byteStr.length); for (var i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i); var viewBlob = new Blob([bytes], { type: 'application/pdf' }); var viewUrl = URL.createObjectURL(viewBlob); window.open(viewUrl, '_blank'); setTimeout(function () { URL.revokeObjectURL(viewUrl); }, 10000); setFormData(Object.assign({}, formData, { docMsg: "" })); return; }
-                          var { data: signedData, error: signErr } = await supabase.storage.from('pdfs').createSignedUrl('knowledge/' + k.id + '.pdf', 300);
-                          if (signErr || !signedData) { setFormData(Object.assign({}, formData, { docMsg: "❌ Không mở được PDF." })); return; }
-                          window.open(signedData.signedUrl, "_blank");
-                          setFormData(Object.assign({}, formData, { docMsg: "" }));
-                        }} style={{ padding: "20px 16px", borderRadius: 12, background: "linear-gradient(135deg," + C.teal + "12," + C.teal + "05)", border: "1px solid " + C.teal + "33", textAlign: "center", cursor: "pointer" }}>
-                          <div style={{ fontSize: 28, marginBottom: 6 }}>{"👁️"}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: C.teal }}>{"Xem PDF"}</div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>{"Mở trong tab mới"}</div>
-                        </button>
-                      )}
-                      {k.docUrl && (
-                        <a href={k.docUrl} target="_blank" rel="noopener noreferrer" style={{ padding: "20px 16px", borderRadius: 12, background: "linear-gradient(135deg," + C.blue + "12," + C.blue + "05)", border: "1px solid " + C.blue + "33", textAlign: "center", textDecoration: "none", display: "block" }}>
-                          <div style={{ fontSize: 28, marginBottom: 6 }}>{"🔗"}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: C.blue }}>{"Tài liệu gốc"}</div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 2, wordBreak: "break-all" }}>{(k.docUrl || "").replace(/https?:\/\//, "").slice(0, 35) + "..."}</div>
-                        </a>
-                      )}
-                    </div>
-                    {formData.docMsg && <div style={{ textAlign: "center", fontSize: 11, color: C.gold, marginBottom: 8 }}>{formData.docMsg}</div>}
-
-                    {/* Text content toggle */}
-                    {k.content && (
-                      <div style={{ marginTop: 4 }}>
-                        <button onClick={function () { setFormData(Object.assign({}, formData, { showRawDoc: !formData.showRawDoc })) }} style={{ width: "100%", padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid " + C.border, textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-                          {formData.showRawDoc ? "▲ Thu gọn" : "📝 Xem nội dung text (" + (k.content || "").length + " ký tự)"}
-                        </button>
-                        {formData.showRawDoc && (
-                          <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 400, overflow: "auto", padding: 14, background: "rgba(0,0,0,0.2)", borderRadius: "0 0 10px 10px", marginTop: -1 }}>{k.content}</div>
+                      {/* Hero */}
+                      <div style={{ textAlign: "center", paddingBottom: 28 }}>
+                        <div style={{ width: 56, height: 56, borderRadius: 16, background: "linear-gradient(135deg," + C.teal + "33," + C.gold + "18)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 28, marginBottom: 12, border: "1px solid " + C.gold + "22" }}>{"📚"}</div>
+                        <h3 style={{ ...hd(20), marginBottom: 6 }}>{k.title}</h3>
+                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>{(k.depts || ["Tất cả"]).join(" · ")}</div>
+                        {k.hasPdf && k.pdfName && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, padding: "5px 14px", borderRadius: 20, background: C.purple + "18", border: "1px solid " + C.purple + "33" }}>
+                            <span style={{ fontSize: 13 }}>📄</span>
+                            <span style={{ fontSize: 12, color: C.purple, fontWeight: 600 }}>{k.pdfName}</span>
+                          </div>
                         )}
                       </div>
-                    )}
 
-                    {!k.hasPdf && !k.docUrl && !k.content && (
-                      <div style={{ textAlign: "center", padding: 30, color: "rgba(255,255,255,0.3)", fontSize: 13 }}>
-                        {"Chưa có tài liệu. Admin thêm trong phần Quản lý."}
+                      {/* Resource rows */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+                        {k.hasPdf && (
+                          <button onClick={async function () {
+                            setFormData(Object.assign({}, formData, { docMsg: "⏳ Đang tải..." }));
+                            var cached = _pdfCache[k.id];
+                            if (cached) { var a = document.createElement("a"); a.href = cached; a.download = (k.pdfName || k.title + ".pdf"); document.body.appendChild(a); a.click(); document.body.removeChild(a); setFormData(Object.assign({}, formData, { docMsg: "✅ Đã tải xuống" })); return; }
+                            var { data: blob, error: dlErr } = await supabase.storage.from('pdfs').download('knowledge/' + k.id + '.pdf');
+                            if (dlErr || !blob) { setFormData(Object.assign({}, formData, { docMsg: "❌ Chưa có PDF. Admin cần tải lên trước." })); return; }
+                            var blobUrl = URL.createObjectURL(blob);
+                            var a2 = document.createElement("a"); a2.href = blobUrl; a2.download = (k.pdfName || k.title + ".pdf"); document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+                            setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 3000);
+                            setFormData(Object.assign({}, formData, { docMsg: "✅ Đã tải xuống" }));
+                          }} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", borderRadius: 14, background: "linear-gradient(135deg," + C.purple + "18," + C.purple + "08)", border: "1px solid " + C.purple + "33", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: C.purple + "25", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{"⬇️"}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: C.purple, marginBottom: 3 }}>{"Tải PDF về máy"}</div>
+                              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.pdfName || k.title + ".pdf"}</div>
+                            </div>
+                            <div style={{ fontSize: 11, color: C.purple + "99", fontWeight: 600, flexShrink: 0 }}>{"↓ Lưu"}</div>
+                          </button>
+                        )}
+                        {k.hasPdf && (
+                          <button onClick={async function () {
+                            setFormData(Object.assign({}, formData, { docMsg: "⏳ Đang mở..." }));
+                            var cached = _pdfCache[k.id];
+                            if (cached) { var byteStr = atob(cached.split(',')[1]); var bytes = new Uint8Array(byteStr.length); for (var i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i); var viewBlob = new Blob([bytes], { type: 'application/pdf' }); var viewUrl = URL.createObjectURL(viewBlob); window.open(viewUrl, '_blank'); setTimeout(function () { URL.revokeObjectURL(viewUrl); }, 10000); setFormData(Object.assign({}, formData, { docMsg: "" })); return; }
+                            var { data: signedData, error: signErr } = await supabase.storage.from('pdfs').createSignedUrl('knowledge/' + k.id + '.pdf', 300);
+                            if (signErr || !signedData) { setFormData(Object.assign({}, formData, { docMsg: "❌ Không mở được PDF." })); return; }
+                            window.open(signedData.signedUrl, "_blank");
+                            setFormData(Object.assign({}, formData, { docMsg: "" }));
+                          }} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", borderRadius: 14, background: "linear-gradient(135deg," + C.teal + "18," + C.teal + "08)", border: "1px solid " + C.teal + "33", textAlign: "left", cursor: "pointer", width: "100%" }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: C.teal + "25", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{"👁️"}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: C.teal, marginBottom: 3 }}>{"Xem PDF trực tiếp"}</div>
+                              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.pdfName || k.title + ".pdf"}</div>
+                            </div>
+                            <div style={{ fontSize: 11, color: C.teal + "99", fontWeight: 600, flexShrink: 0 }}>{"↗ Mở"}</div>
+                          </button>
+                        )}
+                        {k.docUrl && (
+                          <a href={k.docUrl} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", borderRadius: 14, background: "linear-gradient(135deg," + C.blue + "18," + C.blue + "08)", border: "1px solid " + C.blue + "33", textDecoration: "none", width: "100%" }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: C.blue + "25", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{"🔗"}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: C.blue, marginBottom: 3 }}>{"Tài liệu gốc"}</div>
+                              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(function(){ try { return new URL(k.docUrl).hostname.replace("www.", ""); } catch(e) { return k.docUrl.replace(/https?:\/\//, "").slice(0, 50); } })()}</div>
+                            </div>
+                            <div style={{ fontSize: 11, color: C.blue + "99", fontWeight: 600, flexShrink: 0 }}>{"↗ Mở"}</div>
+                          </a>
+                        )}
                       </div>
-                    )}
+
+                      {formData.docMsg && (
+                        <div style={{ textAlign: "center", fontSize: 12, padding: "10px 16px", borderRadius: 10, background: formData.docMsg.startsWith("✅") ? C.green + "15" : formData.docMsg.startsWith("❌") ? C.red + "15" : C.gold + "15", color: formData.docMsg.startsWith("✅") ? C.green : formData.docMsg.startsWith("❌") ? C.red : C.gold, marginBottom: 12 }}>{formData.docMsg}</div>
+                      )}
+
+                      {/* Text content toggle */}
+                      {k.content && (
+                        <div style={{ marginTop: 4 }}>
+                          <button onClick={function () { setFormData(Object.assign({}, formData, { showRawDoc: !formData.showRawDoc })) }} style={{ width: "100%", padding: "14px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid " + C.border, textAlign: "center", fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                            {formData.showRawDoc ? "▲ Thu gọn nội dung" : "📝 Xem nội dung text (" + (k.content || "").length + " ký tự)"}
+                          </button>
+                          {formData.showRawDoc && (
+                            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap", maxHeight: 420, overflow: "auto", padding: 16, background: "rgba(0,0,0,0.25)", borderRadius: "0 0 10px 10px", marginTop: -1 }}>{k.content}</div>
+                          )}
+                        </div>
+                      )}
+
+                      {!k.hasPdf && !k.docUrl && !k.content && (
+                        <div style={{ textAlign: "center", padding: "48px 24px", color: "rgba(255,255,255,0.25)" }}>
+                          <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
+                          <div style={{ fontSize: 13 }}>{"Chưa có tài liệu đính kèm."}</div>
+                          <div style={{ fontSize: 11, marginTop: 4, color: "rgba(255,255,255,0.15)" }}>{"Admin thêm PDF hoặc link trong phần Quản lý bài học."}</div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
