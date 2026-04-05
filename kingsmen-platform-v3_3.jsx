@@ -4199,6 +4199,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           const mcCorrect = Object.values(qAnswers).filter(a => a.correct === true).length;
           return (
             <div style={{ animation: "fadeIn .4s" }}>
+              {/* Retry spinner */}
+              {aiStatus && <div style={{ textAlign: "center", fontSize: 13, padding: "10px 16px", borderRadius: 10, background: C.gold + "15", color: C.goldL, marginBottom: 12, animation: "pulse 1.5s infinite" }}>{aiStatus}</div>}
               {/* Score header */}
               <div style={{ textAlign: "center", marginBottom: 20 }}>
                 <div style={{ fontSize: 11, color: C.gold, letterSpacing: 4, marginBottom: 12 }}>KẾT QUẢ BÀI THI</div>
@@ -4208,9 +4210,55 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </div>
 
               {/* Mixed quiz breakdown */}
-              {isMixed && curEssayResults.length > 0 && (
+              {isMixed && curEssayResults.length > 0 && (() => {
+                const failedEssays = curEssayResults.filter(r => r.grade === "Lỗi");
+                const okEssays = curEssayResults.filter(r => r.grade !== "Lỗi");
+                const allOk = failedEssays.length === 0;
+                return (
                 <div style={{ ...card, background: "rgba(155,89,182,0.06)", border: `1px solid ${C.purple}22`, marginBottom: 16 }}>
                   <div style={{ fontSize: 13, color: C.purple, fontWeight: 700, marginBottom: 10 }}>📊 CHI TIẾT BÀI THI KẾT HỢP</div>
+
+                  {/* AI grading status banner */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 14px", borderRadius: 10, marginBottom: 14, background: allOk ? C.green + "12" : C.red + "12", border: `1px solid ${allOk ? C.green : C.red}33`, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 18 }}>{allOk ? "✅" : "⚠️"}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: allOk ? C.green : C.red }}>
+                          {allOk ? "AI chấm thành công " + okEssays.length + "/" + curEssayResults.length + " câu" : "Thất bại " + failedEssays.length + "/" + curEssayResults.length + " câu"}
+                        </div>
+                        {!allOk && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Câu thất bại tính 0 điểm. Bấm Thử lại để chấm lại.</div>}
+                      </div>
+                    </div>
+                    {!allOk && (
+                      <button onClick={async () => {
+                        if (!activeQuiz) return;
+                        const qs = activeQuiz.questions;
+                        const answers = qAnswers;
+                        const updated = [...curEssayResults];
+                        setAiStatus("🔄 Đang chấm lại...");
+                        for (let ri = 0; ri < updated.length; ri++) {
+                          if (updated[ri].grade !== "Lỗi") continue;
+                          const i = updated[ri].qIdx;
+                          const q = qs[i];
+                          const userAns = (answers[i] && answers[i].selected) || "(Không trả lời)";
+                          try {
+                            const gp = `Chấm bài tự luận, trả về CHỈ JSON object (KHÔNG markdown, KHÔNG backtick):\n{"score":8,"maxScore":10,"grade":"Tốt","feedback":"nhận xét ngắn","explanation":"phân tích tiêu chí","strengthPoints":["điểm mạnh"],"improvementPoints":["cần cải thiện"]}\n\nCÂU HỎI: ${q.q}\nTIÊU CHÍ: ${q.rubric || "Chấm theo nội dung"}\nĐÁP ÁN MẪU: ${(q.modelAnswer || "").slice(0, 400)}\nBÀI LÀM: ${userAns.slice(0, 800)}\n\nCHỈ JSON thuần.`;
+                            const txt = await callAIWithRetry(gp, 1, 1000);
+                            const parsed = cleanJSON(txt, false);
+                            if (!parsed || typeof parsed.score !== "number") throw new Error("JSON không hợp lệ");
+                            updated[ri] = { ...updated[ri], score: parsed.score || 0, maxScore: parsed.maxScore || 10, grade: parsed.grade || "", feedback: parsed.feedback || "", explanation: parsed.explanation || "", strengthPoints: parsed.strengthPoints || [], improvementPoints: parsed.improvementPoints || [], _error: null };
+                          } catch (e) {
+                            updated[ri] = { ...updated[ri], _error: e.message || String(e) };
+                          }
+                        }
+                        setEssayResults([...updated]);
+                        setAiStatus("");
+                      }} style={{ padding: "8px 16px", borderRadius: 8, background: C.orange + "20", border: `1px solid ${C.orange}44`, color: C.orange, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer" }}>
+                        🔄 Thử lại
+                      </button>
+                    )}
+                  </div>
+
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 8, marginBottom: 14 }}>
                     <div style={{ padding: "12px", borderRadius: 10, background: `${C.green}08`, border: `1px solid ${C.green}22`, textAlign: "center" }}>
                       <div style={{ fontSize: 22, fontWeight: 900, color: C.green, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{mcCorrect}/{mcQs.length}</div>
@@ -4282,7 +4330,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     );
                   })}
                 </div>
-              )}
+                );
+              })()}
 
               {/* MC review for mixed or standalone */}
               {activeQuiz && (() => {
