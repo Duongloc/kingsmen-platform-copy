@@ -2049,12 +2049,30 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎧 Audio (hosting/link)"}</div><input value={k.audioUrl || ""} onChange={function (e) { upd({ audioUrl: e.target.value }) }} placeholder="/media/audio.mp3 hoặc link" style={{ ...inp, fontSize: 10 }} />{k.audioUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{"✓ " + (k.audioUrl.length > 35 ? k.audioUrl.slice(0, 35) + "..." : k.audioUrl)}</div>}</div>
-                          <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"📄 PDF" + (k.hasPdf ? " ✅" : "")}</div>
-                            <div style={{ display: "flex", gap: 4 }}>
-                              <label style={{ flex: 1, display: "block", padding: "7px", borderRadius: 6, border: "1px solid " + C.border, textAlign: "center", cursor: "pointer", fontSize: 10, color: k.hasPdf ? C.green : "rgba(255,255,255,0.4)" }}>{k.hasPdf ? "🔄 Thay" : "📎 Tải lên"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải lên..." })); var path = 'knowledge/' + k.id + '.pdf'; var { error: upErr } = await supabase.storage.from('pdfs').upload(path, file, { upsert: true, contentType: 'application/pdf' }); if (upErr) { var fb = new FileReader(); fb.onload = function (ev) { _pdfCache[k.id] = ev.target.result; upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "⚠️ Lưu tạm (cần bucket 'pdfs' trong Supabase Storage)" })); }; fb.readAsDataURL(file); return; } var fr = new FileReader(); fr.onload = function (ev) { _pdfCache[k.id] = ev.target.result; }; fr.readAsDataURL(file); upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã lưu vào DB" })); }} /></label>
-                              {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false, pdfName: "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 10px", borderRadius: 6, fontSize: 10, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22" }}>{"🗑"}</button>}
+                        </div>
+
+                        {/* ── PDF — full-width row ── */}
+                        <div style={{ borderRadius: 10, border: "1px solid " + (k.hasPdf ? C.purple + "44" : "rgba(255,255,255,0.1)"), background: k.hasPdf ? C.purple + "08" : "rgba(255,255,255,0.02)", padding: "12px 14px", marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                            {/* Left: status + filename */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 8, background: k.hasPdf ? C.purple + "25" : "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{k.hasPdf ? "📄" : "📭"}</div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2, letterSpacing: 1 }}>{"TỆP PDF ĐÍNH KÈM"}</div>
+                                {k.hasPdf && k.pdfName
+                                  ? <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, wordBreak: "break-all", lineHeight: 1.4 }}>{k.pdfName}</div>
+                                  : <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>{"Chưa có PDF — bấm Tải lên để thêm"}</div>
+                                }
+                              </div>
                             </div>
-                            {k.hasPdf && k.pdfName && <div style={{ fontSize: 11, color: C.green, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={k.pdfName}>{"📄 " + k.pdfName}</div>}
+                            {/* Right: actions */}
+                            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                              <label style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", borderRadius: 8, border: "1px solid " + (k.hasPdf ? C.purple + "55" : C.border), background: k.hasPdf ? C.purple + "15" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 11, fontWeight: 700, color: k.hasPdf ? C.purple : "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>
+                                {k.hasPdf ? "🔄 Thay thế" : "📎 Tải lên PDF"}
+                                <input type="file" accept=".pdf" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải lên..." })); var path = 'knowledge/' + k.id + '.pdf'; var { error: upErr } = await supabase.storage.from('pdfs').upload(path, file, { upsert: true, contentType: 'application/pdf' }); if (upErr) { var fb = new FileReader(); fb.onload = function (ev) { _pdfCache[k.id] = ev.target.result; upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "⚠️ Lưu tạm (cần bucket 'pdfs' trong Supabase Storage)" })); }; fb.readAsDataURL(file); return; } var fr = new FileReader(); fr.onload = function (ev) { _pdfCache[k.id] = ev.target.result; }; fr.readAsDataURL(file); upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã lưu vào DB" })); }} />
+                              </label>
+                              {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false, pdfName: "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22", whiteSpace: "nowrap" }}>{"🗑 Xóa"}</button>}
+                            </div>
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
