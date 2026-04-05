@@ -228,8 +228,8 @@ const supabase = createClient(
 // ─── Field mapping: DB (snake_case) ↔ App (camelCase) ───
 const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, accRole: r.acc_role, xp: r.xp || 0, streak: r.streak || 0, status: r.status, lastCheckIn: r.last_check_in || null, lastXpGainDate: r.last_xp_gain_date || null, checkIns: r.check_ins || [], readLessons: r.read_lessons || [], pathProgress: r.path_progress || {}, avatar: r.avatar || null, team: r.team || "" });
 const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
-const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, createdAt: r.created_at });
-const quizToSnake = (q) => ({ id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null });
+const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, createdAt: r.created_at });
+const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
 const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
 const knowledgeToSnake = (k) => ({ id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] });
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
@@ -285,7 +285,7 @@ const DB = {
            if (rows.length > 0) { const { error } = await supabase.from("profiles").upsert(rows); if (error) console.error("profiles upsert err:", error.message); } 
            return true; 
         }
-        case "km-quizzes": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("quizzes").upsert(v.map(quizToSnake)); return !error; }
+        case "km-quizzes": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("quizzes").upsert(v.map(quizToSnake)); if (error) console.error("quizzes upsert err:", error.message, error.details); return !error; }
         case "km-knowledge": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("knowledge").upsert(v.map(knowledgeToSnake)); if (error) console.error("knowledge upsert err:", error.message, error.details); return !error; }
         case "km-results": { 
            if (!Array.isArray(v)) return false; 
@@ -1011,153 +1011,165 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
   const importQuizFile = (file) => {
     const ext = file.name.split('.').pop().toLowerCase();
     const doImport = (rows) => {
-      if (!rows || rows.length < 2) { setAiStatus("❌ File trống."); return; }
+      try {
+        if (!rows || rows.length < 2) {
+          setAiStatus("❌ File trống hoặc chỉ có 1 dòng. Kiểm tra lại file.");
+          return;
+        }
 
-      let title = "", difficulty = "medium", depts = ["Tất cả"];
-      let headerRowIdx = -1;
+        let title = "", difficulty = "medium", depts = ["Tất cả"];
+        let headerRowIdx = -1;
+        const parseLog = []; // collect debug info
 
-      // Scan rows to extract metadata and find header
-      for (let i = 0; i < Math.min(rows.length, 20); i++) {
-        const cells = rows[i].map(c => String(c || "").trim());
-        const joined = cells.join(" ");
+        // Scan rows to extract metadata and find header
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+          const cells = rows[i].map(c => String(c || "").trim());
+          const joined = cells.join(" ");
 
-        // Extract title from "KINGSMEN TRAINING — <TITLE>" row
-        if (i < 3 && joined.includes("KINGSMEN")) {
-          // Extract the content part after "TRAINING —" but before " – TYPE"
-          const m = joined.match(/TRAINING[^—–]*[—–]+([^—–]+?)(?:[—–]|$)/i);
-          if (m) title = m[1].replace(/[📝✍️📋]/g, "").trim();
-          else {
-            const sep = joined.split(/[—–]/);
-            title = (sep[1] || sep[0]).replace(/[📝✍️📋]/g, "").trim();
+          if (i < 3 && joined.includes("KINGSMEN")) {
+            const m = joined.match(/TRAINING[^—–]*[—–]+([^—–]+?)(?:[—–]|$)/i);
+            if (m) title = m[1].replace(/[📝✍️📋]/g, "").trim();
+            else { const sep = joined.split(/[—–]/); title = (sep[1] || sep[0]).replace(/[📝✍️📋]/g, "").trim(); }
+          }
+          if (i < 4 && joined.includes("Độ khó")) {
+            const m = joined.match(/Độ khó[^\w]*([\wÀ-ỹ\s]+?)(\s*[•|,]|$)/i);
+            if (m) { const dl = m[1].trim().toLowerCase(); if (dl.includes("nâng cao") || dl === "advanced") difficulty = "advanced"; else if (dl.includes("khó") || dl === "hard") difficulty = "hard"; else if (dl.includes("dễ") || dl === "easy") difficulty = "easy"; else difficulty = "medium"; }
+          }
+          const nonEmpty = cells.map((c, ci) => ({ c, ci })).filter(x => x.c);
+          if (nonEmpty.length >= 2) {
+            const label = nonEmpty[0].c; const val = nonEmpty[1].c;
+            if (label.includes("Tên đề") && val && !val.includes("Tên đề")) { title = val; parseLog.push("✅ Tên đề: " + val); }
+            if (label.includes("Phòng ban") && val && !val.includes("Phòng ban")) { depts = val === "Tất cả" ? ["Tất cả"] : [val]; parseLog.push("✅ Phòng ban: " + val); }
+            if (label.includes("Độ khó") && !label.includes("•") && val && !val.includes("Độ khó")) {
+              const dl = val.toLowerCase(); if (dl.includes("nâng cao") || dl === "advanced") difficulty = "advanced"; else if (dl.includes("khó") || dl === "hard") difficulty = "hard"; else if (dl.includes("dễ") || dl === "easy") difficulty = "easy"; else difficulty = "medium";
+              parseLog.push("✅ Độ khó: " + val);
+            }
+          }
+          if (cells.some(c => c.includes("Câu hỏi")) && cells.some(c => c.includes("Loại"))) {
+            headerRowIdx = i;
+            parseLog.push("✅ Header row tìm thấy ở dòng " + (i + 1));
+            break;
           }
         }
-        // Extract difficulty from "Độ khó: Trung bình..." row
-        if (i < 4 && joined.includes("Độ khó")) {
-          const m = joined.match(/Độ khó[^\w]*([\wÀ-ỹ\s]+?)(\s*[•|,]|$)/i);
-          if (m) {
-            const dl = m[1].trim().toLowerCase();
-            if (dl.includes("nâng cao") || dl === "advanced") difficulty = "advanced";
-            else if (dl.includes("khó") || dl === "hard") difficulty = "hard";
-            else if (dl.includes("dễ") || dl === "easy") difficulty = "easy";
-            else difficulty = "medium";
-          }
+
+        if (headerRowIdx < 0) {
+          parseLog.push("⚠️ Không tìm thấy dòng header (cần có cột 'Loại' và 'Câu hỏi'). Dùng vị trí cột mặc định.");
         }
-        // Config label format: find non-empty cell, check if next cell is value
-        const nonEmpty = cells.map((c, ci) => ({ c, ci })).filter(x => x.c);
-        if (nonEmpty.length >= 2) {
-          const label = nonEmpty[0].c; const val = nonEmpty[1].c;
-          if (label.includes("Tên đề") && val && !val.includes("Tên đề")) title = val;
-          if (label.includes("Phòng ban") && val && !val.includes("Phòng ban"))
-            depts = val === "Tất cả" ? ["Tất cả"] : [val];
-          if (label.includes("Độ khó") && !label.includes("•") && val && !val.includes("Độ khó")) {
-            const dl = val.toLowerCase();
-            if (dl.includes("nâng cao") || dl === "advanced") difficulty = "advanced";
-            else if (dl.includes("khó") || dl === "hard") difficulty = "hard";
-            else if (dl.includes("dễ") || dl === "easy") difficulty = "easy";
-            else difficulty = "medium";
-          }
+
+        if (!title) {
+          title = (file.name || "Đề kiểm tra").replace(/\.[^.]+$/, "").replace(/_/g, " ");
+          parseLog.push("⚠️ Không tìm thấy 'Tên đề' — dùng tên file: " + title);
         }
-        // Detect header row
-        if (cells.some(c => c.includes("Câu hỏi")) && cells.some(c => c.includes("Loại"))) {
-          headerRowIdx = i; break;
-        }
-      }
 
-      if (!title) title = (file.name || "Đề kiểm tra").replace(/\.[^.]+$/, "").replace(/_/g, " ");
-      const dataStart = headerRowIdx >= 0 ? headerRowIdx + 1 : 2;
-
-      // Map column indices from header row
-      let CI = { type: 2, q: 3, a: 4, b: 5, c: 6, d: 7, ans: 8, exp: 9 }; // defaults
-      if (headerRowIdx >= 0) {
-        rows[headerRowIdx].forEach((h, i) => {
-          const v = String(h || "").trim().toLowerCase();
-          if (v.includes("loại")) CI.type = i;
-          else if (v.includes("câu hỏi")) CI.q = i;
-          else if (v === "đáp án a" || v.endsWith(" a") || v === "a") CI.a = i;
-          else if (v === "đáp án b" || v.endsWith(" b") || v === "b") CI.b = i;
-          else if (v === "đáp án c" || v.endsWith(" c") || v === "c") CI.c = i;
-          else if (v === "đáp án d" || v.endsWith(" d") || v === "d") CI.d = i;
-          else if (v.includes("đáp án đúng") || (v.includes("đáp án") && !v.endsWith(" a") && !v.endsWith(" b") && !v.endsWith(" c") && !v.endsWith(" d"))) CI.ans = i;
-          else if (v.includes("giải thích") || v.includes("rubric")) CI.exp = i;
-        });
-      }
-
-      const normalizeType = (raw) => {
-        const v = String(raw || "").trim().toLowerCase();
-        if (!v) return null;
-        if (v === "single" || v.includes("4 đáp") || v.includes("trắc nghiệm") || v === "tn") return "single";
-        if (v === "truefalse" || v.includes("đúng/sai") || v.includes("đúng sai") || v === "true/false") return "truefalse";
-        if (v === "essay" || v.includes("tự luận")) return "essay";
-        return null;
-      };
-      const ansMap = { A: 0, B: 1, C: 2, D: 3, a: 0, b: 1, c: 2, d: 3 };
-
-      const questions = [];
-      for (let i = dataStart; i < rows.length; i++) {
-        const r = rows[i];
-        const g = (ci) => String(r[ci] || "").trim();
-        const qtype = normalizeType(g(CI.type));
-        const qText = g(CI.q);
-        if (!qtype || !qText || qText.length < 3) continue;
-
-        if (qtype === "essay") {
-          questions.push({
-            id: uid(), type: "essay", q: qText,
-            rubric: g(CI.a), modelAnswer: g(CI.b), points: Number(g(CI.c)) || 10
+        const dataStart = headerRowIdx >= 0 ? headerRowIdx + 1 : 2;
+        let CI = { type: 2, q: 3, a: 4, b: 5, c: 6, d: 7, ans: 8, exp: 9 };
+        if (headerRowIdx >= 0) {
+          rows[headerRowIdx].forEach((h, i) => {
+            const v = String(h || "").trim().toLowerCase();
+            if (v.includes("loại")) CI.type = i;
+            else if (v.includes("câu hỏi")) CI.q = i;
+            else if (v === "đáp án a" || v.endsWith(" a") || v === "a") CI.a = i;
+            else if (v === "đáp án b" || v.endsWith(" b") || v === "b") CI.b = i;
+            else if (v === "đáp án c" || v.endsWith(" c") || v === "c") CI.c = i;
+            else if (v === "đáp án d" || v.endsWith(" d") || v === "d") CI.d = i;
+            else if (v.includes("đáp án đúng") || (v.includes("đáp án") && !v.endsWith(" a") && !v.endsWith(" b") && !v.endsWith(" c") && !v.endsWith(" d"))) CI.ans = i;
+            else if (v.includes("giải thích") || v.includes("rubric")) CI.exp = i;
           });
-        } else if (qtype === "truefalse") {
-          const ar = g(CI.ans);
-          const ans = (ar === "Đúng" || ar.toLowerCase() === "đúng" || ar.toUpperCase() === "TRUE" || ar === "1") ? 0 : 1;
-          questions.push({ id: uid(), type: "truefalse", q: qText, opts: ["Đúng", "Sai"], ans, exp: g(CI.exp) });
+          parseLog.push("✅ Cột: Loại=" + CI.type + " | Câu hỏi=" + CI.q + " | A=" + CI.a + " B=" + CI.b + " C=" + CI.c + " D=" + CI.d + " | Đáp án=" + CI.ans);
         } else {
-          const opts = [g(CI.a), g(CI.b), g(CI.c), g(CI.d)].filter(v => v.length > 0);
-          if (opts.length < 2) continue;
-          const ar = g(CI.ans);
-          const ans = ansMap[ar] !== undefined ? ansMap[ar] : Math.max(0, (Number(ar) || 1) - 1);
-          questions.push({ id: uid(), type: "single", q: qText, opts, ans, exp: g(CI.exp) });
+          parseLog.push("⚠️ Dùng cột mặc định: Loại=2 | Câu hỏi=3 | A=4 B=5 C=6 D=7 | Đáp án=8");
         }
-      }
 
-      if (questions.length === 0) { setAiStatus("❌ Không tìm thấy câu hỏi hợp lệ. Kiểm tra lại format file."); return; }
-      const hasEssay = questions.some(q => q.type === "essay");
-      const hasMC = questions.some(q => q.type !== "essay");
-      const quizType = hasEssay && hasMC ? "mixed" : hasEssay ? "essay" : "mc";
-      const quiz = {
-        id: uid(), title, questions, timeLimit: questions.length * 90,
-        createdAt: new Date().toISOString(), aiGenerated: false, importedFrom: file.name,
-        depts, difficulty, quizType
-      };
-      // Show preview/confirm instead of saving immediately
-      setImportPreview({ quiz, fileName: file.name });
-      setAiStatus("");
+        const normalizeType = (raw) => {
+          const v = String(raw || "").trim().toLowerCase();
+          if (!v) return null;
+          if (v === "single" || v.includes("4 đáp") || v.includes("trắc nghiệm") || v === "tn") return "single";
+          if (v === "truefalse" || v.includes("đúng/sai") || v.includes("đúng sai") || v === "true/false") return "truefalse";
+          if (v === "essay" || v.includes("tự luận")) return "essay";
+          return null;
+        };
+        const ansMap = { A: 0, B: 1, C: 2, D: 3, a: 0, b: 1, c: 2, d: 3 };
+
+        const questions = [];
+        const skipped = [];
+        for (let i = dataStart; i < rows.length; i++) {
+          const r = rows[i];
+          const g = (ci) => String(r[ci] !== undefined ? r[ci] : "").trim();
+          const rawType = g(CI.type);
+          const qtype = normalizeType(rawType);
+          const qText = g(CI.q);
+          const rowNum = i + 1;
+
+          if (!rawType && !qText) continue; // blank row, skip silently
+          if (!qtype) { skipped.push("Dòng " + rowNum + ": loại '" + rawType + "' không nhận dạng được (cần: single/truefalse/essay)"); continue; }
+          if (!qText || qText.length < 3) { skipped.push("Dòng " + rowNum + ": thiếu nội dung câu hỏi"); continue; }
+
+          if (qtype === "essay") {
+            questions.push({ id: uid(), type: "essay", q: qText, rubric: g(CI.a), modelAnswer: g(CI.b), points: Number(g(CI.c)) || 10 });
+          } else if (qtype === "truefalse") {
+            const ar = g(CI.ans);
+            const ans = (ar === "Đúng" || ar.toLowerCase() === "đúng" || ar.toUpperCase() === "TRUE" || ar === "1") ? 0 : 1;
+            if (!ar) skipped.push("Dòng " + rowNum + ": đáp án trống, mặc định = Sai");
+            questions.push({ id: uid(), type: "truefalse", q: qText, opts: ["Đúng", "Sai"], ans, exp: g(CI.exp) });
+          } else {
+            const opts = [g(CI.a), g(CI.b), g(CI.c), g(CI.d)].filter(v => v.length > 0);
+            if (opts.length < 2) { skipped.push("Dòng " + rowNum + ": trắc nghiệm cần ≥2 đáp án, chỉ có " + opts.length + " — bỏ qua"); continue; }
+            const ar = g(CI.ans);
+            if (!ar) skipped.push("Dòng " + rowNum + ": thiếu đáp án đúng, mặc định = A");
+            const ans = ansMap[ar] !== undefined ? ansMap[ar] : Math.max(0, (Number(ar) || 1) - 1);
+            questions.push({ id: uid(), type: "single", q: qText, opts, ans, exp: g(CI.exp) });
+          }
+        }
+
+        if (questions.length === 0) {
+          const detail = skipped.length > 0
+            ? "\n\nCác dòng bị bỏ qua:\n" + skipped.slice(0, 5).join("\n") + (skipped.length > 5 ? "\n...và " + (skipped.length - 5) + " dòng khác" : "")
+            : "\n\nKhông có dòng dữ liệu nào sau header. File có thể dùng sai format.";
+          setAiStatus("❌ Không tìm thấy câu hỏi hợp lệ." + detail);
+          console.warn("CSV import failed. parseLog:", parseLog, "skipped:", skipped);
+          return;
+        }
+
+        const hasEssay = questions.some(q => q.type === "essay");
+        const hasMC = questions.some(q => q.type !== "essay");
+        const quizType = hasEssay && hasMC ? "mixed" : hasEssay ? "essay" : "mc";
+        const quiz = { id: uid(), title, questions, timeLimit: questions.length * 90, createdAt: new Date().toISOString(), aiGenerated: false, importedFrom: file.name, depts, difficulty, quizType };
+        setImportPreview({ quiz, fileName: file.name, parseLog, skipped });
+        setAiStatus("");
+      } catch (fatalErr) {
+        setAiStatus("❌ Lỗi xử lý file: " + fatalErr.message);
+        console.error("CSV/Excel doImport fatal error:", fatalErr);
+      }
     };
 
     if (ext === "csv") {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const text = e.target.result;
-        const rows = text.split(/\r?\n/).map(line => {
-          // Simple CSV parse: split by comma, handle quoted fields
-          const result = []; let cur = ""; let inQ = false;
-          for (const ch of line + ",") {
-            if (ch === '"') { inQ = !inQ; }
-            else if (ch === "," && !inQ) { result.push(cur.trim()); cur = ""; }
-            else cur += ch;
-          }
-          return result;
-        }).filter(r => r.some(c => c));
-        doImport(rows);
+        try {
+          const text = e.target.result;
+          if (!text || !text.trim()) { setAiStatus("❌ File CSV rỗng."); return; }
+          const rows = text.split(/\r?\n/).map(line => {
+            const result = []; let cur = ""; let inQ = false;
+            for (const ch of line + ",") {
+              if (ch === '"') { inQ = !inQ; }
+              else if (ch === "," && !inQ) { result.push(cur.trim()); cur = ""; }
+              else cur += ch;
+            }
+            return result;
+          }).filter(r => r.some(c => c));
+          doImport(rows);
+        } catch (e) { setAiStatus("❌ Không đọc được CSV: " + e.message); }
       };
+      reader.onerror = () => setAiStatus("❌ Lỗi đọc file. Kiểm tra file không bị hỏng.");
       reader.readAsText(file, "UTF-8");
     } else {
-      // Excel — use SheetJS (load on demand if not ready)
       const loadXLSX = (cb) => {
         if (window.XLSX) return cb();
         setAiStatus("⏳ Đang tải thư viện đọc Excel...");
         const s = document.createElement('script');
         s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
         s.onload = () => { setAiStatus(""); cb(); };
-        s.onerror = () => setAiStatus("❌ Không tải được thư viện Excel. Hãy dùng CSV thay thế.");
+        s.onerror = () => setAiStatus("❌ Không tải được thư viện Excel. Hãy dùng file CSV thay thế.");
         document.head.appendChild(s);
       };
       const reader = new FileReader();
@@ -1167,21 +1179,20 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
             const XLSX = window.XLSX;
             if (!XLSX) { setAiStatus("❌ Không tải được SheetJS. Dùng file CSV thay thế."); return; }
             const wb = XLSX.read(e.target.result, { type: "array" });
-            // Try sheets in order: KH - Kết hợp > TN - Trắc nghiệm > TL - Tự luận > first sheet
-            // Skip info/guide sheets, prefer sheets with actual quiz data
             const skipKeywords = ["hướng dẫn", "thông tin", "📋", "guide", "info", "readme"];
             const quizSheets = wb.SheetNames.filter(n => !skipKeywords.some(k => n.toLowerCase().includes(k)));
-            // Among quiz sheets, prefer "kết hợp" (mixed) > others
+            if (quizSheets.length === 0) { setAiStatus("❌ Không tìm thấy sheet dữ liệu trong file Excel. Các sheet: " + wb.SheetNames.join(", ")); return; }
             let sheetName = quizSheets.find(n => n.toLowerCase().includes("kết hợp") || n.toLowerCase().includes("mixed"))
               || quizSheets.find(n => n.toLowerCase().includes("trắc nghiệm") || n.toLowerCase().includes("tn"))
-              || quizSheets[0]
-              || wb.SheetNames[0];
+              || quizSheets[0];
+            setAiStatus("⏳ Đang đọc sheet: " + sheetName + "...");
             const ws = wb.Sheets[sheetName];
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
             doImport(rows);
-          } catch (err) { setAiStatus("❌ Lỗi đọc file Excel: " + err.message); }
-        }); // end loadXLSX
+          } catch (err) { setAiStatus("❌ Lỗi đọc file Excel: " + err.message); console.error("Excel read error:", err); }
+        });
       };
+      reader.onerror = () => setAiStatus("❌ Lỗi đọc file Excel. Kiểm tra file không bị hỏng.");
       reader.readAsArrayBuffer(file);
     }
   };
@@ -1710,6 +1721,36 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </div>
             </div>
 
+            {/* Parse log + skipped rows */}
+            {((importPreview.parseLog && importPreview.parseLog.length > 0) || (importPreview.skipped && importPreview.skipped.length > 0)) && (
+              <div style={{ ...card, flexShrink: 0, padding: 12, marginBottom: 10, background: "rgba(0,0,0,0.25)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, color: C.goldL, fontWeight: 700, letterSpacing: 1 }}>🔍 CHI TIẾT PHÂN TÍCH FILE</div>
+                  {importPreview.skipped && importPreview.skipped.length > 0 && (
+                    <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: C.red + "22", color: C.red, fontWeight: 700 }}>⚠️ {importPreview.skipped.length} dòng bị bỏ qua</span>
+                  )}
+                </div>
+                <div style={{ maxHeight: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+                  {(importPreview.parseLog || []).map((entry, i) => {
+                    const isWarn = entry.startsWith("⚠️");
+                    const isErr  = entry.startsWith("❌");
+                    const col    = isErr ? C.red : isWarn ? C.gold : C.green;
+                    return (
+                      <div key={"pl" + i} style={{ fontSize: 10, color: col, fontFamily: "monospace", lineHeight: 1.5, padding: "1px 4px", borderLeft: `2px solid ${col}44` }}>{entry}</div>
+                    );
+                  })}
+                  {(importPreview.skipped || []).length > 0 && (
+                    <div style={{ marginTop: 4, borderTop: `1px solid ${C.red}22`, paddingTop: 4 }}>
+                      <div style={{ fontSize: 10, color: C.red, fontWeight: 700, marginBottom: 2 }}>DÒNG BỊ BỎ QUA:</div>
+                      {(importPreview.skipped || []).map((s, i) => (
+                        <div key={"sk" + i} style={{ fontSize: 10, color: "rgba(255,100,80,0.85)", fontFamily: "monospace", lineHeight: 1.5, padding: "1px 4px", borderLeft: `2px solid ${C.red}44` }}>{s}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Preview questions (scrollable) */}
             <div style={{ flex: 1, overflowY: "auto", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: C.goldL, fontWeight: 700, marginBottom: 6 }}>XEM TRƯỚC CÂU HỎI</div>
@@ -2109,7 +2150,59 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <button onClick={function () { setPromptPanel({ text: buildPrompt({ type: "lesson_interactive_json", knowledgeItem: k }), title: k.title }) }} style={{ padding: "8px 16px", borderRadius: 8, background: C.green + "15", color: C.green, fontSize: 12, fontWeight: 700, border: "1px solid " + C.green + "33" }}>{"🎴 Prompt"}</button>
                           <button onClick={function () { setFormData(Object.assign({}, formData, { _impLesson: formData._impLesson === k.id ? null : k.id })) }} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: formData._impLesson === k.id ? C.teal + "15" : "rgba(255,255,255,0.04)", color: formData._impLesson === k.id ? C.teal : "rgba(255,255,255,0.5)", border: "1px solid " + (formData._impLesson === k.id ? C.teal + "44" : "rgba(255,255,255,0.1)") }}>{formData._impLesson === k.id ? "▼ Đóng" : "📥 Import JSON"}</button>
                         </div>
-                        {formData._impLesson === k.id && (<div style={{ padding: 10, background: "rgba(0,0,0,0.2)", borderRadius: 8, marginBottom: 8 }}><textarea id={"ljson_" + k.id} defaultValue="" placeholder='{"slides":[...],"flashcards":[...],...}' style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid " + C.teal + "33", background: C.teal + "08", color: C.white, fontSize: 11, fontFamily: "monospace", minHeight: 80, resize: "vertical", boxSizing: "border-box" }} /><button onClick={function () { try { var el = document.getElementById("ljson_" + k.id); var raw = (el ? el.value : "").trim(); if (!raw) return; var j1 = raw.indexOf("{"); if (j1 > 0) raw = raw.slice(j1); var j2 = raw.lastIndexOf("}"); if (j2 >= 0) raw = raw.slice(0, j2 + 1); raw = raw.replace(/```[\s\S]*?```/g, "").replace(/[\x00-\x1F]/g, " ").replace(/,\s*([}\]])/g, "$1"); var obj = JSON.parse(raw); upd({ interactive: { slides: obj.slides || [], flashcards: obj.flashcards || [], cheatsheet: obj.cheatsheet || { title: "", rows: [] }, miniQuiz: obj.miniQuiz || [] } }); setFormData(Object.assign({}, formData, { _impLesson: null })); setAiStatus("✅ Import OK") } catch (e2) { setAiStatus("❌ " + e2.message) } }} style={{ marginTop: 6, padding: "8px 20px", borderRadius: 6, background: "linear-gradient(135deg," + C.teal + "," + C.tealD + ")", color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>{"✅ Import & Lưu"}</button></div>)}
+                        {formData._impLesson === k.id && (
+                          <div style={{ padding: 10, background: "rgba(0,0,0,0.2)", borderRadius: 8, marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Dán JSON từ Claude vào đây (có thể kèm markdown code block)</div>
+                            <textarea id={"ljson_" + k.id} defaultValue="" placeholder={'{\n  "slides": [...],\n  "flashcards": [...],\n  "miniQuiz": [...]\n}'} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid " + C.teal + "33", background: C.teal + "08", color: C.white, fontSize: 11, fontFamily: "monospace", minHeight: 90, resize: "vertical", boxSizing: "border-box" }} />
+                            <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+                              <button onClick={function () {
+                                try {
+                                  var el = document.getElementById("ljson_" + k.id);
+                                  var raw = (el ? el.value : "").trim();
+                                  if (!raw) { setFormData(Object.assign({}, formData, { _impLessonStatus: "⚠️ Chưa nhập JSON" })); return; }
+                                  // strip markdown code fences
+                                  raw = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+                                  var j1 = raw.indexOf("{"); if (j1 > 0) raw = raw.slice(j1);
+                                  var j2 = raw.lastIndexOf("}"); if (j2 >= 0) raw = raw.slice(0, j2 + 1);
+                                  raw = raw.replace(/[\x00-\x1F]/g, " ").replace(/,\s*([}\]])/g, "$1");
+                                  var obj;
+                                  try { obj = JSON.parse(raw); }
+                                  catch (parseErr) {
+                                    // find approximate error position
+                                    var msg = parseErr.message || String(parseErr);
+                                    var posMatch = msg.match(/position (\d+)/i);
+                                    var hint = "";
+                                    if (posMatch) {
+                                      var pos = parseInt(posMatch[1]);
+                                      hint = " | gần: …" + raw.slice(Math.max(0, pos - 20), pos + 20).replace(/\n/g, "↵") + "…";
+                                    }
+                                    setFormData(Object.assign({}, formData, { _impLessonStatus: "❌ JSON không hợp lệ: " + msg.slice(0, 120) + hint }));
+                                    return;
+                                  }
+                                  var slidesCount = (obj.slides || []).length;
+                                  var fcCount = (obj.flashcards || []).length;
+                                  var mqCount = (obj.miniQuiz || []).length;
+                                  var csRows = ((obj.cheatsheet || {}).rows || []).length;
+                                  if (slidesCount === 0 && fcCount === 0 && mqCount === 0) {
+                                    setFormData(Object.assign({}, formData, { _impLessonStatus: "⚠️ JSON hợp lệ nhưng không có slides, flashcards hay miniQuiz nào. Kiểm tra lại cấu trúc." }));
+                                    return;
+                                  }
+                                  upd({ interactive: { slides: obj.slides || [], flashcards: obj.flashcards || [], cheatsheet: obj.cheatsheet || { title: "", rows: [] }, miniQuiz: obj.miniQuiz || [] } });
+                                  setFormData(Object.assign({}, formData, { _impLesson: null, _impLessonStatus: null }));
+                                  setAiStatus("✅ Import bài học OK — " + slidesCount + " slides, " + fcCount + " flashcards, " + mqCount + " quiz, " + csRows + " cheatsheet");
+                                } catch (e2) {
+                                  setFormData(Object.assign({}, formData, { _impLessonStatus: "❌ Lỗi: " + String(e2.message || e2).slice(0, 200) }));
+                                }
+                              }} style={{ padding: "8px 20px", borderRadius: 6, background: "linear-gradient(135deg," + C.teal + "," + C.tealD + ")", color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>{"✅ Import & Lưu"}</button>
+                              <button onClick={function () { setFormData(Object.assign({}, formData, { _impLesson: null, _impLessonStatus: null })) }} style={{ padding: "8px 14px", borderRadius: 6, background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)", fontSize: 12, border: "1px solid rgba(255,255,255,0.1)" }}>Hủy</button>
+                            </div>
+                            {formData._impLessonStatus && (
+                              <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 6, background: formData._impLessonStatus.startsWith("✅") ? C.green + "12" : formData._impLessonStatus.startsWith("⚠️") ? C.gold + "12" : C.red + "12", border: "1px solid " + (formData._impLessonStatus.startsWith("✅") ? C.green : formData._impLessonStatus.startsWith("⚠️") ? C.gold : C.red) + "33", fontSize: 11, color: formData._impLessonStatus.startsWith("✅") ? C.green : formData._impLessonStatus.startsWith("⚠️") ? C.gold : "#ff8070", fontFamily: "monospace", wordBreak: "break-word", lineHeight: 1.6 }}>
+                                {formData._impLessonStatus}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {hasL && (
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             <button onClick={function () { setFormData(Object.assign({}, formData, { _returnAdmin: subScreen })); setRole("employee"); setScreen("emp_knowledge"); setSubScreen(k.id) }} style={{ padding: "8px 16px", borderRadius: 8, background: C.blue + "15", color: C.blue, fontSize: 12, fontWeight: 700, border: "1px solid " + C.blue + "33" }}>{"👁 Xem bài học"}</button>
