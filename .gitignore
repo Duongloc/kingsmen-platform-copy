@@ -23,7 +23,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.txt
+*.txt
 # Environment variables
 .env
 .env.*.local
