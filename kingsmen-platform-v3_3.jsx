@@ -807,22 +807,27 @@ ${content}`);
         if (q.type !== "essay") continue;
         const userAns = (answers[i] && answers[i].selected) || "(Không trả lời)";
         setAiStatus("AI đang chấm câu tự luận " + (essayGradingResults.length + 1) + "/" + essayQsList.length + "...");
+        let gradingError = "";
         try {
-          const gradingPrompt = `Chấm bài tự luận, trả về CHỈ JSON object (KHÔNG markdown):
-{"score":8,"maxScore":10,"grade":"Tốt","feedback":"1 câu nhận xét tổng quát","explanation":"2-3 câu: phân tích ngắn gọn tiêu chí đạt và chưa đạt","strengthPoints":["điểm mạnh 1"],"improvementPoints":["cần cải thiện 1"]}
+          const gradingPrompt = `Chấm bài tự luận, trả về CHỈ JSON object (KHÔNG markdown, KHÔNG backtick):
+{"score":8,"maxScore":10,"grade":"Tốt","feedback":"nhận xét ngắn","explanation":"phân tích tiêu chí","strengthPoints":["điểm mạnh"],"improvementPoints":["cần cải thiện"]}
 
 CÂU HỎI: ${q.q}
-TIÊU CHÍ: ${q.rubric || "Chấm theo nội dung"}
-ĐÁP ÁN MẪU: ${q.modelAnswer || ""}
-BÀI LÀM: ${userAns}
+TIÊU CHÍ: ${q.rubric || "Chấm theo nội dung và mức độ hoàn thiện"}
+ĐÁP ÁN MẪU: ${(q.modelAnswer || "").slice(0, 400)}
+BÀI LÀM: ${userAns.slice(0, 800)}
 
-CHỈ JSON. KHÔNG backtick.`;
-          const txt = await callAIWithRetry(gradingPrompt);
+CHỈ JSON thuần. KHÔNG thêm gì khác.`;
+          const txt = await callAIWithRetry(gradingPrompt, 1, 1000);
+          if (!txt) throw new Error("AI trả về rỗng");
           const parsed = cleanJSON(txt, false);
+          if (!parsed || typeof parsed.score !== "number") throw new Error("JSON không hợp lệ: " + String(txt).slice(0, 120));
           essayGradingResults.push({ qIdx: i, q: q.q, userAns, score: parsed.score || 0, maxScore: parsed.maxScore || 10, grade: parsed.grade || "", feedback: parsed.feedback || "", explanation: parsed.explanation || "", strengthPoints: parsed.strengthPoints || [], improvementPoints: parsed.improvementPoints || [] });
-          sc += Math.round((parsed.score || 0) / (parsed.maxScore || 10));// normalize to 1 point scale
+          sc += Math.round((parsed.score || 0) / (parsed.maxScore || 10));
         } catch (e) {
-          essayGradingResults.push({ qIdx: i, q: q.q, userAns, score: 0, maxScore: 10, grade: "Lỗi", feedback: "Không chấm được do lỗi AI", explanation: "", strengthPoints: [], improvementPoints: [] });
+          gradingError = e.message || String(e);
+          console.error("Essay grading error q" + i + ":", gradingError);
+          essayGradingResults.push({ qIdx: i, q: q.q, userAns, score: 0, maxScore: 10, grade: "Lỗi", feedback: "Không chấm được: " + gradingError.slice(0, 120), explanation: "", strengthPoints: [], improvementPoints: [], _error: gradingError });
         }
       }
       setEssayResults(essayGradingResults); setEssayGrading(false); setAiStatus("");
@@ -4159,15 +4164,27 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
         {/* ═══ EMPLOYEE: ESSAY GRADING SCREEN ═══ */}
         {role === "employee" && screen === "emp_essay_grading" && activeQuiz && (
-          <div style={{ animation: "fadeIn .4s", textAlign: "center", padding: "40px 0" }}>
+          <div style={{ animation: "fadeIn .4s", textAlign: "center", padding: "40px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 16, animation: "pulse 1.5s infinite" }}>🤖</div>
             <h2 style={{ ...hd(20), marginBottom: 8 }}>AI đang chấm bài tự luận</h2>
             <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, marginBottom: 24 }}>Vui lòng chờ trong giây lát...</div>
-            {aiStatus && <div style={{ fontSize: 14, color: C.goldL, animation: "pulse 1.5s infinite", marginBottom: 12 }}>{aiStatus}</div>}
-            <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
-              {activeQuiz.questions.filter(q => q.type === "essay").map((_, i) => (
-                <div key={i} style={{ width: 12, height: 12, borderRadius: 6, background: essayResults[i] ? C.green : `${C.gold}44`, animation: !essayResults[i] ? "pulse 1.5s infinite" : "" }} />
-              ))}
+            {aiStatus && (
+              <div style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, display: "inline-block", marginBottom: 16,
+                background: aiStatus.startsWith("❌") ? C.red + "15" : C.gold + "15",
+                color: aiStatus.startsWith("❌") ? C.red : C.goldL,
+                animation: "pulse 1.5s infinite" }}>{aiStatus}</div>
+            )}
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 16 }}>
+              {activeQuiz.questions.filter(q => q.type === "essay").map((_, i) => {
+                const done = essayResults[i];
+                const hasErr = done && done.grade === "Lỗi";
+                return (
+                  <div key={i} title={hasErr ? "Lỗi: " + (done._error || "") : done ? "Đã chấm" : "Đang chờ"} style={{ width: 14, height: 14, borderRadius: 7, background: hasErr ? C.red : done ? C.green : `${C.gold}44`, animation: !done ? "pulse 1.5s infinite" : "", cursor: hasErr ? "help" : "default" }} />
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 8 }}>
+              {essayResults.length}/{activeQuiz.questions.filter(q => q.type === "essay").length} câu đã chấm
             </div>
           </div>
         )}
@@ -4228,7 +4245,14 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, fontSize: 13, color: "rgba(255,255,255,0.65)", lineHeight: 1.6 }}>{er.userAns || "(Không trả lời)"}</div>
                         </div>
 
-                        {/* AI feedback */}
+                        {/* AI feedback — or error banner */}
+                        {er.grade === "Lỗi" ? (
+                          <div style={{ padding: "12px 14px", borderRadius: 10, background: C.red + "10", border: `1px solid ${C.red}33` }}>
+                            <div style={{ fontSize: 11, color: C.red, fontWeight: 700, marginBottom: 6 }}>⚠️ CHẤM BÀI THẤT BẠI</div>
+                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: 6 }}>AI không thể chấm câu này. Câu sẽ được tính 0 điểm.</div>
+                            {er._error && <div style={{ fontSize: 11, fontFamily: "monospace", color: C.red + "cc", background: "rgba(0,0,0,0.2)", padding: "6px 10px", borderRadius: 6, wordBreak: "break-all" }}>{"Lỗi: " + er._error}</div>}
+                          </div>
+                        ) : (
                         <div style={{ padding: "12px 14px", borderRadius: 10, background: `${scoreColor}08`, border: `1px solid ${scoreColor}22` }}>
                           <div style={{ fontSize: 11, color: scoreColor, fontWeight: 700, marginBottom: 6 }}>🤖 NHẬN XÉT CỦA AI</div>
                           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.7, marginBottom: 10 }}>{er.feedback}</div>
@@ -4253,6 +4277,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                             )}
                           </div>
                         </div>
+                        )}
                       </div>
                     );
                   })}
