@@ -1609,11 +1609,17 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
         if (data.accounts) {
           const cleaned = data.accounts.map(a => { const { password, _enc, ...rest } = a; return rest; });
           setAccounts(cleaned); accountsRef.current = cleaned;
-          await DB.set("km-accounts", cleaned);
+          // Skip accounts DB sync for legacy string IDs to prevent UUID crashes
+          const hasLegacyId = cleaned.some(a => a.id.length < 15);
+          if (!hasLegacyId) { await DB.set("km-accounts", cleaned); }
         }
         if (data.knowledge) { setKnowledge(data.knowledge); await DB.set("km-knowledge", data.knowledge); }
         if (data.quizzes) { setQuizzes(data.quizzes); await DB.set("km-quizzes", data.quizzes); }
-        if (data.results) { setResults(data.results); await DB.set("km-results", data.results); }
+        if (data.results) { 
+           // Safety: Drop results that have legacy non-UUID empIds to prevent FK crashes
+           const validResults = data.results.filter(r => r.empId && r.empId.length > 15);
+           setResults(validResults); await DB.set("km-results", validResults); 
+        }
         if (data.recognitions) { setRecognitions(data.recognitions); await DB.set("km-recognitions", data.recognitions); }
         if (data.challenges) { setChallenges(data.challenges); await DB.set("km-challenges", data.challenges); }
         if (data.notifications) { setNotifications(data.notifications); await DB.set("km-notifications", data.notifications); }
@@ -1621,12 +1627,11 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
         if (data.bulletins) { setBulletins(data.bulletins); await DB.set("km-bulletins", data.bulletins); }
         if (data.settings) { setSettings(data.settings); await DB.set("km-settings", data.settings); }
         const msg = `✅ Khôi phục thành công!`
-          + `\n👤 ${(data.accounts || []).length} tài khoản`
+          + `\n👤 Tài khoản (chỉ UI)`
           + ` · 📚 ${(data.knowledge || []).length} kiến thức`
           + ` · 📝 ${(data.quizzes || []).length} đề thi`
-          + `\n📊 ${(data.results || []).length} kết quả`
-          + ` · 🎯 ${(data.challenges || []).length} thử thách`
-          + ` · 📋 ${(data.paths || []).length} lộ trình`
+          + `\n🎯 ${(data.challenges || []).length} thử thách`
+          + ` · 📋 ${(data.paths || []).length} lộ trình`;
           + ` · 📢 ${(data.bulletins || []).length} bảng tin`;
         setImportStatus({ ok: true, msg });
         setSaveStatus("saved");
