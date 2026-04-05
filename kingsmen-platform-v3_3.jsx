@@ -3431,7 +3431,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 { i: "📊", t: "Kết Quả", d: `${results.filter(r => r.empId === currentUser.id).length} lượt`, s: "emp_results" },
                 { i: "🏆", t: "Xếp Hạng", d: "Toàn công ty", s: "emp_ranking" },
                 { i: "🎖️", t: "Huy Hiệu", d: `${getUserBadges(currentUser).length}/${BADGES.length}`, s: "emp_badges" },
-                { i: "🎯", t: "Thử Thách", d: `${challenges.length} thử thách`, s: "emp_challenges" },
+                { i: "🎯", t: "Thử Thách", d: `${challenges.filter(ch => challengeVisibleTo(ch, currentUser)).length} thử thách`, s: "emp_challenges" },
                 { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => (p.assignedTo || []).includes(currentUser.id)).length} lộ trình`, s: "emp_pathway" },
                 { i: "📢", t: "Bảng Tin", d: `${bulletins.length} bài đăng`, s: "emp_bulletins" },
                 ...(currentUser.accRole === "director" ? [

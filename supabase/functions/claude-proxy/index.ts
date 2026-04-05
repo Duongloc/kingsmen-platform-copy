@@ -39,7 +39,7 @@ serve(async (req) => {
       });
     }
 
-    // ── 2. Restrict to active admins and directors only ────────────────────
+    // ── 2. Require active account — all active users may call this proxy ──────
     const { data: profile } = await supabase
       .from("profiles")
       .select("status, emp_id, acc_role")
@@ -48,16 +48,6 @@ serve(async (req) => {
 
     if (!profile || profile.status !== "active") {
       return new Response(JSON.stringify({ error: "Account inactive" }), {
-        status: 403,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-      });
-    }
-
-    const isAdminOrDirector =
-      profile.emp_id === "admin" || profile.acc_role === "director";
-
-    if (!isAdminOrDirector) {
-      return new Response(JSON.stringify({ error: "Forbidden: AI features are restricted to admins and directors" }), {
         status: 403,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
@@ -82,9 +72,12 @@ serve(async (req) => {
       });
     }
 
-    // ── 4. Enforce model and token limits server-side (never trust the client) ─
+    // ── 4. Enforce model and token limits server-side — admins get higher cap ─
     const ALLOWED_MODEL = "claude-sonnet-4-6";
-    const MAX_TOKENS_LIMIT = 6000;
+    const isAdminOrDirector = profile.emp_id === "admin" || profile.acc_role === "director";
+    // Admins/directors: 6000 tokens (quiz gen, knowledge AI, analysis)
+    // Regular employees: 2000 tokens (essay grading only)
+    const MAX_TOKENS_LIMIT = isAdminOrDirector ? 6000 : 2000;
 
     const safeBody = {
       ...clientBody,
