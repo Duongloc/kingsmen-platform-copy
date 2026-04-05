@@ -1538,7 +1538,7 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Google Sans','Be Vietnam Pro',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Google Sans','Be Vietnam Pro',sans-serif", overflowX: "hidden" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Google+Sans:wght@400;500;600;700&display=swap');
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -1546,7 +1546,9 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
 *{box-sizing:border-box;margin:0;padding:0}input:focus,textarea:focus,select:focus{outline:2px solid ${C.teal};outline-offset:1px}
 button{cursor:pointer;border:none;transition:all .15s}button:hover{filter:brightness(1.08);transform:translateY(-1px)}button:active{transform:translateY(0)}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:${C.teal}55;border-radius:3px}
-select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !important}select option{background-color:#1A3A4A !important;color:#FFFFFF !important}input[type="date"]{color-scheme:dark}`}</style>
+select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !important}select option{background-color:#1A3A4A !important;color:#FFFFFF !important}input[type="date"]{color-scheme:dark}
+.nav-scroll::-webkit-scrollbar{display:none}
+@media(max-width:480px){body{font-size:13px}}`}</style>
       <div ref={topRef} />
 
       {/* ═══ MOTIVATIONAL QUOTE POPUP ═══ */}
@@ -1633,7 +1635,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
       {/* ═══ IMPORT PREVIEW OVERLAY ═══ */}
       {importPreview && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99997, background: "rgba(10,45,58,0.97)", display: "flex", flexDirection: "column", padding: 20, animation: "fadeIn .25s" }}>
-          <div style={{ maxWidth: 640, width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", height: "100%", maxHeight: "92vh" }}>
+          <div style={{ maxWidth: "min(640px, 95vw)", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", height: "100%", maxHeight: "92vh" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexShrink: 0 }}>
               <div>
@@ -1737,7 +1739,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
       {/* ═══ PROMPT PANEL OVERLAY ═══ */}
       {promptPanel && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99998, background: "rgba(10,45,58,0.96)", display: "flex", flexDirection: "column", padding: 20, animation: "fadeIn .25s" }} onClick={() => setPromptPanel(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 720, width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", height: "100%", maxHeight: "92vh" }}>
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: "min(720px, 95vw)", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", height: "100%", maxHeight: "92vh" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexShrink: 0 }}>
               <div>
@@ -1785,8 +1787,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: role === "admin" ? "pointer" : "default" }} onClick={() => { if (role === "admin" && logoInputRef.current) logoInputRef.current.click(); }}>
             {companyLogo ? (<img src={companyLogo} alt="Logo" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />) : (<div style={{ width: 32, height: 32, background: C.gold, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 900, fontSize: 14, color: C.dark, flexShrink: 0 }}>K</div>)}
-            <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 800, fontSize: 14, color: C.white, letterSpacing: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>KINGSMEN</div><div style={{ fontSize: 9, color: C.goldL, letterSpacing: 2 }}>Training Platform v3</div></div>
-            {role === "admin" && <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: 2, padding: "2px 5px", borderRadius: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>🖼 Logo</div>}
+            <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 800, fontSize: 14, color: C.white, letterSpacing: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>KINGSMEN</div><div style={{ fontSize: 11, color: C.goldL, letterSpacing: 2 }}>Training Platform v3</div></div>
+            {role === "admin" && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginLeft: 2, padding: "4px 7px", borderRadius: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>🖼 Logo</div>}
             <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1803,86 +1805,47 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </button>
             )}
             {currentUser && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", position: "relative" }} onClick={() => { if (avatarInputRef.current) avatarInputRef.current.click(); }}>
-                {currentUser.avatar ? (<img src={currentUser.avatar} alt="av" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "2px solid " + C.gold + "55" }} />) : (<span style={{ fontSize: 14 }}>{gL(currentUser.xp || 0).icon}</span>)}
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{currentUser.name}</span>
-                {currentUser.streak > 0 && <span style={{ fontSize: 11, color: C.orange }}>{"🔥" + currentUser.streak}</span>}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", position: "relative", minWidth: 0 }} onClick={() => { if (avatarInputRef.current) avatarInputRef.current.click(); }}>
+                {currentUser.avatar ? (<img src={currentUser.avatar} alt="av" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "2px solid " + C.gold + "55", flexShrink: 0 }} />) : (<span style={{ fontSize: 14, flexShrink: 0 }}>{gL(currentUser.xp || 0).icon}</span>)}
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80 }}>{currentUser.name}</span>
+                {currentUser.streak > 0 && <span style={{ fontSize: 11, color: C.orange, flexShrink: 0 }}>{"🔥" + currentUser.streak}</span>}
                 <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleAvatarUpload(e, currentUser.id)} />
               </div>
             )}
             {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); Session.clear("km-session"); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
           </div>
         </div>
-        {/* ═══ MENU BAR ═══ */}
-        {role === "employee" && currentUser && (() => {
-          const empMenuItems = [
-            { i: "🏠", t: "HOME", s: "emp_home" },
-            { i: "📖", t: "HỌC", s: "emp_knowledge" },
-            { i: "✏️", t: "THI", s: "emp_quizzes" },
-            { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
-            { i: "🏆", t: "HẠNG", s: "emp_ranking" },
-            { i: "🎯", t: "THÁCH", s: "emp_challenges" },
-            { i: "🧠", t: "NLỰC", s: "emp_competency" },
-            { i: "📢", t: "TIN", s: "emp_bulletins" },
-          ];
-          const empPrimary = empMenuItems.slice(0, 5);
-          const empMore = empMenuItems.slice(5);
-          const empMoreActive = empMore.some(m => m.s === screen);
-          return (
-            <div style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", alignItems: "center", position: "relative" }}>
-              {empPrimary.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "8px 10px", fontSize: 10, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.i + " " + m.t}</button> })}
-              {empMore.length > 0 && (
-                <div style={{ position: "relative", marginLeft: "auto" }}>
-                  <button onClick={() => setFormData({ ...formData, _moreMenu: formData._moreMenu === "emp" ? null : "emp" })} style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: empMoreActive ? C.goldL : "rgba(255,255,255,0.5)", background: empMoreActive ? C.gold + "22" : "none", border: empMoreActive ? "1px solid " + C.gold + "44" : "none", borderRadius: 6, whiteSpace: "nowrap", cursor: "pointer" }}>{"≡ Thêm" + (empMoreActive ? " ●" : "")}</button>
-                  {formData._moreMenu === "emp" && (
-                    <div>
-                      <div onClick={() => setFormData({ ...formData, _moreMenu: null })} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} />
-                      <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 999, marginTop: 4, background: "linear-gradient(135deg,#1a3a45,#0f2d3a)", border: "1px solid " + C.gold + "33", borderRadius: 12, padding: 6, minWidth: 150, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-                        {empMore.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null); setFormData({ ...formData, _moreMenu: null }) }} style={{ display: "block", width: "100%", padding: "10px 14px", fontSize: 12, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? C.goldL : "rgba(255,255,255,0.65)", background: screen === m.s ? C.gold + "15" : "transparent", border: "none", borderRadius: 8, textAlign: "left", cursor: "pointer", marginBottom: 2 }}>{m.i + "  " + m.t}</button> })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-        {role === "admin" && (() => {
-          const admMenuItems = [
-            { i: "🏠", t: "HOME", s: "admin_home" },
-            { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
-            { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
-            { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
-            { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
-            { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
-            { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
-            { i: "📈", t: "HOẠT ĐỘNG", s: "admin_activity" },
-            { i: "👥", t: "TÀI KHOẢN", s: "admin_accounts" },
-            { i: "⚙️", t: "CÀI ĐẶT", s: "admin_settings" },
-            { i: "💾", t: "SAO LƯU", s: "admin_backup" },
-          ];
-          const admPrimary = admMenuItems.slice(0, 5);
-          const admMore = admMenuItems.slice(5);
-          const admMoreActive = admMore.some(m => m.s === screen);
-          return (
-            <div style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", alignItems: "center", position: "relative" }}>
-              {admPrimary.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "8px 10px", fontSize: 10, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.teal : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.i + " " + m.t}</button> })}
-              {admMore.length > 0 && (
-                <div style={{ position: "relative", marginLeft: "auto" }}>
-                  <button onClick={() => setFormData({ ...formData, _moreMenu: formData._moreMenu === "adm" ? null : "adm" })} style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: admMoreActive ? C.teal : "rgba(255,255,255,0.5)", background: admMoreActive ? C.teal + "22" : "none", border: admMoreActive ? "1px solid " + C.teal + "44" : "none", borderRadius: 6, whiteSpace: "nowrap", cursor: "pointer" }}>{"≡ Thêm" + (admMoreActive ? " ●" : "")}</button>
-                  {formData._moreMenu === "adm" && (
-                    <div>
-                      <div onClick={() => setFormData({ ...formData, _moreMenu: null })} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} />
-                      <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 999, marginTop: 4, background: "linear-gradient(135deg,#1a3a45,#0f2d3a)", border: "1px solid " + C.teal + "33", borderRadius: 12, padding: 6, minWidth: 160, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-                        {admMore.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null); setFormData({ ...formData, _moreMenu: null }) }} style={{ display: "block", width: "100%", padding: "10px 14px", fontSize: 12, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? C.teal : "rgba(255,255,255,0.65)", background: screen === m.s ? C.teal + "15" : "transparent", border: "none", borderRadius: 8, textAlign: "left", cursor: "pointer", marginBottom: 2 }}>{m.i + "  " + m.t}</button> })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {role === "employee" && currentUser && (
+          <div className="nav-scroll" style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            {[
+              { i: "🏠", t: "HOME", s: "emp_home" },
+              { i: "📖", t: "HỌC", s: "emp_knowledge" },
+              { i: "✏️", t: "THI", s: "emp_quizzes" },
+              { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
+              { i: "🏆", t: "HẠNG", s: "emp_ranking" },
+              { i: "🎯", t: "THÁCH", s: "emp_challenges" },
+              { i: "🧠", t: "NLỰC", s: "emp_competency" },
+              { i: "📢", t: "TIN", s: "emp_bulletins" },
+            ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44 }}>{m.i + " " + m.t}</button> })}
+          </div>
+        )}
+        {role === "admin" && (
+          <div className="nav-scroll" style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            {[
+              { i: "🏠", t: "HOME", s: "admin_home" },
+              { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
+              { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
+              { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
+              { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
+              { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
+              { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
+              { i: "📈", t: "HOẠT ĐỘNG", s: "admin_activity" },
+              { i: "👥", t: "TÀI KHOẢN", s: "admin_accounts" },
+              { i: "⚙️", t: "CÀI ĐẶT", s: "admin_settings" },
+              { i: "💾", t: "SAO LƯU", s: "admin_backup" },
+            ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.teal : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44 }}>{m.i + " " + m.t}</button> })}
+          </div>
+        )}
       </header>
 
       <div style={{ maxWidth: 920, margin: "0 auto", padding: "12px 10px 60px" }}>
@@ -1963,7 +1926,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               })}
             </div>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>{"BÁO CÁO & PHÂN TÍCH"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 8, marginBottom: 16 }}>
               {[
                 { i: "📊", t: "Năng Lực", d: "Radar + Gap", s: "admin_analytics" },
                 { i: "🏆", t: "Xếp Hạng", d: "Bảng xếp hạng", s: "admin_ranking" },
@@ -2086,7 +2049,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               <label style={{ flex: 1, display: "block", padding: "7px", borderRadius: 6, border: "1px solid " + C.border, textAlign: "center", cursor: "pointer", fontSize: 10, color: k.hasPdf ? C.green : "rgba(255,255,255,0.4)" }}>{k.hasPdf ? "🔄 Thay" : "📎 Tải lên"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải lên..." })); var path = 'knowledge/' + k.id + '.pdf'; var { error: upErr } = await supabase.storage.from('pdfs').upload(path, file, { upsert: true, contentType: 'application/pdf' }); if (upErr) { var fb = new FileReader(); fb.onload = function (ev) { _pdfCache[k.id] = ev.target.result; upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "⚠️ Lưu tạm (cần bucket 'pdfs' trong Supabase Storage)" })); }; fb.readAsDataURL(file); return; } var fr = new FileReader(); fr.onload = function (ev) { _pdfCache[k.id] = ev.target.result; }; fr.readAsDataURL(file); upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã lưu vào DB" })); }} /></label>
                               {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false, pdfName: "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 10px", borderRadius: 6, fontSize: 10, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22" }}>{"🗑"}</button>}
                             </div>
-                            {k.hasPdf && k.pdfName && <div style={{ fontSize: 9, color: C.green, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={k.pdfName}>{"📄 " + k.pdfName}</div>}
+                            {k.hasPdf && k.pdfName && <div style={{ fontSize: 11, color: C.green, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={k.pdfName}>{"📄 " + k.pdfName}</div>}
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -2510,7 +2473,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
             {/* Filters: Dept + Team + Employee */}
             <div style={{ ...card, padding: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
                 <div><label style={lbl}>Phòng ban</label>
                   <select value={formData.anaDept || ""} onChange={e => setFormData({ ...formData, anaDept: e.target.value, anaTeam: "", anaEmp: "" })} style={inp}>
                     <option value="">Tất cả phòng ban</option>{DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
@@ -3559,7 +3522,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   const sl = it.slides; const s = sl[sIdx] || sl[0]; if (!s) return null;
                   return (<React.Fragment>
                     <div style={{ ...fsBody, justifyContent: "center", alignItems: "center", padding: "24px" }}>
-                      <div style={{ width: "100%", maxWidth: 560 }}>
+                      <div style={{ width: "100%", maxWidth: "min(560px, 100%)" }}>
                         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", marginBottom: 16 }}>SLIDE {sIdx + 1} / {sl.length}</div>
                         <div style={{ fontSize: 48, textAlign: "center", marginBottom: 16 }}>{s.icon || "📌"}</div>
                         <h2 style={{ ...hd(24), textAlign: "center", marginBottom: 24 }}>{s.title}</h2>
@@ -3586,7 +3549,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   return (<React.Fragment>
                     <div style={{ ...fsBody, justifyContent: "center", alignItems: "center", padding: "24px" }} onClick={() => setFormData({ ...formData, cardFlip: !cFlip })}>
                       <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginBottom: 12 }}>THẺ {cIdx + 1} / {fc.length} · Bấm để lật</div>
-                      <div style={{ width: "100%", maxWidth: 420, minHeight: 280, borderRadius: 20, padding: "36px 28px", background: cFlip ? `linear-gradient(160deg,#0d3d2d,#0a2620)` : `linear-gradient(160deg,#1a2d40,#0f1f2e)`, border: `2px solid ${cFlip ? C.green + "55" : C.gold + "44"}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", cursor: "pointer", transition: "all .4s", boxShadow: cFlip ? "0 0 40px rgba(46,204,113,0.1)" : "0 0 40px rgba(197,153,62,0.1)" }}>
+                      <div style={{ width: "100%", maxWidth: "min(420px, 100%)", minHeight: 280, borderRadius: 20, padding: "36px 28px", background: cFlip ? `linear-gradient(160deg,#0d3d2d,#0a2620)` : `linear-gradient(160deg,#1a2d40,#0f1f2e)`, border: `2px solid ${cFlip ? C.green + "55" : C.gold + "44"}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", cursor: "pointer", transition: "all .4s", boxShadow: cFlip ? "0 0 40px rgba(46,204,113,0.1)" : "0 0 40px rgba(197,153,62,0.1)" }}>
                         <div style={{ fontSize: 12, padding: "3px 12px", borderRadius: 20, background: cFlip ? `${C.green}22` : `${C.gold}22`, color: cFlip ? C.green : C.gold, fontWeight: 700, marginBottom: 16 }}>{cFlip ? "ĐÁP ÁN" : "CÂU HỎI"}</div>
                         <div style={{ fontSize: 40, marginBottom: 16 }}>{cFlip ? "✅" : c.icon || "❓"}</div>
                         <div style={{ fontSize: 20, fontWeight: 700, color: C.white, lineHeight: 1.6, maxWidth: 340 }}>{cFlip ? c.back : c.front}</div>
@@ -3673,7 +3636,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     </div>
 
                     {/* Resource cards */}
-                    <div style={{ display: "grid", gridTemplateColumns: k.hasPdf ? (k.docUrl ? "1fr 1fr 1fr" : "1fr 1fr") : (k.docUrl ? "1fr" : "1fr"), gap: 8, marginBottom: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
                       {k.hasPdf && (
                         <button onClick={async function () {
                           setFormData(Object.assign({}, formData, { docMsg: "⏳" }));
@@ -3761,8 +3724,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       {isYT && (function () {
                         var m = aUrl.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/); var ytId = m ? m[1] : "";
                         return ytId ? (
-                          <div style={{ marginBottom: 16, maxWidth: 600, margin: "0 auto 16px" }}>
-                            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 12, maxHeight: "50vh" }}>
+                          <div style={{ marginBottom: 16, maxWidth: "min(800px, 100%)", margin: "0 auto 16px" }}>
+                            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 12, maxHeight: "60vh" }}>
                               <iframe src={"https://www.youtube.com/embed/" + ytId + "?rel=0"} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} allow="accelerometer; autoplay; encrypted-media" allowFullScreen title="audio" />
                             </div>
                           </div>
@@ -3798,8 +3761,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ ...fsBody, padding: 0, alignItems: "center" }}>
                       {/* YouTube embed — works on hosting, blocked in artifact */}
                       {isYT && ytId && (
-                        <div style={{ width: "100%", maxWidth: 800, margin: "0 auto" }}>
-                          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 0, maxHeight: "65vh" }}>
+                        <div style={{ width: "100%", maxWidth: "min(1100px, 100%)", margin: "0 auto" }}>
+                          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 0, maxHeight: "75vh" }}>
                             <iframe src={"https://www.youtube.com/embed/" + ytId + "?rel=0&modestbranding=1"} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="video" />
                           </div>
                           <div style={{ padding: "8px 12px", fontSize: 10, color: "rgba(255,255,255,0.2)", textAlign: "center" }}>{"⚠ Nếu không hiện: mở link bên dưới"}</div>
@@ -3808,8 +3771,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                       {/* Direct video — works on hosting with MP4/WebM */}
                       {isDirect && (
-                        <div style={{ width: "100%", maxWidth: 800, margin: "0 auto", background: "#000" }}>
-                          <video controls playsInline preload="metadata" style={{ width: "100%", maxHeight: "65vh", display: "block", margin: "0 auto" }} src={vUrl}>
+                        <div style={{ width: "100%", maxWidth: "min(1100px, 100%)", margin: "0 auto", background: "#000" }}>
+                          <video controls playsInline preload="metadata" style={{ width: "100%", maxHeight: "75vh", display: "block", margin: "0 auto" }} src={vUrl}>
                             <source src={vUrl} type="video/mp4" />
                           </video>
                         </div>
@@ -3817,7 +3780,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                       {/* Fallback link */}
                       {vUrl && (
-                        <div style={{ padding: "10px 16px", width: "100%", maxWidth: 800, margin: "0 auto" }}>
+                        <div style={{ padding: "10px 16px", width: "100%", maxWidth: "min(1100px, 100%)", margin: "0 auto" }}>
                           <a href={vUrl} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, background: isYT ? "rgba(255,0,0,0.06)" : "rgba(12,123,111,0.06)", border: "1px solid " + (isYT ? "rgba(255,0,0,0.15)" : "rgba(12,123,111,0.15)"), textDecoration: "none" }}>
                             {isYT ? <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#ff0000", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 0, height: 0, borderTop: "5px solid transparent", borderBottom: "5px solid transparent", borderLeft: "9px solid #fff", marginLeft: 2 }} /></div> : <span style={{ fontSize: 16 }}>{"🔗"}</span>}
                             <div style={{ fontSize: 12, fontWeight: 600, color: isYT ? "#ff4444" : C.teal }}>{"Mở " + (isYT ? "YouTube" : "video") + " trong tab mới"}</div>
@@ -3938,7 +3901,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     })}
                   </div>
                   <div style={{ fontSize: 11, color: C.goldL, letterSpacing: 2, fontWeight: 700, marginBottom: 6 }}>{"ÔN BÀI"}</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8 }}>
                     {[
                       { id: "cards", icon: "🎴", t: "Flashcards", d: (it.flashcards && it.flashcards.length || 0) + " thẻ", extra: { cardIdx: 0, cardFlip: false } },
                       { id: "sheet", icon: "📋", t: "Tóm tắt", d: (it.cheatsheet && it.cheatsheet.rows && it.cheatsheet.rows.length || 0) + " mục", extra: {} },
@@ -4598,7 +4561,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               return (
                 <div>
                   {/* Team overview */}
-                  <div style={{ ...card, display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
+                  <div style={{ ...card, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 10, textAlign: "center" }}>
                     <div><div style={{ fontSize: 20, fontWeight: 800, color: C.blue, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{myTeam.length}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Thành viên</div></div>
                     <div><div style={{ fontSize: 20, fontWeight: 800, color: C.green, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{(() => { const rs = results.filter(r => myTeam.some(m => m.id === r.empId)); return rs.length ? Math.round(rs.reduce((s, r) => s + r.pct, 0) / rs.length) : 0 })}%</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Điểm TB team</div></div>
                     <div><div style={{ fontSize: 20, fontWeight: 800, color: C.gold, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{Math.round(myTeam.reduce((s, a) => s + (a.xp || 0), 0) / Math.max(myTeam.length, 1))}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>XP TB</div></div>
@@ -4609,7 +4572,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ fontSize: 12, color: C.gold, fontWeight: 700, marginBottom: 8 }}>🎯 GÁN THỬ THÁCH</div>
                     <input value={formData.mgrCh || ""} onChange={e => setFormData({ ...formData, mgrCh: e.target.value })} placeholder="Tên thử thách..." style={{ ...inp, marginBottom: 6 }} />
                     <div style={{ marginBottom: 6 }}><label style={{ ...lbl, fontSize: 10 }}>Bài kiểm tra *</label><select value={formData.mgrChQuiz || ""} onChange={e => setFormData({ ...formData, mgrChQuiz: e.target.value })} style={inp}><option value="">— Chọn đề —</option>{quizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}</select></div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6, marginBottom: 6 }}>
                       <select value={formData.mgrChFor || "team"} onChange={e => setFormData({ ...formData, mgrChFor: e.target.value })} style={inp}>
                         <option value="team">Cả team</option>
                         {myTeam.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
