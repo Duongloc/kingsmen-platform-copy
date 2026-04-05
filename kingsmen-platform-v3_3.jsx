@@ -228,9 +228,9 @@ const supabase = createClient(
 // ─── Field mapping: DB (snake_case) ↔ App (camelCase) ───
 const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, accRole: r.acc_role, xp: r.xp || 0, streak: r.streak || 0, status: r.status, lastCheckIn: r.last_check_in || null, lastXpGainDate: r.last_xp_gain_date || null, checkIns: r.check_ins || [], readLessons: r.read_lessons || [], pathProgress: r.path_progress || {}, avatar: r.avatar || null, team: r.team || "" });
 const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
-const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, createdAt: r.created_at, _lazy: r.questions === undefined });
+const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, createdAt: r.created_at });
 const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
-const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at, _lazy: r.content === undefined });
+const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
 const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] }; if (k.createdAt) base.created_at = k.createdAt; return base; };
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
@@ -253,8 +253,8 @@ const DB = {
     try {
       switch (k) {
         case "km-accounts": { const { data } = await supabase.from("profiles").select("*").order("created_at"); return data ? data.map(profileToCamel) : fb; }
-        case "km-quizzes": { const selectFields = isAdmin ? "*" : "id, title, time_limit, depts, ai_generated, difficulty, quiz_type, knowledge_id, imported_from, created_at"; const { data } = await supabase.from("quizzes").select(selectFields).order("created_at"); return data ? data.map(quizToCamel) : fb; }
-        case "km-knowledge": { const selectFields = isAdmin ? "*" : "id, title, depts, has_pdf, pdf_name, created_at, doc_url, video_url, audio_url"; const { data } = await supabase.from("knowledge").select(selectFields).order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
+        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
+        case "km-knowledge": { const { data } = await supabase.from("knowledge").select("*").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           const { data: userData } = await supabase.auth.getUser();
           const userId = userData?.user?.id;
@@ -425,59 +425,6 @@ export default function App() {
     return () => { if (aiStatusTimerRef.current) clearTimeout(aiStatusTimerRef.current); };
   }, [aiStatus]);
   const [subScreen, setSubScreen] = useState(null); const [formData, setFormData] = useState({});
-  // Lazy loading observer for heavy content
-  useEffect(() => {
-    (async () => {
-      if (subScreen && typeof subScreen === 'string') {
-        const kMatch = knowledge.find(k => k.id === subScreen);
-        if (kMatch && kMatch._lazy) {
-          try {
-            setAiStatus("⏳ Đang tải chi tiết bài học...");
-            const { data } = await supabase.from("knowledge").select("*").eq("id", subScreen).single();
-            if (data) {
-              const fullK = knowledgeToCamel(data);
-              setKnowledge(prev => prev.map(x => x.id === subScreen ? fullK : x));
-              // Also update cache
-              const cached = cacheGet("knowledge") || [];
-              cacheSet("knowledge", cached.map(x => x.id === subScreen ? fullK : x));
-            }
-            setAiStatus("");
-          } catch (e) { console.error("Lazy load knowledge err:", e); setAiStatus("❌ Lỗi tải bài học"); }
-        }
-
-        const qMatch = quizzes.find(q => q.id === subScreen);
-        if (qMatch && qMatch._lazy) {
-          try {
-            setAiStatus("⏳ Đang tải chi tiết đề kiểm tra...");
-            const { data } = await supabase.from("quizzes").select("*").eq("id", subScreen).single();
-            if (data) {
-              const fullQ = quizToCamel(data);
-              setQuizzes(prev => prev.map(x => x.id === subScreen ? fullQ : x));
-              const cached = cacheGet("quizzes") || [];
-              cacheSet("quizzes", cached.map(x => x.id === subScreen ? fullQ : x));
-            }
-            setAiStatus("");
-          } catch (e) { console.error("Lazy load quiz err:", e); setAiStatus("❌ Lỗi tải đề kiểm tra"); }
-        }
-      }
-
-      if (activeQuiz && activeQuiz._lazy) {
-        try {
-          setAiStatus("⏳ Đang tải chi tiết đề kiểm tra...");
-          const { data } = await supabase.from("quizzes").select("*").eq("id", activeQuiz.id).single();
-          if (data) {
-            const fullQ = quizToCamel(data);
-            setActiveQuiz(fullQ);
-            setQuizzes(prev => prev.map(x => x.id === fullQ.id ? fullQ : x));
-            const cached = cacheGet("quizzes") || [];
-            cacheSet("quizzes", cached.map(x => x.id === fullQ.id ? fullQ : x));
-          }
-          setAiStatus("");
-        } catch (e) { console.error("Lazy load quiz err:", e); setAiStatus("❌ Lỗi tải đề kiểm tra"); }
-      }
-    })();
-  }, [subScreen, activeQuiz]);
-
   // Auto-clear formData status fields
   const formStatusTimerRef = useRef(null);
   useEffect(() => {
