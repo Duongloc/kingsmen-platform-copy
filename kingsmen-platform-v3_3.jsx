@@ -2243,6 +2243,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                             </div>
                             {/* Right: actions */}
                             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                              <button onClick={async function () {
+                                setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải DS PDF..." }));
+                                var { data, error } = await supabase.storage.from("pdfs").list("knowledge", { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+                                if (error) { setFormData(Object.assign({}, formData, { _upSt: "❌ Lỗi: " + error.message })); return; }
+                                setFormData(Object.assign({}, formData, { _upSt: "", _pdfSelList: data || [], _pdfSelK: k.id }));
+                              }} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.05)", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>{"📂 Chọn PDF cũ"}</button>
                               <label htmlFor={"pdf-upload-" + k.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", borderRadius: 8, border: "1px solid " + (k.hasPdf ? C.purple + "55" : C.border), background: k.hasPdf ? C.purple + "15" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 11, fontWeight: 700, color: k.hasPdf ? C.purple : "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>
                                 {k.hasPdf ? "🔄 Thay thế" : "📎 Tải lên PDF"}
                               </label>
@@ -2250,6 +2256,37 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false, pdfName: "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22", whiteSpace: "nowrap" }}>{"🗑 Xóa"}</button>}
                             </div>
                           </div>
+                          {formData._pdfSelK === k.id && formData._pdfSelList && (
+                            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999, background: "rgba(10,30,40,0.9)", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                              <div style={{ ...card, width: 400, maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                                  <h3 style={{ ...hd(16), margin: 0 }}>📂 Chọn PDF có sẵn</h3>
+                                  <button onClick={function () { setFormData(Object.assign({}, formData, { _pdfSelK: null, _pdfSelList: null })) }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 18, cursor: "pointer" }}>✕</button>
+                                </div>
+                                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                                  {formData._pdfSelList.filter(function (f) { return f.name.endsWith('.pdf') }).map(function (f) {
+                                    return (
+                                      <button key={f.name} onClick={async function () {
+                                        setFormData(Object.assign({}, formData, { _pdfSelK: null, _pdfSelList: null, _upSt: "⏳ Đang gán PDF..." }));
+                                        var sourcePath = 'knowledge/' + f.name;
+                                        var targetPath = 'knowledge/' + k.id + '.pdf';
+                                        if (sourcePath !== targetPath) {
+                                          var { error: copyErr } = await supabase.storage.from('pdfs').copy(sourcePath, targetPath);
+                                          if (copyErr && copyErr.message !== "Duplicate container path") { setFormData(Object.assign({}, formData, { _upSt: "❌ Lỗi: " + copyErr.message })); return; }
+                                        }
+                                        upd({ hasPdf: true, pdfName: f.name });
+                                        setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã gán thành công!" }));
+                                      }} style={{ padding: "10px 12px", textAlign: "left", background: "rgba(255,255,255,0.03)", border: "1px solid " + C.border, borderRadius: 8, color: C.white, fontSize: 12, display: "flex", justifyContent: "space-between", cursor: "pointer" }}>
+                                        <span>📄 {f.name}</span>
+                                        <span style={{ color: "rgba(255,255,255,0.3)" }}>{(f.metadata ? Math.round(f.metadata.size / 1024) : 0)} KB</span>
+                                      </button>
+                                    )
+                                  })}
+                                  {formData._pdfSelList.filter(function (f) { return f.name.endsWith('.pdf') }).length === 0 && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: 20 }}>Chưa có file PDF nào.</div>}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                           <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{"🖼️ Ảnh"}</div>
