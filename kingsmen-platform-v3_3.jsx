@@ -249,19 +249,20 @@ var _pdfCache = {};
 
 // ─── DB layer backed by Supabase ───
 const DB = {
-  async get(k, fb = null) {
+  async get(k, fb = null, isAdmin = false) {
     try {
       switch (k) {
         case "km-accounts": { const { data } = await supabase.from("profiles").select("*").order("created_at"); return data ? data.map(profileToCamel) : fb; }
-        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("id, title, time_limit, depts, ai_generated, difficulty, quiz_type, knowledge_id, imported_from, created_at").order("created_at"); return data ? data.map(quizToCamel) : fb; }
-        case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id, title, depts, has_pdf, pdf_name, created_at, doc_url, video_url, audio_url").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
+        case "km-quizzes": { const selectFields = isAdmin ? "*" : "id, title, time_limit, depts, ai_generated, difficulty, quiz_type, knowledge_id, imported_from, created_at"; const { data } = await supabase.from("quizzes").select(selectFields).order("created_at"); return data ? data.map(quizToCamel) : fb; }
+        case "km-knowledge": { const selectFields = isAdmin ? "*" : "id, title, depts, has_pdf, pdf_name, created_at, doc_url, video_url, audio_url"; const { data } = await supabase.from("knowledge").select(selectFields).order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           const { data: userData } = await supabase.auth.getUser();
           const userId = userData?.user?.id;
-          const { data } = await supabase.from("results").select("id, emp_id, quiz_id, quiz_title, score, total, pct, passed, time_taken, quiz_type, created_at").order("created_at");
+          const selectFields = isAdmin ? "*" : "id, emp_id, quiz_id, quiz_title, score, total, pct, passed, time_taken, quiz_type, created_at";
+          const { data } = await supabase.from("results").select(selectFields).order("created_at");
           if (!data) return fb;
           let results = data;
-          if (userId) {
+          if (userId && !isAdmin) {
             const { data: myAnswers } = await supabase.from("results").select("id, answers").eq("emp_id", userId);
             if (myAnswers) {
               const answersMap = {};
@@ -584,10 +585,18 @@ export default function App() {
   // ─── Fetch ALL data from database ───
   const loadAllData = async () => {
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      let isAdmin = false;
+      if (user) {
+         const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+         isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+      }
+
       // Batch 1: Critical data (accounts, knowledge, quizzes, settings)
       const [a, k, q, s] = await Promise.all([
-        DB.get("km-accounts", []), DB.get("km-knowledge", []),
-        DB.get("km-quizzes", []), DB.get("km-settings", null),
+        DB.get("km-accounts", [], isAdmin), DB.get("km-knowledge", [], isAdmin),
+        DB.get("km-quizzes", [], isAdmin), DB.get("km-settings", null, isAdmin),
       ]);
       if (Array.isArray(a)) { setAccounts(a); accountsRef.current = a; cacheSet("accounts", a); }
       if (Array.isArray(k)) { setKnowledge(k); cacheSet("knowledge", k); }
@@ -596,8 +605,8 @@ export default function App() {
 
       // Batch 2: Secondary data
       const [r, rec, ch, notif, p, bul] = await Promise.all([
-        DB.get("km-results", []), DB.get("km-recognitions", []), DB.get("km-challenges", []),
-        DB.get("km-notifications", []), DB.get("km-paths", []), DB.get("km-bulletins", []),
+        DB.get("km-results", [], isAdmin), DB.get("km-recognitions", [], isAdmin), DB.get("km-challenges", [], isAdmin),
+        DB.get("km-notifications", [], isAdmin), DB.get("km-paths", [], isAdmin), DB.get("km-bulletins", [], isAdmin),
       ]);
       if (Array.isArray(r)) { setResults(r); cacheSet("results", r); }
       if (Array.isArray(rec)) { setRecognitions(rec); cacheSet("recognitions", rec); }
