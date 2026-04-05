@@ -230,8 +230,8 @@ const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: 
 const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
 const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, createdAt: r.created_at });
 const quizToSnake = (q) => ({ id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null });
-const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
-const knowledgeToSnake = (k) => ({ id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] });
+const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
+const knowledgeToSnake = (k) => ({ id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] });
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
 const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {} });
@@ -1781,12 +1781,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
       )}
 
       {/* Header */}
-      <header style={{ background: "linear-gradient(135deg," + C.tealD + "," + C.dark + ")", borderBottom: "2px solid " + C.gold, padding: "10px 20px", position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: role === "admin" ? "pointer" : "default" }} onClick={() => { if (role === "admin" && logoInputRef.current) logoInputRef.current.click(); }}>
-            {companyLogo ? (<img src={companyLogo} alt="Logo" style={{ width: 36, height: 36, borderRadius: 7, objectFit: "contain", background: "rgba(255,255,255,0.1)" }} />) : (<div style={{ width: 36, height: 36, background: C.gold, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 900, fontSize: 16, color: C.dark }}>K</div>)}
-            <div><div style={{ fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 800, fontSize: 15, color: C.white, letterSpacing: 1 }}>KINGSMEN</div><div style={{ fontSize: 10, color: C.goldL, letterSpacing: 2 }}>Training Platform v3</div></div>
-            {role === "admin" && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginLeft: 4, padding: "2px 6px", borderRadius: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>🖼 Đổi logo</div>}
+      <header style={{ background: "linear-gradient(135deg," + C.tealD + "," + C.dark + ")", borderBottom: "2px solid " + C.gold, padding: "8px 12px", position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: role === "admin" ? "pointer" : "default" }} onClick={() => { if (role === "admin" && logoInputRef.current) logoInputRef.current.click(); }}>
+            {companyLogo ? (<img src={companyLogo} alt="Logo" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />) : (<div style={{ width: 32, height: 32, background: C.gold, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 900, fontSize: 14, color: C.dark, flexShrink: 0 }}>K</div>)}
+            <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 800, fontSize: 14, color: C.white, letterSpacing: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>KINGSMEN</div><div style={{ fontSize: 9, color: C.goldL, letterSpacing: 2 }}>Training Platform v3</div></div>
+            {role === "admin" && <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginLeft: 2, padding: "2px 5px", borderRadius: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>🖼 Logo</div>}
             <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1814,37 +1814,75 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           </div>
         </div>
         {/* ═══ MENU BAR ═══ */}
-        {role === "employee" && currentUser && (
-          <div style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            {[
-              { i: "🏠", t: "HOME", s: "emp_home" },
-              { i: "📖", t: "HỌC", s: "emp_knowledge" },
-              { i: "✏️", t: "THI", s: "emp_quizzes" },
-              { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
-              { i: "🏆", t: "HẠNG", s: "emp_ranking" },
-              { i: "🎯", t: "THÁCH", s: "emp_challenges" },
-              { i: "🧠", t: "NLỰC", s: "emp_competency" },
-              { i: "📢", t: "TIN", s: "emp_bulletins" },
-            ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "8px 10px", fontSize: 10, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.i + " " + m.t}</button> })}
-          </div>
-        )}
-        {role === "admin" && (
-          <div style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            {[
-              { i: "🏠", t: "HOME", s: "admin_home" },
-              { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
-              { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
-              { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
-              { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
-              { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
-              { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
-              { i: "📈", t: "HOẠT ĐỘNG", s: "admin_activity" },
-              { i: "👥", t: "TÀI KHOẢN", s: "admin_accounts" },
-              { i: "⚙️", t: "CÀI ĐẶT", s: "admin_settings" },
-              { i: "💾", t: "SAO LƯU", s: "admin_backup" },
-            ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "8px 10px", fontSize: 10, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.teal : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.i + " " + m.t}</button> })}
-          </div>
-        )}
+        {role === "employee" && currentUser && (() => {
+          const empMenuItems = [
+            { i: "🏠", t: "HOME", s: "emp_home" },
+            { i: "📖", t: "HỌC", s: "emp_knowledge" },
+            { i: "✏️", t: "THI", s: "emp_quizzes" },
+            { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
+            { i: "🏆", t: "HẠNG", s: "emp_ranking" },
+            { i: "🎯", t: "THÁCH", s: "emp_challenges" },
+            { i: "🧠", t: "NLỰC", s: "emp_competency" },
+            { i: "📢", t: "TIN", s: "emp_bulletins" },
+          ];
+          const empPrimary = empMenuItems.slice(0, 5);
+          const empMore = empMenuItems.slice(5);
+          const empMoreActive = empMore.some(m => m.s === screen);
+          return (
+            <div style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", alignItems: "center", position: "relative" }}>
+              {empPrimary.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "8px 10px", fontSize: 10, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.i + " " + m.t}</button> })}
+              {empMore.length > 0 && (
+                <div style={{ position: "relative", marginLeft: "auto" }}>
+                  <button onClick={() => setFormData({ ...formData, _moreMenu: formData._moreMenu === "emp" ? null : "emp" })} style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: empMoreActive ? C.goldL : "rgba(255,255,255,0.5)", background: empMoreActive ? C.gold + "22" : "none", border: empMoreActive ? "1px solid " + C.gold + "44" : "none", borderRadius: 6, whiteSpace: "nowrap", cursor: "pointer" }}>{"≡ Thêm" + (empMoreActive ? " ●" : "")}</button>
+                  {formData._moreMenu === "emp" && (
+                    <div>
+                      <div onClick={() => setFormData({ ...formData, _moreMenu: null })} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} />
+                      <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 999, marginTop: 4, background: "linear-gradient(135deg,#1a3a45,#0f2d3a)", border: "1px solid " + C.gold + "33", borderRadius: 12, padding: 6, minWidth: 150, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                        {empMore.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null); setFormData({ ...formData, _moreMenu: null }) }} style={{ display: "block", width: "100%", padding: "10px 14px", fontSize: 12, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? C.goldL : "rgba(255,255,255,0.65)", background: screen === m.s ? C.gold + "15" : "transparent", border: "none", borderRadius: 8, textAlign: "left", cursor: "pointer", marginBottom: 2 }}>{m.i + "  " + m.t}</button> })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        {role === "admin" && (() => {
+          const admMenuItems = [
+            { i: "🏠", t: "HOME", s: "admin_home" },
+            { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
+            { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
+            { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
+            { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
+            { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
+            { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
+            { i: "📈", t: "HOẠT ĐỘNG", s: "admin_activity" },
+            { i: "👥", t: "TÀI KHOẢN", s: "admin_accounts" },
+            { i: "⚙️", t: "CÀI ĐẶT", s: "admin_settings" },
+            { i: "💾", t: "SAO LƯU", s: "admin_backup" },
+          ];
+          const admPrimary = admMenuItems.slice(0, 5);
+          const admMore = admMenuItems.slice(5);
+          const admMoreActive = admMore.some(m => m.s === screen);
+          return (
+            <div style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", alignItems: "center", position: "relative" }}>
+              {admPrimary.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "8px 10px", fontSize: 10, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.teal : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0 }}>{m.i + " " + m.t}</button> })}
+              {admMore.length > 0 && (
+                <div style={{ position: "relative", marginLeft: "auto" }}>
+                  <button onClick={() => setFormData({ ...formData, _moreMenu: formData._moreMenu === "adm" ? null : "adm" })} style={{ padding: "8px 12px", fontSize: 10, fontWeight: 700, color: admMoreActive ? C.teal : "rgba(255,255,255,0.5)", background: admMoreActive ? C.teal + "22" : "none", border: admMoreActive ? "1px solid " + C.teal + "44" : "none", borderRadius: 6, whiteSpace: "nowrap", cursor: "pointer" }}>{"≡ Thêm" + (admMoreActive ? " ●" : "")}</button>
+                  {formData._moreMenu === "adm" && (
+                    <div>
+                      <div onClick={() => setFormData({ ...formData, _moreMenu: null })} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} />
+                      <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 999, marginTop: 4, background: "linear-gradient(135deg,#1a3a45,#0f2d3a)", border: "1px solid " + C.teal + "33", borderRadius: 12, padding: 6, minWidth: 160, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+                        {admMore.map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null); setFormData({ ...formData, _moreMenu: null }) }} style={{ display: "block", width: "100%", padding: "10px 14px", fontSize: 12, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? C.teal : "rgba(255,255,255,0.65)", background: screen === m.s ? C.teal + "15" : "transparent", border: "none", borderRadius: 8, textAlign: "left", cursor: "pointer", marginBottom: 2 }}>{m.i + "  " + m.t}</button> })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </header>
 
       <div style={{ maxWidth: 920, margin: "0 auto", padding: "12px 10px 60px" }}>
@@ -1969,7 +2007,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{knowledge.length + " bài · " + knowledge.filter(function (k2) { return k2.interactive }).length + " có interactive"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledge([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
+                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledge([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
                     <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, createdAt: new Date().toISOString() }; updKnowledge([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
                     <button onClick={function () { setScreen("admin_home") }} style={{ ...btnO, padding: "8px 12px", fontSize: 11 }}>{"←"}</button>
                   </div>
@@ -1986,7 +2024,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
                           {(k.depts || []).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
                           {hasL && tag(sl + "S " + fc + "F", C.teal)}
-                          {k.hasPdf && tag("PDF", C.purple)}
+                          {k.hasPdf && tag("📄 " + (k.pdfName ? k.pdfName.slice(0, 20) + (k.pdfName.length > 20 ? "…" : "") : "PDF"), C.purple)}
                           {!!(k.docUrl) && tag("🔗", C.blue)}
                           {!!(k.videoUrl) && tag("🎬", C.red)}
                           {!!(k.audioUrl) && tag("🎧", C.purple)}
@@ -2045,9 +2083,10 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎧 Audio (hosting/link)"}</div><input value={k.audioUrl || ""} onChange={function (e) { upd({ audioUrl: e.target.value }) }} placeholder="/media/audio.mp3 hoặc link" style={{ ...inp, fontSize: 10 }} />{k.audioUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{"✓ " + (k.audioUrl.length > 35 ? k.audioUrl.slice(0, 35) + "..." : k.audioUrl)}</div>}</div>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"📄 PDF" + (k.hasPdf ? " ✅" : "")}</div>
                             <div style={{ display: "flex", gap: 4 }}>
-                              <label style={{ flex: 1, display: "block", padding: "7px", borderRadius: 6, border: "1px solid " + C.border, textAlign: "center", cursor: "pointer", fontSize: 10, color: k.hasPdf ? C.green : "rgba(255,255,255,0.4)" }}>{k.hasPdf ? "Thay" : "📎 Tải lên"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải lên..." })); var path = 'knowledge/' + k.id + '.pdf'; var { error: upErr } = await supabase.storage.from('pdfs').upload(path, file, { upsert: true, contentType: 'application/pdf' }); if (upErr) { var fb = new FileReader(); fb.onload = function (ev) { _pdfCache[k.id] = ev.target.result; upd({ hasPdf: true }); setFormData(Object.assign({}, formData, { _upSt: "⚠️ Lưu tạm (cần bucket 'pdfs' trong Supabase Storage)" })); }; fb.readAsDataURL(file); return; } var fr = new FileReader(); fr.onload = function (ev) { _pdfCache[k.id] = ev.target.result; }; fr.readAsDataURL(file); upd({ hasPdf: true }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã lưu vào DB" })); }} /></label>
-                              {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 10px", borderRadius: 6, fontSize: 10, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22" }}>{"🗑"}</button>}
+                              <label style={{ flex: 1, display: "block", padding: "7px", borderRadius: 6, border: "1px solid " + C.border, textAlign: "center", cursor: "pointer", fontSize: 10, color: k.hasPdf ? C.green : "rgba(255,255,255,0.4)" }}>{k.hasPdf ? "🔄 Thay" : "📎 Tải lên"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải lên..." })); var path = 'knowledge/' + k.id + '.pdf'; var { error: upErr } = await supabase.storage.from('pdfs').upload(path, file, { upsert: true, contentType: 'application/pdf' }); if (upErr) { var fb = new FileReader(); fb.onload = function (ev) { _pdfCache[k.id] = ev.target.result; upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "⚠️ Lưu tạm (cần bucket 'pdfs' trong Supabase Storage)" })); }; fb.readAsDataURL(file); return; } var fr = new FileReader(); fr.onload = function (ev) { _pdfCache[k.id] = ev.target.result; }; fr.readAsDataURL(file); upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã lưu vào DB" })); }} /></label>
+                              {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false, pdfName: "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 10px", borderRadius: 6, fontSize: 10, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22" }}>{"🗑"}</button>}
                             </div>
+                            {k.hasPdf && k.pdfName && <div style={{ fontSize: 9, color: C.green, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={k.pdfName}>{"📄 " + k.pdfName}</div>}
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -2326,36 +2365,35 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div><label style={lbl}>Phòng ban</label><select value={formData.dept || DEPTS[0]} onChange={e => setFormData({ ...formData, dept: e.target.value })} style={inp}>{DEPTS.map(d => <option key={d}>{d}</option>)}</select></div>
                   <div><label style={lbl}>Team / Nhóm</label><input value={formData.team || ""} onChange={e => setFormData({ ...formData, team: e.target.value })} placeholder="VD: Team A" style={inp} /></div>
                   <div><label style={lbl}>Cấp bậc</label><select value={formData.accRole || "employee"} onChange={e => setFormData({ ...formData, accRole: e.target.value })} style={inp}>{ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select></div>
-                  <div><label style={lbl}>Mật khẩu</label><input value={formData.pw || "123456"} onChange={e => setFormData({ ...formData, pw: e.target.value })} style={inp} /></div>
-                  <div><label style={lbl}>Xác nhận MK</label><input value={formData.confirmPw || ""} onChange={e => setFormData({ ...formData, confirmPw: e.target.value })} placeholder="Nhập lại mật khẩu" style={{ ...inp, borderColor: formData.confirmPw && formData.confirmPw !== (formData.pw || "123456") ? C.red : undefined }} /></div>
+                  <div><label style={lbl}>Mật khẩu</label><input value={formData.pw || "Kingsmen@2026"} onChange={e => setFormData({ ...formData, pw: e.target.value })} style={inp} /></div>
+                  <div><label style={lbl}>Xác nhận MK</label><input value={formData.confirmPw || ""} onChange={e => setFormData({ ...formData, confirmPw: e.target.value })} placeholder="Nhập lại mật khẩu" style={{ ...inp, borderColor: formData.confirmPw && formData.confirmPw !== (formData.pw || "Kingsmen@2026") ? C.red : undefined }} /></div>
                 </div>
-                {formData.confirmPw && formData.confirmPw !== (formData.pw || "123456") && <div style={{ color: C.red, fontSize: 11, marginBottom: 8 }}>⚠ Mật khẩu xác nhận không khớp</div>}
+                {formData.confirmPw && formData.confirmPw !== (formData.pw || "Kingsmen@2026") && <div style={{ color: C.red, fontSize: 11, marginBottom: 8 }}>⚠ Mật khẩu xác nhận không khớp</div>}
                 <button onClick={async () => {
                   const name = (formData.name || "").trim(); const empId = (formData.empId || "").trim();
-                  if (!name || !empId) return;
-                  if (formData.confirmPw && formData.confirmPw !== (formData.pw || "123456")) { alert("Mật khẩu xác nhận không khớp!"); return; }
-                  const email = empId.toLowerCase() + "@kingsmen.internal";
-                  const password = (formData.pw || "123456");
-                  // Step 1: create Supabase Auth user to get a real UUID
-                  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
-                  if (signUpErr) { alert("Lỗi tạo Auth: " + signUpErr.message); return; }
-                  const userId = signUpData.user?.id;
-                  if (!userId) { alert("Không lấy được user ID từ Supabase"); return; }
-                  // Step 2: insert profile row with the real auth UUID
-                  const { error: profileErr } = await supabase.from("profiles").insert({ id: userId, name, emp_id: empId, dept: formData.dept || DEPTS[0], team: formData.team || "", acc_role: formData.accRole || "employee", xp: 0, streak: 0, check_ins: [], read_lessons: [], path_progress: {}, status: "active" });
-                  if (profileErr) { alert("Lỗi tạo hồ sơ: " + profileErr.message); return; }
-                  // Step 3: reload accounts list from DB
-                  const newAccounts = await DB.get("km-accounts", []);
-                  setAccounts(newAccounts); accountsRef.current = newAccounts;
-                  setFormData({}); setSubScreen(null);
-                  // signUp may have replaced admin session — force re-login if so
-                  const { data: { session: curSession } } = await supabase.auth.getSession();
-                  if (curSession && curSession.user?.email !== "admin@kingsmen.internal") {
-                    await supabase.auth.signOut();
-                    alert("Tài khoản NV \"" + name + "\" đã tạo thành công! Vui lòng đăng nhập lại Admin.");
-                    setRole(null); setScreen("login"); setCurrentUser(null); Session.set("km-session", null);
+                  if (!name || !empId) { alert("Vui lòng nhập Họ tên và Mã NV"); return; }
+                  if (accounts.some(a => a.empId === empId)) { alert("Mã NV \"" + empId + "\" đã tồn tại!"); return; }
+                  const password = (formData.pw || "Kingsmen@2026");
+                  if (formData.confirmPw && formData.confirmPw !== password) { alert("Mật khẩu xác nhận không khớp!"); return; }
+                  setFormData({ ...formData, _creating: true });
+                  try {
+                    await supabase.auth.getSession();
+                    const { data: rawRes, error: fnErr } = await supabase.functions.invoke("create-user", {
+                      body: { name, empId, dept: formData.dept || DEPTS[0], team: formData.team || "", accRole: formData.accRole || "employee", password },
+                      responseType: "text"
+                    });
+                    if (fnErr) throw new Error(fnErr.message || "Edge function error");
+                    var resData; try { resData = typeof rawRes === "string" ? JSON.parse(rawRes) : rawRes; } catch (e) { throw new Error("Response parse error"); }
+                    if (resData.error) throw new Error(resData.error);
+                    const newAccounts = await DB.get("km-accounts", []);
+                    setAccounts(newAccounts); accountsRef.current = newAccounts;
+                    setFormData({}); setSubScreen(null);
+                    alert("✅ Tài khoản \"" + name + "\" đã tạo thành công!");
+                  } catch (err) {
+                    setFormData({ ...formData, _creating: false });
+                    alert("Lỗi tạo tài khoản: " + (err.message || "Không xác định"));
                   }
-                }} style={btnG}>Tạo tài khoản</button>
+                }} disabled={!!formData._creating} style={{ ...btnG, opacity: formData._creating ? 0.6 : 1 }}>{formData._creating ? "⏳ Đang tạo..." : "Tạo tài khoản"}</button>
               </div>
             )}
             {/* Department Management */}
@@ -2399,15 +2437,46 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Phòng ban</label><select value={formData.editDept || a.dept} onChange={e => setFormData({ ...formData, editDept: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12 }}>{DEPTS.map(d => <option key={d}>{d}</option>)}</select></div>
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Team</label><input value={(formData.editTeam || a.team) || ""} onChange={e => setFormData({ ...formData, editTeam: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12 }} /></div>
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Cấp bậc</label><select value={formData.editRole || a.accRole} onChange={e => setFormData({ ...formData, editRole: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12 }}>{ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select></div>
-                          <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Mật khẩu mới</label><div style={{ padding: "7px 10px", borderRadius: 6, background: `${C.gold}08`, border: `1px solid ${C.gold}22`, fontSize: 10, color: C.gold }}>Đổi mật khẩu nhân viên qua Supabase Dashboard</div></div>
+                          <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Mật khẩu mới</label><input type="password" value={formData.editNewPw || ""} onChange={e => setFormData({ ...formData, editNewPw: e.target.value, editPwMsg: "" })} placeholder="Nhập mật khẩu mới (≥6 ký tự)" style={{ ...inp, padding: "5px 8px", fontSize: 12 }} /></div>
+                          <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Xác nhận MK mới</label><input type="password" value={formData.editConfirmPw || ""} onChange={e => setFormData({ ...formData, editConfirmPw: e.target.value, editPwMsg: "" })} placeholder="Nhập lại mật khẩu mới" style={{ ...inp, padding: "5px 8px", fontSize: 12, borderColor: formData.editConfirmPw && formData.editConfirmPw !== formData.editNewPw ? C.red : undefined }} /></div>
                         </div>
-                        <div style={{ display: "flex", gap: 6 }}>
+                        {formData.editPwMsg && <div style={{ fontSize: 11, marginBottom: 6, color: formData.editPwMsg.startsWith("✓") ? C.green : C.red }}>{formData.editPwMsg}</div>}
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           <button onClick={async () => {
                             if (!window.confirm("Lưu thay đổi thông tin tài khoản của " + a.name + "?")) return;
-                            const updated = accounts.map(x => x.id === a.id ? { ...x, name: formData.editName || a.name, empId: formData.editEmpId || a.empId, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", accRole: formData.editRole || a.accRole } : x);
+                            const newEmpId = (formData.editEmpId || a.empId).trim();
+                            const empIdChanged = newEmpId !== a.empId;
+                            // If empId changed, update Auth email via edge function first
+                            if (empIdChanged) {
+                              if (accounts.some(x => x.id !== a.id && x.empId === newEmpId)) { alert("Mã NV \"" + newEmpId + "\" đã tồn tại!"); return; }
+                              try {
+                                await supabase.auth.getSession();
+                                const { data: rawRes, error: fnErr } = await supabase.functions.invoke("update-user", { body: { targetUserId: a.id, newEmpId }, responseType: "text" });
+                                if (fnErr) throw new Error(fnErr.message);
+                                var resData; try { resData = typeof rawRes === "string" ? JSON.parse(rawRes) : rawRes; } catch (e) { throw new Error("Response parse error"); }
+                                if (resData.error) throw new Error(resData.error);
+                              } catch (err) { alert("Lỗi cập nhật mã NV: " + err.message); return; }
+                            }
+                            const updated = accounts.map(x => x.id === a.id ? { ...x, name: formData.editName || a.name, empId: newEmpId, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", accRole: formData.editRole || a.accRole } : x);
                             setAccounts(updated); accountsRef.current = updated; await DB.set("km-accounts", updated);
                             setSaveStatus("saved"); setFormData({});
-                          }} style={{ ...btnG, fontSize: 11, padding: "6px 14px" }}>💾 Lưu</button>
+                          }} style={{ ...btnG, fontSize: 11, padding: "6px 14px" }}>💾 Lưu thông tin</button>
+                          <button onClick={async () => {
+                            if (!formData.editNewPw || formData.editNewPw.length < 6) { setFormData({ ...formData, editPwMsg: "✗ Mật khẩu mới tối thiểu 6 ký tự" }); return; }
+                            if (formData.editNewPw !== formData.editConfirmPw) { setFormData({ ...formData, editPwMsg: "✗ Xác nhận mật khẩu không khớp" }); return; }
+                            if (!window.confirm("Đổi mật khẩu của " + a.name + " (" + a.empId + ")?")) return;
+                            setFormData({ ...formData, editPwMsg: "⏳ Đang cập nhật..." });
+                            try {
+                              await supabase.auth.getSession();
+                              const { data: rawRes, error: fnErr } = await supabase.functions.invoke("reset-password", { body: { targetUserId: a.id, newPassword: formData.editNewPw }, responseType: "text" });
+                              if (fnErr) throw new Error(fnErr.message || "Edge function error");
+                              var resData; try { resData = typeof rawRes === "string" ? JSON.parse(rawRes) : rawRes; } catch (pe) { throw new Error("Response parse error"); }
+                              if (resData.error) throw new Error(resData.error);
+                              setFormData({ ...formData, editNewPw: "", editConfirmPw: "", editPwMsg: "✓ Đổi mật khẩu thành công!" });
+                            } catch (err) {
+                              setFormData({ ...formData, editPwMsg: "✗ " + (err.message || "Lỗi không xác định").slice(0, 100) });
+                            }
+                          }} disabled={!formData.editNewPw} style={{ padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: formData.editNewPw ? C.orange + "22" : "rgba(255,255,255,0.03)", color: formData.editNewPw ? C.orange : "rgba(255,255,255,0.2)", border: "1px solid " + (formData.editNewPw ? C.orange + "44" : C.border) }}>🔐 Reset MK</button>
                           <button onClick={() => setFormData({})} style={{ ...btnO, fontSize: 11, padding: "6px 14px" }}>Hủy</button>
                         </div>
                       </div>
@@ -3604,20 +3673,37 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     </div>
 
                     {/* Resource cards */}
-                    <div style={{ display: "grid", gridTemplateColumns: k.hasPdf && k.docUrl ? "1fr 1fr" : "1fr", gap: 8, marginBottom: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: k.hasPdf ? (k.docUrl ? "1fr 1fr 1fr" : "1fr 1fr") : (k.docUrl ? "1fr" : "1fr"), gap: 8, marginBottom: 12 }}>
                       {k.hasPdf && (
                         <button onClick={async function () {
                           setFormData(Object.assign({}, formData, { docMsg: "⏳" }));
                           var cached = _pdfCache[k.id];
-                          if (cached) { var a = document.createElement("a"); a.href = cached; a.download = k.title + ".pdf"; document.body.appendChild(a); a.click(); document.body.removeChild(a); setFormData(Object.assign({}, formData, { docMsg: "✅ PDF OK" })); return; }
+                          if (cached) { var a = document.createElement("a"); a.href = cached; a.download = (k.pdfName || k.title + ".pdf"); document.body.appendChild(a); a.click(); document.body.removeChild(a); setFormData(Object.assign({}, formData, { docMsg: "✅ Đã tải xuống" })); return; }
                           var { data: blob, error: dlErr } = await supabase.storage.from('pdfs').download('knowledge/' + k.id + '.pdf');
                           if (dlErr || !blob) { setFormData(Object.assign({}, formData, { docMsg: "❌ Chưa có PDF. Admin cần tải lên trước." })); return; }
-                          var blobUrl = URL.createObjectURL(blob); var a2 = document.createElement("a"); a2.href = blobUrl; a2.download = k.title + ".pdf"; document.body.appendChild(a2); a2.click(); document.body.removeChild(a2); setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 3000);
-                          setFormData(Object.assign({}, formData, { docMsg: "✅ PDF OK" }));
-                        }} style={{ padding: "20px 16px", borderRadius: 12, background: "linear-gradient(135deg," + C.purple + "12," + C.purple + "05)", border: "1px solid " + C.purple + "33", textAlign: "center" }}>
-                          <div style={{ fontSize: 28, marginBottom: 6 }}>{"📄"}</div>
+                          var blobUrl = URL.createObjectURL(blob);
+                          var a2 = document.createElement("a"); a2.href = blobUrl; a2.download = (k.pdfName || k.title + ".pdf"); document.body.appendChild(a2); a2.click(); document.body.removeChild(a2);
+                          setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 3000);
+                          setFormData(Object.assign({}, formData, { docMsg: "✅ Đã tải xuống" }));
+                        }} style={{ padding: "20px 16px", borderRadius: 12, background: "linear-gradient(135deg," + C.purple + "12," + C.purple + "05)", border: "1px solid " + C.purple + "33", textAlign: "center", cursor: "pointer" }}>
+                          <div style={{ fontSize: 28, marginBottom: 6 }}>{"⬇️"}</div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: C.purple }}>{"Tải PDF"}</div>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>{"Tải về máy"}</div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>{k.pdfName ? k.pdfName.slice(0, 22) + (k.pdfName.length > 22 ? "…" : "") : "Tải về máy"}</div>
+                        </button>
+                      )}
+                      {k.hasPdf && (
+                        <button onClick={async function () {
+                          setFormData(Object.assign({}, formData, { docMsg: "⏳ Đang mở..." }));
+                          var cached = _pdfCache[k.id];
+                          if (cached) { var byteStr = atob(cached.split(',')[1]); var bytes = new Uint8Array(byteStr.length); for (var i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i); var viewBlob = new Blob([bytes], { type: 'application/pdf' }); var viewUrl = URL.createObjectURL(viewBlob); window.open(viewUrl, '_blank'); setTimeout(function () { URL.revokeObjectURL(viewUrl); }, 10000); setFormData(Object.assign({}, formData, { docMsg: "" })); return; }
+                          var { data: signedData, error: signErr } = await supabase.storage.from('pdfs').createSignedUrl('knowledge/' + k.id + '.pdf', 300);
+                          if (signErr || !signedData) { setFormData(Object.assign({}, formData, { docMsg: "❌ Không mở được PDF." })); return; }
+                          window.open(signedData.signedUrl, "_blank");
+                          setFormData(Object.assign({}, formData, { docMsg: "" }));
+                        }} style={{ padding: "20px 16px", borderRadius: 12, background: "linear-gradient(135deg," + C.teal + "12," + C.teal + "05)", border: "1px solid " + C.teal + "33", textAlign: "center", cursor: "pointer" }}>
+                          <div style={{ fontSize: 28, marginBottom: 6 }}>{"👁️"}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: C.teal }}>{"Xem PDF"}</div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>{"Mở trong tab mới"}</div>
                         </button>
                       )}
                       {k.docUrl && (
@@ -3675,8 +3761,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       {isYT && (function () {
                         var m = aUrl.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/); var ytId = m ? m[1] : "";
                         return ytId ? (
-                          <div style={{ marginBottom: 16 }}>
-                            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 12 }}>
+                          <div style={{ marginBottom: 16, maxWidth: 600, margin: "0 auto 16px" }}>
+                            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 12, maxHeight: "50vh" }}>
                               <iframe src={"https://www.youtube.com/embed/" + ytId + "?rel=0"} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} allow="accelerometer; autoplay; encrypted-media" allowFullScreen title="audio" />
                             </div>
                           </div>
@@ -3709,21 +3795,21 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   if (isYT) { var m = vUrl.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/); if (m) ytId = m[1] }
                   var isDirect = !isYT && !!vUrl;
                   return (
-                    <div style={{ ...fsBody, padding: 0 }}>
+                    <div style={{ ...fsBody, padding: 0, alignItems: "center" }}>
                       {/* YouTube embed — works on hosting, blocked in artifact */}
                       {isYT && ytId && (
-                        <div>
-                          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 0 }}>
+                        <div style={{ width: "100%", maxWidth: 800, margin: "0 auto" }}>
+                          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, overflow: "hidden", background: "#000", borderRadius: 0, maxHeight: "65vh" }}>
                             <iframe src={"https://www.youtube.com/embed/" + ytId + "?rel=0&modestbranding=1"} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="video" />
                           </div>
-                          <div style={{ padding: "8px 12px", fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{"⚠ Nếu không hiện: mở link bên dưới"}</div>
+                          <div style={{ padding: "8px 12px", fontSize: 10, color: "rgba(255,255,255,0.2)", textAlign: "center" }}>{"⚠ Nếu không hiện: mở link bên dưới"}</div>
                         </div>
                       )}
 
                       {/* Direct video — works on hosting with MP4/WebM */}
                       {isDirect && (
-                        <div style={{ background: "#000" }}>
-                          <video controls playsInline preload="metadata" style={{ width: "100%", maxHeight: "70vh", display: "block" }} src={vUrl}>
+                        <div style={{ width: "100%", maxWidth: 800, margin: "0 auto", background: "#000" }}>
+                          <video controls playsInline preload="metadata" style={{ width: "100%", maxHeight: "65vh", display: "block", margin: "0 auto" }} src={vUrl}>
                             <source src={vUrl} type="video/mp4" />
                           </video>
                         </div>
@@ -3731,7 +3817,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                       {/* Fallback link */}
                       {vUrl && (
-                        <div style={{ padding: "10px 16px" }}>
+                        <div style={{ padding: "10px 16px", width: "100%", maxWidth: 800, margin: "0 auto" }}>
                           <a href={vUrl} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, background: isYT ? "rgba(255,0,0,0.06)" : "rgba(12,123,111,0.06)", border: "1px solid " + (isYT ? "rgba(255,0,0,0.15)" : "rgba(12,123,111,0.15)"), textDecoration: "none" }}>
                             {isYT ? <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#ff0000", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 0, height: 0, borderTop: "5px solid transparent", borderBottom: "5px solid transparent", borderLeft: "9px solid #fff", marginLeft: 2 }} /></div> : <span style={{ fontSize: 16 }}>{"🔗"}</span>}
                             <div style={{ fontSize: 12, fontWeight: 600, color: isYT ? "#ff4444" : C.teal }}>{"Mở " + (isYT ? "YouTube" : "video") + " trong tab mới"}</div>
@@ -3751,25 +3837,25 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                 {/* ── INFOGRAPHIC / ẢNH ── */}
                 {tab === "info" && (
-                  <div style={{ ...fsBody, padding: 16 }}>
-                    <div style={{ textAlign: "center", marginBottom: 14 }}>
+                  <div style={{ ...fsBody, padding: 16, alignItems: "center" }}>
+                    <div style={{ textAlign: "center", marginBottom: 14, width: "100%" }}>
                       <div style={{ fontSize: 28, marginBottom: 6 }}>{"🖼️"}</div>
                       <h3 style={{ ...hd(16), marginBottom: 4 }}>{"Bản đồ thông tin"}</h3>
                       <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{"Ảnh đồ họa từ link tải lên"}</div>
                     </div>
                     {k.images && k.images.length > 0 ? (
-                      <div>
+                      <div style={{ width: "100%", maxWidth: 600, margin: "0 auto" }}>
                         {k.images.map(function (imgUrl, imgIdx) {
                           return (
                             <div key={imgIdx} style={{ marginBottom: 12, borderRadius: 12, overflow: "hidden", border: "1px solid " + C.border, background: "rgba(255,255,255,0.02)" }}>
-                              <img src={toDriveImageUrl(imgUrl)} alt={"Ảnh " + (imgIdx + 1)} style={{ width: "100%", height: "auto", display: "block" }} onError={function (e2) { e2.target.style.display = "none" }} />
+                              <img src={toDriveImageUrl(imgUrl)} alt={"Ảnh " + (imgIdx + 1)} style={{ width: "100%", height: "auto", display: "block", maxHeight: "80vh", objectFit: "contain" }} onError={function (e2) { e2.target.style.display = "none" }} />
                             </div>
                           )
                         })}
                         <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", textAlign: "center" }}>{k.images.length + " ảnh"}</div>
                       </div>
                     ) : (
-                      <div style={{ ...card, padding: 24, textAlign: "center" }}>
+                      <div style={{ ...card, padding: 24, textAlign: "center", width: "100%", maxWidth: 400 }}>
                         <div style={{ fontSize: 32, marginBottom: 8 }}>{"🖼️"}</div>
                         <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, marginBottom: 8 }}>{"Chưa có ảnh đồ họa."}</div>
                         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>{"Admin thêm URL ảnh trong Bài học → 🖼️ Ảnh"}</div>
