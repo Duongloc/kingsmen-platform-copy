@@ -231,7 +231,7 @@ const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: 
 const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, createdAt: r.created_at });
 const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
 const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
-const knowledgeToSnake = (k) => ({ id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] });
+const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] }; if (k.createdAt) base.created_at = k.createdAt; return base; };
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
 const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {} });
@@ -285,8 +285,39 @@ const DB = {
            if (rows.length > 0) { const { error } = await supabase.from("profiles").upsert(rows); if (error) console.error("profiles upsert err:", error.message); } 
            return true; 
         }
-        case "km-quizzes": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("quizzes").upsert(v.map(quizToSnake)); if (error) console.error("quizzes upsert err:", error.message, error.details); return !error; }
-        case "km-knowledge": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("knowledge").upsert(v.map(knowledgeToSnake)); if (error) console.error("knowledge upsert err:", error.message, error.details); return !error; }
+        case "km-quizzes": {
+          if (!Array.isArray(v)) return false;
+          const qzRows = v.map(quizToSnake);
+          const { error } = await supabase.from("quizzes").upsert(qzRows);
+          if (error) {
+            console.error("quizzes batch upsert err:", error.message, error.details);
+            let failCount = 0;
+            for (const row of qzRows) {
+              const { error: rowErr } = await supabase.from("quizzes").upsert(row);
+              if (rowErr) { failCount++; console.error("quiz row upsert err for id=" + row.id + ":", rowErr.message); }
+            }
+            if (failCount > 0) console.error("quizzes: " + failCount + "/" + qzRows.length + " rows failed individually");
+            return failCount === 0;
+          }
+          return true;
+        }
+        case "km-knowledge": {
+          if (!Array.isArray(v)) return false;
+          const knRows = v.map(knowledgeToSnake);
+          const { error } = await supabase.from("knowledge").upsert(knRows);
+          if (error) {
+            console.error("knowledge batch upsert err:", error.message, error.details);
+            // Batch failed — try upserting each row individually so one bad row doesn't block all
+            let failCount = 0;
+            for (const row of knRows) {
+              const { error: rowErr } = await supabase.from("knowledge").upsert(row);
+              if (rowErr) { failCount++; console.error("knowledge row upsert err for id=" + row.id + ":", rowErr.message); }
+            }
+            if (failCount > 0) console.error("knowledge: " + failCount + "/" + knRows.length + " rows failed individually");
+            return failCount === 0;
+          }
+          return true;
+        }
         case "km-results": { 
            if (!Array.isArray(v)) return false; 
            const rows = v.map(resultToSnake).filter(r => isAdmin || (user && r.emp_id === user.id)); 
