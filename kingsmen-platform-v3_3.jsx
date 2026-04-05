@@ -286,7 +286,7 @@ const DB = {
            return true; 
         }
         case "km-quizzes": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("quizzes").upsert(v.map(quizToSnake)); return !error; }
-        case "km-knowledge": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("knowledge").upsert(v.map(knowledgeToSnake)); return !error; }
+        case "km-knowledge": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("knowledge").upsert(v.map(knowledgeToSnake)); if (error) console.error("knowledge upsert err:", error.message, error.details); return !error; }
         case "km-results": { 
            if (!Array.isArray(v)) return false; 
            const rows = v.map(resultToSnake).filter(r => isAdmin || (user && r.emp_id === user.id)); 
@@ -2058,7 +2058,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                             <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
                               <div style={{ width: 36, height: 36, borderRadius: 8, background: k.hasPdf ? C.purple + "25" : "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{k.hasPdf ? "📄" : "📭"}</div>
                               <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2, letterSpacing: 1 }}>{"TỆP PDF ĐÍNH KÈM"}</div>
+                                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2, letterSpacing: 1 }}>{"TỆP PDF ĐÍNH KÈM"}<span style={{ marginLeft: 8, fontSize: 9, color: "rgba(255,255,255,0.15)" }}>{"[hasPdf=" + String(k.hasPdf) + ", pdfName=" + String(k.pdfName || "") + "]"}</span></div>
                                 {k.hasPdf && k.pdfName
                                   ? <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, wordBreak: "break-all", lineHeight: 1.4 }}>{k.pdfName}</div>
                                   : <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>{"Chưa có PDF — bấm Tải lên để thêm"}</div>
