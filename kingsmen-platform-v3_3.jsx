@@ -262,21 +262,17 @@ const DB = {
         case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("*").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
-          // userId passed from caller avoids an extra auth.getUser() roundtrip
-          if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
-          const selectFields = isAdmin ? "*" : "id, emp_id, quiz_id, quiz_title, score, total, pct, passed, time_taken, quiz_type, created_at";
-          const { data } = await supabase.from("results").select(selectFields).order("created_at");
-          if (!data) return fb;
-          let results = data;
-          if (userId && !isAdmin) {
-            const { data: myAnswers } = await supabase.from("results").select("id, answers").eq("emp_id", userId);
-            if (myAnswers) {
-              const answersMap = {};
-              myAnswers.forEach(r => answersMap[r.id] = r.answers);
-              results = results.map(r => ({ ...r, answers: answersMap[r.id] || [] }));
-            }
+          if (isAdmin) {
+            // Admins fetch everything — RLS allows this
+            const { data } = await supabase.from("results").select("*").order("created_at");
+            return data ? data.map(resultToCamel) : fb;
           }
-          return results.map(resultToCamel);
+          // Non-admins: single query filtered to own rows (explicit filter + RLS double protection)
+          // No second query needed — answers are included since we only fetch own rows
+          if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
+          if (!userId) return fb;
+          const { data } = await supabase.from("results").select("*").eq("emp_id", userId).order("created_at");
+          return data ? data.map(resultToCamel) : fb;
         }
         case "km-recognitions": { const { data } = await supabase.from("recognitions").select("*").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
         case "km-challenges": { const { data } = await supabase.from("challenges").select("*").order("created_at"); return data ? data.map(challengeToCamel) : fb; }
@@ -390,6 +386,13 @@ const DB = {
         default: return false;
       }
     } catch (e) { console.error("DB.set error", k, e); return false; }
+  },
+  async updateOne(table, id, fields) {
+    try {
+      const { error } = await supabase.from(table).update(fields).eq('id', id);
+      if (error) { console.error('DB.updateOne error', table, error.message); return false; }
+      return true;
+    } catch(e) { console.error('DB.updateOne error', table, e); return false; }
   },
 };
 
@@ -604,8 +607,24 @@ export default function App() {
   const updPaths = (d) => { setPaths(d); save("km-paths", d); };
   const updSettings = (d) => { setSettings(d); save("km-settings", d); };
 
-  const addXP = (userId, amount) => { const u = accountsRef.current.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a); updAccounts(u); };
+  const addXP = (userId, amount) => {
+    const newXp = Math.max(0, (accountsRef.current.find(a => a.id === userId)?.xp || 0) + amount);
+    const u = accountsRef.current.map(a => a.id === userId ? { ...a, xp: newXp, ...(amount > 0 ? { lastXpGainDate: today() } : {}) } : a);
+    setAccounts(u); accountsRef.current = u; cacheSet("accounts", u);
+    const fields = { xp: newXp };
+    if (amount > 0) fields.last_xp_gain_date = today();
+    DB.updateOne('profiles', userId, fields);
+  };
   const addNotif = (empId, msg, type = "info") => { const n = [...notifications, { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false }]; updNotifications(n); };
+  const markNotifRead = (notifId) => {
+    setNotifications(prev => prev.map(x => x.id === notifId ? { ...x, read: true } : x));
+    DB.updateOne('notifications', notifId, { read: true });
+  };
+  const markAllNotifsRead = () => {
+    const myUnread = notifications.filter(n => n.empId === currentUser?.id && !n.read);
+    setNotifications(prev => prev.map(n => n.empId === currentUser?.id ? { ...n, read: true } : n));
+    myUnread.forEach(n => DB.updateOne('notifications', n.id, { read: true }));
+  };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
@@ -665,11 +684,15 @@ export default function App() {
     }
     const newXp = Math.max(0, (user.xp || 0) + xpChange);
     const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: [...(user.checkIns || []), t].slice(-90) };
-    // Reload latest accounts from DB before saving
-    let latestAccs = accountsRef.current;
-    try { const acDB = await DB.get("km-accounts", []); if (Array.isArray(acDB) && acDB.length > 0) latestAccs = acDB; } catch (e) { }
-    const accs = latestAccs.map(a => a.id === user.id ? { ...updated, xp: newXp } : a);
-    setAccounts(accs); accountsRef.current = accs; await DB.set("km-accounts", accs);
+    const accs = accountsRef.current.map(a => a.id === user.id ? { ...updated, xp: newXp } : a);
+    setAccounts(accs); accountsRef.current = accs; cacheSet("accounts", accs);
+    await DB.updateOne('profiles', user.id, {
+      last_check_in: updated.lastCheckIn,
+      streak: updated.streak,
+      xp: updated.xp,
+      check_ins: updated.checkIns,
+      last_xp_gain_date: updated.lastXpGainDate || null,
+    });
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
     if (idleMsg) addNotif(user.id, idleMsg, "decay");
     return updated;
@@ -3732,11 +3755,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <div style={{ ...card, background: `${C.orange}08`, border: `1px solid ${C.orange}22` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <div style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>🔔 THÔNG BÁO MỚI ({notifications.filter(n => n.empId === currentUser.id && !n.read).length})</div>
-                  <button onClick={() => { updNotifications(notifications.map(n => n.empId === currentUser.id ? { ...n, read: true } : n)); }} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "none", padding: "2px 6px" }}>Đã đọc tất cả</button>
+                  <button onClick={() => markAllNotifsRead()} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "none", padding: "2px 6px" }}>Đã đọc tất cả</button>
                 </div>
                 {notifications.filter(n => n.empId === currentUser.id && !n.read).slice(-5).reverse().map(n => (
                   <div key={n.id} onClick={() => {
-                    updNotifications(notifications.map(x => x.id === n.id ? { ...x, read: true } : x));
+                    markNotifRead(n.id);
                     if (n.msg.includes("Thử thách")) { setScreen("emp_challenges"); setSubScreen(null); }
                     else if (n.msg.includes("tuyên dương")) { }
                   }} style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", padding: "6px 8px", marginBottom: 2, borderRadius: 6, background: "rgba(255,255,255,0.03)", cursor: n.msg.includes("Thử thách") ? "pointer" : "default", display: "flex", gap: 8, alignItems: "center" }}>
