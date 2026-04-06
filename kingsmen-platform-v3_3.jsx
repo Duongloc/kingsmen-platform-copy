@@ -2301,9 +2301,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                         }
                                         upd({ hasPdf: true, pdfName: f.name });
                                         setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã gán thành công!" }));
-                                      }} style={{ padding: "10px 12px", textAlign: "left", background: "rgba(255,255,255,0.03)", border: "1px solid " + C.border, borderRadius: 8, color: C.white, fontSize: 12, display: "flex", justifyContent: "space-between", cursor: "pointer" }}>
-                                        <span>📄 {f.name}</span>
-                                        <span style={{ color: "rgba(255,255,255,0.3)" }}>{(f.metadata ? Math.round(f.metadata.size / 1024) : 0)} KB</span>
+                                      }} style={{ padding: "10px 12px", textAlign: "left", background: "rgba(255,255,255,0.03)", border: "1px solid " + C.border, borderRadius: 8, color: C.white, fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+                                        <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                          <span>📄 {(function(){ var lesson = knowledge.find(function(kk){ return kk.id === f.name.replace('.pdf',''); }); return lesson ? lesson.title : f.name; })()}</span>
+                                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{f.name}</span>
+                                        </span>
+                                        <span style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0, marginLeft: 8 }}>{(f.metadata ? Math.round(f.metadata.size / 1024) : 0)} KB</span>
                                       </button>
                                     )
                                   })}
