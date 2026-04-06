@@ -249,15 +249,15 @@ var _pdfCache = {};
 
 // ─── DB layer backed by Supabase ───
 const DB = {
-  async get(k, fb = null, isAdmin = false) {
+  async get(k, fb = null, isAdmin = false, userId = null) {
     try {
       switch (k) {
         case "km-accounts": { const { data } = await supabase.from("profiles").select("*").order("created_at"); return data ? data.map(profileToCamel) : fb; }
         case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("*").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
-          const { data: userData } = await supabase.auth.getUser();
-          const userId = userData?.user?.id;
+          // userId passed from caller avoids an extra auth.getUser() roundtrip
+          if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
           const selectFields = isAdmin ? "*" : "id, emp_id, quiz_id, quiz_title, score, total, pct, passed, time_taken, quiz_type, created_at";
           const { data } = await supabase.from("results").select(selectFields).order("created_at");
           if (!data) return fb;
@@ -283,15 +283,17 @@ const DB = {
       }
     } catch (e) { console.error("DB.get error", k, e); return fb; }
   },
-  async set(k, v) {
+  async set(k, v, user = null, isAdmin = false) {
     try {
       if (!v) return false;
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      let isAdmin = false;
-      if (user) {
-         const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
-         isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+      // Only fetch auth user when not provided — avoids redundant roundtrips when the caller already knows the user
+      if (!user) {
+        const { data: userData } = await supabase.auth.getUser();
+        user = userData?.user;
+        if (user) {
+          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+          isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+        }
       }
 
       switch (k) {
@@ -409,6 +411,14 @@ export default function App() {
   const getNextLevel2 = (xp) => { const c = gL(xp); return c.idx >= LEVELS.length - 1 ? null : LEVELS[c.idx + 1] };
   const xpProgress2 = (xp) => { const c = gL(xp), n = getNextLevel2(xp); return n ? (xp - c.min) / (n.min - c.min) : 1 };
   const [saveStatus, setSaveStatus] = useState("");
+  const saveStatusTimerRef = useRef(null);
+  useEffect(() => {
+    if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+    if (!saveStatus) return;
+    const ms = saveStatus === "saved" ? 2500 : saveStatus === "error" ? 5000 : 3000;
+    saveStatusTimerRef.current = setTimeout(() => setSaveStatus(""), ms);
+    return () => { if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current); };
+  }, [saveStatus]);
   const [loginId, setLoginId] = useState(""); const [loginPw, setLoginPw] = useState(""); const [loginErr, setLoginErr] = useState("");
   const [activeQuiz, setActiveQuiz] = useState(null); const [qIdx, setQIdx] = useState(0);
   const [qAnswers, setQAnswers] = useState({}); const [qSel, setQSel] = useState(null); const [qShowExp, setQShowExp] = useState(false);
@@ -446,6 +456,7 @@ export default function App() {
   }, [formData._upSt, formData.docMsg, formData._impLessonStatus, formData.editPwMsg, formData.pwErr, formData.recMsg]);
   const qTimerRef = useRef(null); const qAnswersRef = useRef({}); const topRef = useRef(null);
   const accountsRef = useRef([]);
+  const lastAutoReloadRef = useRef(0); // tracks last auto-reload timestamp for throttling
   // Essay grading state
   const [essayGrading, setEssayGrading] = useState(false);
   const [essayResults, setEssayResults] = useState([]);
@@ -527,17 +538,21 @@ export default function App() {
     })();
   }, []);
 
-  const save = async (k, d) => { const ok = await DB.set(k, d); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); } else { setSaveStatus("error"); console.error("Save failed for:", k); setTimeout(() => setSaveStatus(""), 4000); } };
+  const save = async (k, d) => { const u = currentUser ? { id: currentUser.id } : null; const ok = await DB.set(k, d, u, role === "admin"); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); } else { setSaveStatus("error"); console.error("Save failed for:", k); setTimeout(() => setSaveStatus(""), 4000); } };
 
   // ─── Fetch ALL data from database ───
-  const loadAllData = async () => {
+  const loadAllData = async (knownUser = null, knownIsAdmin = null) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      let isAdmin = false;
-      if (user) {
-         const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
-         isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+      let user = knownUser;
+      let isAdmin = knownIsAdmin !== null ? knownIsAdmin : false;
+      // Only fetch from auth when caller hasn't provided user context
+      if (!user) {
+        const { data: userData } = await supabase.auth.getUser();
+        user = userData?.user;
+        if (user) {
+          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+          isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+        }
       }
 
       // Batch 1: Critical data (accounts, knowledge, quizzes, settings)
@@ -550,9 +565,9 @@ export default function App() {
       if (Array.isArray(q)) { setQuizzes(q); cacheSet("quizzes", q); }
       if (s) { setSettings(s); cacheSet("settings", s); }
 
-      // Batch 2: Secondary data
+      // Batch 2: Secondary data — pass userId to avoid extra auth.getUser() inside km-results
       const [r, rec, ch, notif, p, bul] = await Promise.all([
-        DB.get("km-results", [], isAdmin), DB.get("km-recognitions", [], isAdmin), DB.get("km-challenges", [], isAdmin),
+        DB.get("km-results", [], isAdmin, user?.id), DB.get("km-recognitions", [], isAdmin), DB.get("km-challenges", [], isAdmin),
         DB.get("km-notifications", [], isAdmin), DB.get("km-paths", [], isAdmin), DB.get("km-bulletins", [], isAdmin),
       ]);
       if (Array.isArray(r)) { setResults(r); cacheSet("results", r); }
@@ -564,6 +579,9 @@ export default function App() {
 
       // Lowest priority
       try { const logoData = await DB.get("km-logo", null); if (logoData) { setCompanyLogo(logoData); cacheSet("logo", logoData); } } catch (e2) { }
+
+      // Stamp the ref so the navigation effect doesn't double-fire right after this completes
+      lastAutoReloadRef.current = Date.now();
     } catch (e) { console.error("loadAllData error:", e); }
   };
   const updAccounts = (d) => { setAccounts(d); accountsRef.current = d; save("km-accounts", d); };
@@ -660,12 +678,17 @@ export default function App() {
 
   useEffect(() => { if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth" }); }, [screen, subScreen]);
   useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } })(); } }, [screen]);
-  // Auto-reload data when navigating screens
+  // Auto-reload data when navigating screens — throttled to at most once per 45 seconds
   useEffect(() => {
     if (role && (screen === "emp_challenges" || screen === "emp_quizzes" || screen === "emp_knowledge" || screen === "emp_home" || screen === "emp_pathway" || screen === "emp_bulletins" || screen === "dir_bulletins" || screen === "admin_challenges" || screen === "admin_home" || screen === "admin_analytics" || screen === "admin_ranking" || screen === "admin_bulletins" || screen === "admin_activity" || screen === "admin_lessons" || screen === "admin_quizzes" || screen === "admin_accounts")) {
+      const now = Date.now();
+      if (now - lastAutoReloadRef.current < 8000) return; // skip if reloaded within last 8s (prevents double-fire after login)
+      lastAutoReloadRef.current = now;
       (async () => {
         try {
-          const [ch, q, k, r, ac, p, bul] = await Promise.all([DB.get("km-challenges", []), DB.get("km-quizzes", []), DB.get("km-knowledge", []), DB.get("km-results", []), DB.get("km-accounts", []), DB.get("km-paths", []), DB.get("km-bulletins", [])]);
+          const uid = currentUser?.id || null;
+          const isAdm = role === "admin";
+          const [ch, q, k, r, ac, p, bul] = await Promise.all([DB.get("km-challenges", []), DB.get("km-quizzes", []), DB.get("km-knowledge", []), DB.get("km-results", [], isAdm, uid), DB.get("km-accounts", []), DB.get("km-paths", []), DB.get("km-bulletins", [])]);
           if (Array.isArray(ch)) setChallenges(ch); if (Array.isArray(q)) setQuizzes(q);
           if (Array.isArray(k)) {
             setKnowledge(function (prev) {
@@ -702,10 +725,11 @@ export default function App() {
     if (pErr || !profile) { setLoginErr("Không tìm thấy hồ sơ nhân viên"); return; }
     if (profile.status === "inactive") { await supabase.auth.signOut(); setLoginErr("Tài khoản đã bị vô hiệu hóa. Liên hệ Admin."); return; }
     // Admin user (emp_id === "admin") or Director → admin panel
-    if (profile.emp_id === "admin" || profile.acc_role === "director") {
+    const isAdminUser = profile.emp_id === "admin" || profile.acc_role === "director";
+    if (isAdminUser) {
       setRole("admin"); setScreen("admin_home");
       setLoginId(""); setLoginPw(""); setLoginErr("");
-      await loadAllData();
+      await loadAllData({ id: data.user.id }, true);
       return;
     }
     const acc = profileToCamel(profile);
@@ -713,7 +737,7 @@ export default function App() {
     setCurrentUser(updated); setRole("employee"); setScreen("emp_home");
     setLoginId(""); setLoginPw(""); setLoginErr("");
     setShowMotivation(getRandomQuote());
-    await loadAllData();
+    await loadAllData({ id: data.user.id }, false);
   };
   // doAdminLogin kept for any remaining UI references; routes through the unified Supabase flow
   const doAdminLogin = () => doEmployeeLogin();
@@ -1688,6 +1712,7 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Google Sans','Be Vietnam Pro',sans-serif", overflowX: "hidden" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Google+Sans:wght@400;500;600;700&display=swap');
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastSlideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes glowPulse{0%,100%{opacity:0.4;transform:translate(-50%,-50%) scale(1)}50%{opacity:0.7;transform:translate(-50%,-50%) scale(1.1)}}
 *{box-sizing:border-box;margin:0;padding:0}input:focus,textarea:focus,select:focus{outline:2px solid ${C.teal};outline-offset:1px}
@@ -1781,8 +1806,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
       {/* ═══ IMPORT PREVIEW OVERLAY ═══ */}
       {importPreview && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99997, background: "rgba(10,45,58,0.97)", display: "flex", flexDirection: "column", padding: 20, animation: "fadeIn .25s" }}>
-          <div style={{ maxWidth: "min(640px, 95vw)", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", height: "100%", maxHeight: "92vh" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99997, background: "rgba(10,45,58,0.97)", display: "flex", flexDirection: "column", padding: "16px 12px", animation: "fadeIn .25s", overflowY: "auto" }}>
+          <div style={{ maxWidth: "min(640px, 95vw)", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", minHeight: "min-content" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexShrink: 0 }}>
               <div>
@@ -1882,8 +1907,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </div>
             )}
 
-            {/* Preview questions (scrollable) */}
-            <div style={{ flex: 1, overflowY: "auto", marginBottom: 12 }}>
+            {/* Preview questions */}
+            <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: C.goldL, fontWeight: 700, marginBottom: 6 }}>XEM TRƯỚC CÂU HỎI</div>
               {importPreview.quiz.questions.slice(0, 5).map((q, i) => (
                 <div key={i} style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${q.type === "essay" ? C.purple + "33" : q.type === "truefalse" ? C.gold + "33" : C.teal + "22"}`, marginBottom: 6 }}>
@@ -1897,7 +1922,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             </div>
 
             {/* Action buttons */}
-            <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 4, paddingBottom: 16 }}>
               <button onClick={() => {
                 if (!(importPreview.quiz.title || "").trim()) { setAiStatus("⚠️ Vui lòng nhập tên đề!"); return; }
                 const newQ = [...quizzes, importPreview.quiz];
@@ -2236,7 +2261,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2, letterSpacing: 1 }}>{"TỆP PDF ĐÍNH KÈM"}<span style={{ marginLeft: 8, fontSize: 9, color: "rgba(255,255,255,0.15)" }}>{"[hasPdf=" + String(k.hasPdf) + ", pdfName=" + String(k.pdfName || "") + "]"}</span></div>
                                 {k.hasPdf && k.pdfName
-                                  ? <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, wordBreak: "break-all", lineHeight: 1.4 }}>{k.pdfName}</div>
+                                  ? <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", lineHeight: 1.4 }} title={k.pdfName}>{k.pdfName}</div>
                                   : <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>{"Chưa có PDF — bấm Tải lên để thêm"}</div>
                                 }
                               </div>
@@ -3934,9 +3959,9 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         <h3 style={{ ...hd(20), marginBottom: 6 }}>{k.title}</h3>
                         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>{(k.depts || ["Tất cả"]).join(" · ")}</div>
                         {k.hasPdf && k.pdfName && (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, padding: "5px 14px", borderRadius: 20, background: C.purple + "18", border: "1px solid " + C.purple + "33" }}>
-                            <span style={{ fontSize: 13 }}>📄</span>
-                            <span style={{ fontSize: 12, color: C.purple, fontWeight: 600 }}>{k.pdfName}</span>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, padding: "5px 14px", borderRadius: 20, background: C.purple + "18", border: "1px solid " + C.purple + "33", maxWidth: "90vw", overflow: "hidden" }}>
+                            <span style={{ fontSize: 13, flexShrink: 0 }}>📄</span>
+                            <span style={{ fontSize: 12, color: C.purple, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={k.pdfName}>{k.pdfName}</span>
                           </div>
                         )}
                       </div>
@@ -5319,23 +5344,23 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {/* ═══ SAVE STATUS TOAST ═══ */}
         {saveStatus && (
           <div style={{
-            position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+            position: "fixed", bottom: 28, left: "50%",
             zIndex: 99999, pointerEvents: "none",
-            animation: "fadeIn .25s ease-out"
+            animation: "toastSlideUp .3s cubic-bezier(0.34,1.56,0.64,1) both"
           }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,
-              padding: "10px 20px", borderRadius: 12,
+              padding: "11px 22px", borderRadius: 14,
               background: saveStatus === "saved"
-                ? "linear-gradient(135deg, rgba(12,123,111,0.95), rgba(10,100,90,0.95))"
-                : "linear-gradient(135deg, rgba(200,50,50,0.95), rgba(170,30,30,0.95))",
-              backdropFilter: "blur(12px)",
+                ? "linear-gradient(135deg, rgba(12,123,111,0.97), rgba(10,100,90,0.97))"
+                : "linear-gradient(135deg, rgba(200,50,50,0.97), rgba(170,30,30,0.97))",
+              backdropFilter: "blur(16px)",
               boxShadow: saveStatus === "saved"
-                ? "0 4px 20px rgba(12,123,111,0.4), 0 0 0 1px rgba(12,123,111,0.3)"
-                : "0 4px 20px rgba(200,50,50,0.4), 0 0 0 1px rgba(200,50,50,0.3)",
+                ? "0 6px 24px rgba(12,123,111,0.45), 0 0 0 1px rgba(12,123,111,0.35)"
+                : "0 6px 24px rgba(200,50,50,0.45), 0 0 0 1px rgba(200,50,50,0.35)",
               color: "#fff", fontSize: 13, fontWeight: 700,
               fontFamily: "'Be Vietnam Pro', sans-serif",
-              letterSpacing: 0.3
+              letterSpacing: 0.3, whiteSpace: "nowrap"
             }}>
               <span style={{ fontSize: 16 }}>{saveStatus === "saved" ? "✅" : "❌"}</span>
               <span>{saveStatus === "saved" ? "Đã lưu vào Supabase" : "Lỗi lưu dữ liệu — kiểm tra Console"}</span>
