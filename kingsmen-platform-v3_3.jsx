@@ -155,7 +155,13 @@ const getLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const x = Num
 const getNextLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L); return c.idx >= L.length - 1 ? null : L[c.idx + 1] };
 const xpProgress = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L), n = getNextLevel(xp, L); return n ? (xp - c.min) / (n.min - c.min) : 1 };
 const visibleToDept = (item, dept) => { const d = item.depts || ["Tất cả"]; return d.includes("Tất cả") || d.includes(dept) };
-const challengeVisibleTo = (ch, user) => (ch.active !== false) && (!ch.assignTo || ch.assignTo === "all" || (ch.assignTo === "dept" && ch.assignDept === user.dept) || ch.assignTo === user.id);
+const challengeVisibleTo = (ch, user) => {
+  if (ch.active === false) return false;
+  if (!ch.assignTo || ch.assignTo === "all") return true;
+  if (ch.assignTo === "dept") return ch.assignDept === user.dept;
+  if (ch.assignTo.startsWith('[')) { try { return JSON.parse(ch.assignTo).includes(user.id); } catch(e) { return false; } }
+  return ch.assignTo === user.id;
+};
 const uid = () => Math.random().toString(36).slice(2, 10);
 const shuffle = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[b[i], b[j]] = [b[j], b[i]]; } return b };
 const fmtDate = (d) => new Date(d).toLocaleDateString("vi-VN");
@@ -1826,16 +1832,22 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </div>
               {/* Depts */}
               <div style={{ marginBottom: 12 }}>
-                <label style={lbl}>🏢 Phòng ban</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ ...lbl, marginBottom: 0 }}>🏢 Phòng ban</label>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => setImportPreview({ ...importPreview, quiz: { ...importPreview.quiz, depts: ["Tất cả"] } })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.teal}18`, color: C.teal, border: `1px solid ${C.teal}33`, cursor: "pointer" }}>Tất cả</button>
+                    <button onClick={() => setImportPreview({ ...importPreview, quiz: { ...importPreview.quiz, depts: DEPTS.filter(d => d !== "Tất cả") } })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: `1px solid ${C.border}`, cursor: "pointer" }}>Từng phòng</button>
+                  </div>
+                </div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {["Tất cả", ...DEPTS].map(d => {
+                  {["Tất cả", ...DEPTS.filter(d => d !== "Tất cả")].map(d => {
                     const on = (importPreview.quiz.depts || ["Tất cả"]).includes(d);
                     return <button key={d} onClick={() => {
                       let nd = on ? (importPreview.quiz.depts || []).filter(x => x !== d) : [...(importPreview.quiz.depts || []).filter(x => x !== "Tất cả"), d];
                       if (d === "Tất cả") nd = ["Tất cả"];
                       if (!nd.length) nd = ["Tất cả"];
                       setImportPreview({ ...importPreview, quiz: { ...importPreview.quiz, depts: nd } });
-                    }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: on ? 700 : 500, background: on ? `${C.teal}22` : "rgba(255,255,255,0.03)", color: on ? C.teal : "rgba(255,255,255,0.35)", border: `1px solid ${on ? C.teal + "44" : C.border}` }}>{on ? "✓ " : ""}{d}</button>;
+                    }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: on ? 700 : 500, background: on ? `${C.teal}22` : "rgba(255,255,255,0.03)", color: on ? C.teal : "rgba(255,255,255,0.35)", border: `1px solid ${on ? C.teal + "44" : C.border}`, cursor: "pointer" }}>{on ? "✓ " : ""}{d}</button>;
                   })}
                 </div>
               </div>
@@ -2231,7 +2243,16 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div style={{ ...card, padding: 16, marginBottom: 12 }}>
                         <div style={{ fontSize: 10, color: C.gold, letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>{"① NỘI DUNG KIẾN THỨC"}</div>
                         <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>{"Tên bài"}</div><input value={k.title || ""} onChange={function (e) { upd({ title: e.target.value }) }} style={{ ...inp, fontSize: 13, fontWeight: 700 }} /></div>
-                        <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>{"Phòng ban"}</div><div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{["Tất cả", "Sales", "Marketing", "Kế toán", "Kho", "HR", "Kỹ thuật"].map(function (d) { var sel = (k.depts || []).includes(d); return <button key={d} onClick={function () { upd({ depts: sel ? (k.depts || []).filter(function (dd) { return dd !== d }) : [].concat(k.depts || [], [d]) }) }} style={{ padding: "6px 12px", borderRadius: 5, fontSize: 10, background: sel ? C.teal + "18" : "transparent", color: sel ? C.teal : "rgba(255,255,255,0.3)", border: "1px solid " + (sel ? C.teal + "33" : "rgba(255,255,255,0.08)") }}>{d}</button> })}</div></div>
+                        <div style={{ marginBottom: 6 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{"Phòng ban"}</div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button onClick={function () { upd({ depts: ["Tất cả"] }) }} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: C.teal + "18", color: C.teal, border: "1px solid " + C.teal + "33", cursor: "pointer" }}>Tất cả</button>
+                              <button onClick={function () { upd({ depts: DEPTS.filter(function(d){ return d !== "Tất cả"; }) }) }} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>Từng phòng</button>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{["Tất cả", ...DEPTS.filter(function(d){ return d !== "Tất cả"; })].map(function (d) { var sel = (k.depts || []).includes(d); return <button key={d} onClick={function () { upd({ depts: sel ? (k.depts || []).filter(function (dd) { return dd !== d }) : [].concat(k.depts || [], [d]) }) }} style={{ padding: "6px 12px", borderRadius: 5, fontSize: 10, background: sel ? C.teal + "18" : "transparent", color: sel ? C.teal : "rgba(255,255,255,0.3)", border: "1px solid " + (sel ? C.teal + "33" : "rgba(255,255,255,0.08)"), cursor: "pointer" }}>{d}</button> })}</div>
+                        </div>
                         <div>
                           <button onClick={function () { setFormData(Object.assign({}, formData, { _editContent: k.id })) }} style={{ width: "100%", padding: "12px 16px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, textAlign: "left", cursor: "pointer" }}>
                             <div style={{ fontSize: 10, color: C.goldL, fontWeight: 700, marginBottom: 4 }}>{"📝 Nội dung (" + (k.content || "").length + " ký tự)"}</div>
@@ -2972,9 +2993,9 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               {/* Challenge list */}
               {challenges.length === 0 && <Empty msg="Chưa có thử thách nào." />}
               {challenges.map(ch => {
-                const assignee = ch.assignTo === "all" ? "Tất cả" : ch.assignTo === "dept" ? ch.assignDept : !ch.assignTo ? "Tất cả" : (() => { const _a = accounts.find(a => a.id === ch.assignTo); return _a ? _a.name : ch.assignTo; });
+                const assignee = ch.assignTo === "all" || !ch.assignTo ? "Tất cả" : ch.assignTo === "dept" ? ch.assignDept : ch.assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(ch.assignTo); return ids.map(id => { const _a = accounts.find(a => a.id === id); return _a ? _a.name : id; }).join(', '); } catch(e) { return ch.assignTo; } })() : (() => { const _a = accounts.find(a => a.id === ch.assignTo); return _a ? _a.name : ch.assignTo; })();
                 const completed = ch.completedBy || [];
-                const targetAccs = !ch.assignTo || ch.assignTo === "all" ? accounts : ch.assignTo === "dept" ? accounts.filter(a => a.dept === ch.assignDept) : accounts.filter(a => a.id === ch.assignTo);
+                const targetAccs = !ch.assignTo || ch.assignTo === "all" ? accounts : ch.assignTo === "dept" ? accounts.filter(a => a.dept === ch.assignDept) : ch.assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(ch.assignTo); return accounts.filter(a => ids.includes(a.id)); } catch(e) { return []; } })() : accounts.filter(a => a.id === ch.assignTo);
                 const expanded = formData.chExpand === ch.id;
                 return (
                   <div key={ch.id} style={{ ...card }}>
@@ -3049,7 +3070,23 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     {[{ v: "all", l: "Tất cả" }, { v: "dept", l: "Phòng ban" }, { v: "person", l: "Cá nhân" }].map(o => <button key={o.v} onClick={() => setFormData({ ...formData, chAssign: o.v })} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: (formData.chAssign || "all") === o.v ? 700 : 500, background: (formData.chAssign || "all") === o.v ? `${C.gold}22` : "rgba(255,255,255,0.03)", color: (formData.chAssign || "all") === o.v ? C.gold : "rgba(255,255,255,0.3)", border: `1px solid ${(formData.chAssign || "all") === o.v ? C.gold + "44" : C.border}` }}>{o.l}</button>)}
                   </div>
                   {formData.chAssign === "dept" && <select value={formData.chDept || DEPTS[0]} onChange={e => setFormData({ ...formData, chDept: e.target.value })} style={inp}>{DEPTS.map(d => <option key={d}>{d}</option>)}</select>}
-                  {formData.chAssign === "person" && <select value={formData.chPerson || ""} onChange={e => setFormData({ ...formData, chPerson: e.target.value })} style={inp}><option value="">— Chọn NV —</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.empId})</option>)}</select>}
+                  {formData.chAssign === "person" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{(formData.chPersons || []).length > 0 ? `Đã chọn ${(formData.chPersons || []).length} NV` : "Chọn nhân viên"}</span>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <button onClick={() => setFormData({ ...formData, chPersons: accounts.map(a => a.id) })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.gold}18`, color: C.gold, border: `1px solid ${C.gold}33`, cursor: "pointer" }}>Chọn tất cả</button>
+                          <button onClick={() => setFormData({ ...formData, chPersons: [] })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: `1px solid ${C.border}`, cursor: "pointer" }}>Bỏ chọn</button>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {accounts.map(a => {
+                          const on = (formData.chPersons || []).includes(a.id);
+                          return <button key={a.id} onClick={() => { const cur = formData.chPersons || []; const np = on ? cur.filter(x => x !== a.id) : [...cur, a.id]; setFormData({ ...formData, chPersons: np }); }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.gold}22` : "rgba(255,255,255,0.03)", color: on ? C.gold : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.gold + "44" : C.border}`, cursor: "pointer" }}>{on ? "✓ " : ""}{a.name}</button>;
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {/* Rewards */}
                 <div style={{ marginBottom: 12 }}>
@@ -3065,7 +3102,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={async () => {
                     if (!(formData.chTitle || "").trim() || !formData.chQuiz) return;
-                    const assignTo = formData.chAssign === "dept" ? "dept" : formData.chAssign === "person" ? (formData.chPerson || "all") : "all";
+                    const chPersons = formData.chPersons || [];
+                    const assignTo = formData.chAssign === "dept" ? "dept" : formData.chAssign === "person" ? (chPersons.length === 1 ? chPersons[0] : chPersons.length > 1 ? JSON.stringify(chPersons) : "all") : "all";
                     const selQuiz = quizzes.find(q => q.id === formData.chQuiz);
                     const ch = { id: uid(), title: formData.chTitle, quizId: formData.chQuiz, quizTitle: (selQuiz && selQuiz.title) || "", minScore: formData.chMinScore || 70, xpReward: formData.chXP || 50, deadline: formData.chDeadline || "", assignTo, assignDept: formData.chDept || "", rewards: (formData.chRewards || []).filter(r => r.trim()), createdAt: new Date().toISOString(), createdBy: currentUser ? currentUser.id : null, createdByName: currentUser ? currentUser.name : "Admin", active: true, completedBy: [], wonRewards: {} };
                     // Reload latest from storage before appending
@@ -3076,7 +3114,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     const saved = await DB.set("km-challenges", newCh);
                     if (!saved) { setSaveStatus("error"); return; }
                     // Notifications
-                    const targets = assignTo === "all" ? accounts : assignTo === "dept" ? accounts.filter(a => a.dept === formData.chDept) : accounts.filter(a => a.id === assignTo);
+                    const targets = assignTo === "all" ? accounts : assignTo === "dept" ? accounts.filter(a => a.dept === formData.chDept) : assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(assignTo); return accounts.filter(a => ids.includes(a.id)); } catch(e) { return []; } })() : accounts.filter(a => a.id === assignTo);
                     let curNotifs = notifications;
                     try { const nfDB = await DB.get("km-notifications", []); if (Array.isArray(nfDB) && nfDB.length >= curNotifs.length) curNotifs = nfDB; } catch (e) { }
                     const newNotifs = [...curNotifs];
@@ -3154,11 +3192,17 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                   {/* Assign employees */}
                   <div style={{ marginBottom: 12 }}>
-                    <label style={lbl}>Gán cho NV (chọn nhiều)</label>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <label style={{ ...lbl, marginBottom: 0 }}>Gán cho NV {pAssign.length > 0 ? `(${pAssign.length} đã chọn)` : "(chọn nhiều)"}</label>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button onClick={() => { const all = accounts.filter(a => a.dept === pDept || pDept === "Tất cả").map(a => a.id); setFormData({ ...formData, pAssign: all }); }} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.green}18`, color: C.green, border: `1px solid ${C.green}33`, cursor: "pointer" }}>Chọn tất cả</button>
+                        <button onClick={() => setFormData({ ...formData, pAssign: [] })} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: `1px solid ${C.border}`, cursor: "pointer" }}>Bỏ chọn</button>
+                      </div>
+                    </div>
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {accounts.filter(a => a.dept === pDept || pDept === "Tất cả").map(a => {
                         const on = pAssign.includes(a.id); return (
-                          <button key={a.id} onClick={() => { const na = on ? pAssign.filter(x => x !== a.id) : [...pAssign, a.id]; setFormData({ ...formData, pAssign: na }); }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.green}22` : "rgba(255,255,255,0.03)", color: on ? C.green : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.green + "44" : C.border}` }}>{on ? "✓ " : ""}{a.name}</button>
+                          <button key={a.id} onClick={() => { const na = on ? pAssign.filter(x => x !== a.id) : [...pAssign, a.id]; setFormData({ ...formData, pAssign: na }); }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.green}22` : "rgba(255,255,255,0.03)", color: on ? C.green : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.green + "44" : C.border}`, cursor: "pointer" }}>{on ? "✓ " : ""}{a.name}</button>
                         );
                       })}
                     </div>
@@ -5232,7 +5276,10 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               const myChallenges = challenges.filter(ch => {
                 // No filter on active - show all
                 if (ch.assignTo === "dept" && ch.assignDept && ch.assignDept !== currentUser.dept) return false;
-                if (ch.assignTo && ch.assignTo !== "all" && ch.assignTo !== "dept" && ch.assignTo !== currentUser.id) return false;
+                if (ch.assignTo && ch.assignTo !== "all" && ch.assignTo !== "dept") {
+                  if (ch.assignTo.startsWith('[')) { try { if (!JSON.parse(ch.assignTo).includes(currentUser.id)) return false; } catch(e) { return false; } }
+                  else if (ch.assignTo !== currentUser.id) return false;
+                }
                 return true;
               });
               // Check completion from both completedBy AND quiz results
