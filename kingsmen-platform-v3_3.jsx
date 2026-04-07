@@ -651,11 +651,14 @@ export default function App() {
   const handleAvatarUpload = (e, userId) => {
     const file = e.target.files && e.target.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const dataUrl = ev.target.result;
-      const accs = accountsRef.current.map(a => a.id === userId ? { ...a, avatar: dataUrl } : a);
-      updAccounts(accs);
-      if (currentUser && currentUser.id === userId) setCurrentUser({ ...currentUser, avatar: dataUrl });
+      // Optimistic local update
+      setAccounts(prev => { const u = prev.map(a => a.id === userId ? { ...a, avatar: dataUrl } : a); accountsRef.current = u; return u; });
+      if (currentUser && currentUser.id === userId) setCurrentUser(prev => ({ ...prev, avatar: dataUrl }));
+      // Single-row update — not full-array upsert
+      const { error: avErr } = await supabase.from("profiles").update({ avatar: dataUrl }).eq("id", userId);
+      if (avErr) console.error("avatar update error:", avErr.message);
     };
     reader.readAsDataURL(file);
   };
@@ -721,37 +724,62 @@ export default function App() {
 
   useEffect(() => { if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth" }); }, [screen, subScreen]);
   useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } })(); } }, [screen]);
-  // Auto-reload data when navigating screens — throttled to at most once per 45 seconds
+  // Selective auto-reload — only fetch tables the current screen needs
+  const SCREEN_TABLES = {
+    emp_home: ["accounts", "results", "challenges", "notifications"],
+    emp_quizzes: ["quizzes", "results"],
+    emp_knowledge: ["knowledge"],
+    emp_challenges: ["challenges", "results"],
+    emp_pathway: ["paths", "results", "quizzes"],
+    emp_bulletins: ["bulletins"],
+    dir_bulletins: ["bulletins"],
+    admin_home: ["accounts", "results", "challenges", "knowledge", "quizzes"],
+    admin_accounts: ["accounts"],
+    admin_lessons: ["knowledge"],
+    admin_quizzes: ["quizzes", "results", "knowledge"],
+    admin_challenges: ["challenges", "accounts"],
+    admin_analytics: ["accounts", "results", "quizzes"],
+    admin_ranking: ["accounts", "results"],
+    admin_bulletins: ["bulletins"],
+    admin_activity: ["accounts", "results", "notifications"],
+  };
   useEffect(() => {
-    if (role && (screen === "emp_challenges" || screen === "emp_quizzes" || screen === "emp_knowledge" || screen === "emp_home" || screen === "emp_pathway" || screen === "emp_bulletins" || screen === "dir_bulletins" || screen === "admin_challenges" || screen === "admin_home" || screen === "admin_analytics" || screen === "admin_ranking" || screen === "admin_bulletins" || screen === "admin_activity" || screen === "admin_lessons" || screen === "admin_quizzes" || screen === "admin_accounts")) {
-      const now = Date.now();
-      if (now - lastAutoReloadRef.current < 8000) return; // skip if reloaded within last 8s (prevents double-fire after login)
-      lastAutoReloadRef.current = now;
-      (async () => {
-        try {
-          const uid = currentUser?.id || null;
-          const isAdm = role === "admin";
-          const [ch, q, k, r, ac, p, bul] = await Promise.all([DB.get("km-challenges", []), DB.get("km-quizzes", []), DB.get("km-knowledge", []), DB.get("km-results", [], isAdm, uid), DB.get("km-accounts", []), DB.get("km-paths", []), DB.get("km-bulletins", [])]);
-          if (Array.isArray(ch)) setChallenges(ch); if (Array.isArray(q)) setQuizzes(q);
-          if (Array.isArray(k)) {
-            setKnowledge(function (prev) {
-              return k.map(function (item) {
-                var existing = prev.find(function (p) { return p.id === item.id });
-                if (existing && existing.videoData) item.videoData = existing.videoData;
-                if (existing && existing.audioData) item.audioData = existing.audioData;
-                return item;
-              });
-            });
-          } if (Array.isArray(r)) setResults(r);
-          if (Array.isArray(ac)) {
-            setAccounts(ac); accountsRef.current = ac;
-            // Refresh currentUser from latest DB data
-            if (currentUser) { const fresh = ac.find(a => a.id === currentUser.id); if (fresh) setCurrentUser(fresh); }
-          }
-          if (Array.isArray(p)) setPaths(p); if (Array.isArray(bul)) setBulletins(bul);
-        } catch (e) { }
-      })();
-    }
+    const needed = SCREEN_TABLES[screen];
+    if (!role || !needed) return;
+    const now = Date.now();
+    if (now - lastAutoReloadRef.current < 8000) return;
+    lastAutoReloadRef.current = now;
+    (async () => {
+      try {
+        const uid = currentUser?.id || null;
+        const isAdm = role === "admin";
+        // Only fetch tables that this screen needs AND whose cache has expired
+        const fetchers = {};
+        if (needed.includes("accounts") && !cacheGet("accounts")) fetchers.accounts = DB.get("km-accounts", []);
+        if (needed.includes("results") && !cacheGet("results")) fetchers.results = DB.get("km-results", [], isAdm, uid);
+        if (needed.includes("quizzes") && !cacheGet("quizzes")) fetchers.quizzes = DB.get("km-quizzes", []);
+        if (needed.includes("knowledge") && !cacheGet("knowledge")) fetchers.knowledge = DB.get("km-knowledge", []);
+        if (needed.includes("challenges") && !cacheGet("challenges")) fetchers.challenges = DB.get("km-challenges", []);
+        if (needed.includes("notifications") && !cacheGet("notifications")) fetchers.notifications = DB.get("km-notifications", []);
+        if (needed.includes("paths") && !cacheGet("paths")) fetchers.paths = DB.get("km-paths", []);
+        if (needed.includes("bulletins") && !cacheGet("bulletins")) fetchers.bulletins = DB.get("km-bulletins", []);
+        const keys = Object.keys(fetchers);
+        if (keys.length === 0) return; // all caches fresh — skip entirely
+        const vals = await Promise.all(keys.map(k => fetchers[k]));
+        const d = {}; keys.forEach((k, i) => { d[k] = vals[i]; });
+        if (d.accounts && Array.isArray(d.accounts)) { setAccounts(d.accounts); accountsRef.current = d.accounts; cacheSet("accounts", d.accounts); if (currentUser) { const fresh = d.accounts.find(a => a.id === currentUser.id); if (fresh) setCurrentUser(fresh); } }
+        if (d.results && Array.isArray(d.results)) { setResults(d.results); cacheSet("results", d.results); }
+        if (d.quizzes && Array.isArray(d.quizzes)) { setQuizzes(d.quizzes); cacheSet("quizzes", d.quizzes); }
+        if (d.knowledge && Array.isArray(d.knowledge)) {
+          setKnowledge(prev => d.knowledge.map(item => { const existing = prev.find(p => p.id === item.id); if (existing && existing.videoData) item.videoData = existing.videoData; if (existing && existing.audioData) item.audioData = existing.audioData; return item; }));
+          cacheSet("knowledge", d.knowledge);
+        }
+        if (d.challenges && Array.isArray(d.challenges)) { setChallenges(d.challenges); cacheSet("challenges", d.challenges); }
+        if (d.notifications && Array.isArray(d.notifications)) { setNotifications(d.notifications); cacheSet("notifications", d.notifications); }
+        if (d.paths && Array.isArray(d.paths)) { setPaths(d.paths); cacheSet("paths", d.paths); }
+        if (d.bulletins && Array.isArray(d.bulletins)) { setBulletins(d.bulletins); cacheSet("bulletins", d.bulletins); }
+      } catch (e) { }
+    })();
   }, [screen, role]);
 
   // Timer
