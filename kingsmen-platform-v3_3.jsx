@@ -288,10 +288,12 @@ const DB = {
   async set(k, v, user = null, isAdmin = false) {
     try {
       if (!v) return false;
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      let isAdmin = false;
-      if (user) {
+      // Use caller-provided user context; only fetch auth as fallback
+      if (!user) {
+        const { data: userData } = await supabase.auth.getUser();
+        user = userData?.user;
+      }
+      if (!isAdmin && user) {
         const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
         isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
       }
@@ -563,14 +565,13 @@ export default function App() {
     })();
   }, []);
 
-  const save = async (k, d) => { const u = currentUser ? { id: currentUser.id } : null; const ok = await DB.set(k, d, u, role === "admin"); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); } else { setSaveStatus("error"); console.error("Save failed for:", k); setTimeout(() => setSaveStatus(""), 4000); } };
+  const save = async (k, d) => { const u = currentUser ? { id: currentUser.id } : null; const adm = role === "admin"; const ok = await DB.set(k, d, u, adm); if (ok) { setSaveStatus("saved"); cacheSet(k.replace("km-", ""), d); setTimeout(() => setSaveStatus(""), 2000); } else { setSaveStatus("error"); console.error("Save failed for:", k); setTimeout(() => setSaveStatus(""), 4000); } };
 
   // ─── Fetch ALL data from database ───
   const loadAllData = async (knownUser = null, knownIsAdmin = null) => {
     try {
       let user = knownUser;
       let isAdmin = knownIsAdmin !== null ? knownIsAdmin : false;
-      // Only fetch from auth when caller hasn't provided user context
       if (!user) {
         const { data: userData } = await supabase.auth.getUser();
         user = userData?.user;
@@ -580,32 +581,47 @@ export default function App() {
         }
       }
 
-      // Batch 1: Critical data (accounts, knowledge, quizzes, settings)
-      const [a, k, q, s] = await Promise.all([
-        DB.get("km-accounts", [], isAdmin), DB.get("km-knowledge", [], isAdmin),
-        DB.get("km-quizzes", [], isAdmin), DB.get("km-settings", null, isAdmin),
-      ]);
-      if (Array.isArray(a)) { setAccounts(a); accountsRef.current = a; cacheSet("accounts", a); }
-      if (Array.isArray(k)) { setKnowledge(k); cacheSet("knowledge", k); }
-      if (Array.isArray(q)) { setQuizzes(q); cacheSet("quizzes", q); }
-      if (s) { setSettings(s); cacheSet("settings", s); }
+      // Batch 1: Critical data — skip if cache is fresh
+      const batch1 = [];
+      if (!cacheGet("accounts")) batch1.push(["accounts", DB.get("km-accounts", [], isAdmin)]);
+      if (!cacheGet("knowledge")) batch1.push(["knowledge", DB.get("km-knowledge", [], isAdmin)]);
+      if (!cacheGet("quizzes")) batch1.push(["quizzes", DB.get("km-quizzes", [], isAdmin)]);
+      if (!cacheGet("settings")) batch1.push(["settings", DB.get("km-settings", null, isAdmin)]);
+      if (batch1.length > 0) {
+        const vals = await Promise.all(batch1.map(x => x[1]));
+        batch1.forEach(([key], i) => {
+          const d = vals[i];
+          if (key === "accounts" && Array.isArray(d)) { setAccounts(d); accountsRef.current = d; cacheSet("accounts", d); }
+          if (key === "knowledge" && Array.isArray(d)) { setKnowledge(d); cacheSet("knowledge", d); }
+          if (key === "quizzes" && Array.isArray(d)) { setQuizzes(d); cacheSet("quizzes", d); }
+          if (key === "settings" && d) { setSettings(d); cacheSet("settings", d); }
+        });
+      }
 
-      // Batch 2: Secondary data — pass userId to avoid extra auth.getUser() inside km-results
-      const [r, rec, ch, notif, p, bul] = await Promise.all([
-        DB.get("km-results", [], isAdmin, user?.id), DB.get("km-recognitions", [], isAdmin), DB.get("km-challenges", [], isAdmin),
-        DB.get("km-notifications", [], isAdmin), DB.get("km-paths", [], isAdmin), DB.get("km-bulletins", [], isAdmin),
-      ]);
-      if (Array.isArray(r)) { setResults(prev => { const merged = r.length >= prev.length ? r : [...r, ...prev.filter(x => !r.some(y => y.id === x.id))]; cacheSet("results", merged); return merged; }); }
-      if (Array.isArray(rec)) { setRecognitions(rec); cacheSet("recognitions", rec); }
-      if (Array.isArray(ch)) { setChallenges(ch); cacheSet("challenges", ch); }
-      if (Array.isArray(notif)) { setNotifications(notif); cacheSet("notifications", notif); }
-      if (Array.isArray(p)) { setPaths(p); cacheSet("paths", p); }
-      if (Array.isArray(bul)) { setBulletins(bul); cacheSet("bulletins", bul); }
+      // Batch 2: Secondary data — skip if cache is fresh
+      const batch2 = [];
+      if (!cacheGet("results")) batch2.push(["results", DB.get("km-results", [], isAdmin, user?.id)]);
+      if (!cacheGet("recognitions")) batch2.push(["recognitions", DB.get("km-recognitions", [], isAdmin)]);
+      if (!cacheGet("challenges")) batch2.push(["challenges", DB.get("km-challenges", [], isAdmin)]);
+      if (!cacheGet("notifications")) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
+      if (!cacheGet("paths")) batch2.push(["paths", DB.get("km-paths", [], isAdmin)]);
+      if (!cacheGet("bulletins")) batch2.push(["bulletins", DB.get("km-bulletins", [], isAdmin)]);
+      if (batch2.length > 0) {
+        const vals = await Promise.all(batch2.map(x => x[1]));
+        batch2.forEach(([key], i) => {
+          const d = vals[i];
+          if (key === "results" && Array.isArray(d)) { setResults(prev => { const merged = d.length >= prev.length ? d : [...d, ...prev.filter(x => !d.some(y => y.id === x.id))]; cacheSet("results", merged); return merged; }); }
+          if (key === "recognitions" && Array.isArray(d)) { setRecognitions(d); cacheSet("recognitions", d); }
+          if (key === "challenges" && Array.isArray(d)) { setChallenges(d); cacheSet("challenges", d); }
+          if (key === "notifications" && Array.isArray(d)) { setNotifications(d); cacheSet("notifications", d); }
+          if (key === "paths" && Array.isArray(d)) { setPaths(d); cacheSet("paths", d); }
+          if (key === "bulletins" && Array.isArray(d)) { setBulletins(d); cacheSet("bulletins", d); }
+        });
+      }
 
       // Lowest priority
-      try { const logoData = await DB.get("km-logo", null); if (logoData) { setCompanyLogo(logoData); cacheSet("logo", logoData); } } catch (e2) { }
+      if (!cacheGet("logo")) { try { const logoData = await DB.get("km-logo", null); if (logoData) { setCompanyLogo(logoData); cacheSet("logo", logoData); } } catch (e2) { } }
 
-      // Stamp the ref so the navigation effect doesn't double-fire right after this completes
       lastAutoReloadRef.current = Date.now();
     } catch (e) { console.error("loadAllData error:", e); }
   };
