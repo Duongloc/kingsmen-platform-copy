@@ -2049,7 +2049,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleAvatarUpload(e, currentUser.id)} />
               </div>
             )}
-            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
+            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } ["accounts","knowledge","quizzes","results","recognitions","challenges","notifications","paths","settings","bulletins","logo"].forEach(k => localStorage.removeItem("kc_" + k)); setAccounts([]); setKnowledge([]); setQuizzes([]); setResults([]); setRecognitions([]); setChallenges([]); setNotifications([]); setPaths([]); setSettings({}); setBulletins([]); setCompanyLogo(null); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
           </div>
         </div>
         {role === "employee" && currentUser && (
