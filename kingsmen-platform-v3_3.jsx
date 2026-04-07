@@ -579,7 +579,7 @@ export default function App() {
         DB.get("km-results", [], isAdmin, user?.id), DB.get("km-recognitions", [], isAdmin), DB.get("km-challenges", [], isAdmin),
         DB.get("km-notifications", [], isAdmin), DB.get("km-paths", [], isAdmin), DB.get("km-bulletins", [], isAdmin),
       ]);
-      if (Array.isArray(r)) { setResults(r); cacheSet("results", r); }
+      if (Array.isArray(r)) { setResults(prev => { const merged = r.length >= prev.length ? r : [...r, ...prev.filter(x => !r.some(y => y.id === x.id))]; cacheSet("results", merged); return merged; }); }
       if (Array.isArray(rec)) { setRecognitions(rec); cacheSet("recognitions", rec); }
       if (Array.isArray(ch)) { setChallenges(ch); cacheSet("challenges", ch); }
       if (Array.isArray(notif)) { setNotifications(notif); cacheSet("notifications", notif); }
@@ -2808,6 +2808,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => { setFormData({ viewAccDetail: a.id }); setScreen("admin_user_detail"); }} style={{ padding: "6px 8px", borderRadius: 6, background: `${C.teal}22`, color: C.tealL, fontSize: 11, fontWeight: 600, border: "none" }}>📋</button>
                     <button onClick={() => setFormData({ editAccId: formData.editAccId === a.id ? null : a.id })} style={{ padding: "6px 8px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }}>✏️</button>
                     {!isInactive ? <button onClick={async () => {
                       if (!window.confirm("Vô hiệu hóa tài khoản của " + a.name + "?\nNhân viên này sẽ không đăng nhập được nữa.")) return;
@@ -2825,6 +2826,140 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             })}
           </div>
         )}
+
+        {/* ═══ ADMIN: USER DETAIL / ACTIVITY ═══ */}
+        {role === "admin" && screen === "admin_user_detail" && (() => {
+          const a = accounts.find(x => x.id === formData.viewAccDetail);
+          if (!a) return <div><button onClick={() => setScreen("admin_accounts")} style={btnO}>← Quay lại</button></div>;
+          const lv = gL(a.xp || 0);
+          const userResults = [...results.filter(r => r.empId === a.id)].reverse();
+          const userReadLessons = a.readLessons || [];
+          const userChallenges = challenges.filter(c => (c.completedBy || []).includes(a.id));
+          const userPaths = paths.filter(p => (p.assignedTo || []).includes(a.id));
+          const passCount = userResults.filter(r => r.passed).length;
+          const avgPct = userResults.length ? Math.round(userResults.reduce((s, r) => s + r.pct, 0) / userResults.length) : null;
+          return (
+            <div style={{ animation: "fadeIn .4s" }}>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h2 style={hd(22)}>📋 Hoạt Động Nhân Viên</h2>
+                <button onClick={() => { setScreen("admin_accounts"); setFormData({}); }} style={btnO}>← Danh sách</button>
+              </div>
+
+              {/* User card */}
+              <div style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: `${C.teal}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>{a.avatar ? <img src={a.avatar} style={{ width: 48, height: 48, borderRadius: 12, objectFit: "cover" }} /> : lv.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: C.white }}>{a.name} <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>({a.empId})</span></div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{a.dept}{a.team ? " · " + a.team : ""} · {lv.name} · {a.xp || 0} XP · {a.checkIns?.length || 0} ngày</div>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {[{ label: "Bài thi", val: userResults.length, color: C.blue }, { label: "Đạt", val: passCount, color: C.green }, { label: "TB %", val: avgPct !== null ? avgPct + "%" : "—", color: C.gold }, { label: "Bài đọc", val: userReadLessons.length, color: C.purple }, { label: "Thử thách", val: userChallenges.length, color: C.orange }].map((s, i) => (
+                    <div key={i} style={{ textAlign: "center", minWidth: 52 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: s.color, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{s.val}</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quiz history */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8, marginTop: 4 }}>LỊCH SỬ BÀI THI ({userResults.length})</div>
+              {userResults.length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa có bài thi nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+                  {userResults.map(r => (
+                    <div key={r.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12, padding: "10px 14px" }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 9, background: `${getRating(r.pct).color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: getRating(r.pct).color, fontFamily: "'Be Vietnam Pro',sans-serif", flexShrink: 0 }}>{r.pct}%</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.quizTitle}</div>
+                        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{r.score}/{r.total} câu · {fmtTime(r.time)} · {fmtDate(r.date)}</div>
+                      </div>
+                      <span style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, flexShrink: 0, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "CHƯA ĐẠT"}</span>
+                    </div>
+                  ))}
+                </div>
+              }
+
+              {/* Lessons read */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>BÀI HỌC ĐÃ ĐỌC ({userReadLessons.length}/{knowledge.length})</div>
+              {knowledge.length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa có bài học nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+                  {knowledge.map(k => {
+                    const done = userReadLessons.includes(k.id);
+                    return (
+                      <div key={k.id} style={{ ...card, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", opacity: done ? 1 : 0.45 }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{done ? "✅" : "⬜"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.title}</div>
+                          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{k.dept || "Tất cả"}{k.tags?.length ? " · " + k.tags.slice(0, 2).join(", ") : ""}</div>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: done ? C.green : "rgba(255,255,255,0.2)", flexShrink: 0 }}>{done ? "Đã đọc" : "Chưa đọc"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+
+              {/* Challenges completed */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>THỬ THÁCH ĐÃ HOÀN THÀNH ({userChallenges.length}/{challenges.filter(c => c.active !== false).length})</div>
+              {challenges.filter(c => c.active !== false).length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa có thử thách nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+                  {challenges.filter(c => c.active !== false).map(c => {
+                    const done = (c.completedBy || []).includes(a.id);
+                    return (
+                      <div key={c.id} style={{ ...card, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", opacity: done ? 1 : 0.45 }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{done ? "🏆" : "🎯"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
+                          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>+{c.xpReward || 0} XP · Min {c.minScore || settings.passScore}%{c.rewards?.length ? " · 🎁 " + c.rewards.length + " phần thưởng" : ""}</div>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: done ? C.green : "rgba(255,255,255,0.2)", flexShrink: 0 }}>{done ? "Hoàn thành" : "Chưa xong"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+
+              {/* Path progress */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>LỘ TRÌNH ({userPaths.length})</div>
+              {userPaths.length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa được gán lộ trình nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                  {userPaths.map(p => {
+                    const prog = (a.pathProgress || {})[p.id] || {};
+                    const checks = prog.checks || {};
+                    const allMods = (p.stages || []).flatMap(st => st.modules || []);
+                    const totalChecks = allMods.reduce((s, m) => s + (m.checklist?.length || 0), 0);
+                    const quizMods = allMods.filter(m => m.quizId);
+                    const quizDone = quizMods.filter(m => results.some(r => r.empId === a.id && r.quizId === m.quizId && r.pct >= (m.minScore || 70))).length;
+                    const doneChecks = Object.values(checks).filter(Boolean).length;
+                    const totalItems = totalChecks + quizMods.length;
+                    const doneItems = doneChecks + quizDone;
+                    const pct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+                    return (
+                      <div key={p.id} style={{ ...card, padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                          <span style={{ fontSize: 18 }}>📋</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{p.title}</div>
+                            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{doneItems}/{totalItems} mục · {quizDone}/{quizMods.length} bài thi · {pct}% hoàn thành</div>
+                          </div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: pct === 100 ? C.green : C.gold, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{pct}%</div>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 3, width: pct + "%", background: pct === 100 ? C.green : `linear-gradient(90deg,${C.teal},${C.tealL})`, transition: "width .4s" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+            </div>
+          );
+        })()}
 
         {/* ═══ ADMIN: ANALYTICS ═══ */}
         {role === "admin" && screen === "admin_analytics" && (
