@@ -37,6 +37,8 @@ CREATE TABLE public.challenges (
   created_by uuid,
   completed_by jsonb DEFAULT '[]'::jsonb,
   won_rewards jsonb DEFAULT '{}'::jsonb,
+  quiz_title text DEFAULT ''::text,
+  created_by_name text DEFAULT ''::text,
   CONSTRAINT challenges_pkey PRIMARY KEY (id),
   CONSTRAINT challenges_quiz_id_fkey FOREIGN KEY (quiz_id) REFERENCES public.quizzes(id),
   CONSTRAINT challenges_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
@@ -58,6 +60,7 @@ CREATE TABLE public.knowledge (
   audio_url text DEFAULT ''::text,
   images jsonb DEFAULT '[]'::jsonb,
   created_at timestamp with time zone DEFAULT now(),
+  pdf_name text,
   CONSTRAINT knowledge_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.notifications (
@@ -111,6 +114,7 @@ CREATE TABLE public.quizzes (
   difficulty text DEFAULT 'medium'::text,
   quiz_type text DEFAULT 'mc'::text,
   created_at timestamp with time zone DEFAULT now(),
+  imported_from text,
   CONSTRAINT quizzes_pkey PRIMARY KEY (id),
   CONSTRAINT quizzes_knowledge_id_fkey FOREIGN KEY (knowledge_id) REFERENCES public.knowledge(id)
 );

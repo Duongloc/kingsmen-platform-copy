@@ -155,7 +155,13 @@ const getLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const x = Num
 const getNextLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L); return c.idx >= L.length - 1 ? null : L[c.idx + 1] };
 const xpProgress = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L), n = getNextLevel(xp, L); return n ? (xp - c.min) / (n.min - c.min) : 1 };
 const visibleToDept = (item, dept) => { const d = item.depts || ["Tất cả"]; return d.includes("Tất cả") || d.includes(dept) };
-const challengeVisibleTo = (ch, user) => (ch.active !== false) && (!ch.assignTo || ch.assignTo === "all" || (ch.assignTo === "dept" && ch.assignDept === user.dept) || ch.assignTo === user.id);
+const challengeVisibleTo = (ch, user) => {
+  if (ch.active === false) return false;
+  if (!ch.assignTo || ch.assignTo === "all") return true;
+  if (ch.assignTo === "dept") return ch.assignDept === user.dept;
+  if (ch.assignTo.startsWith('[')) { try { return JSON.parse(ch.assignTo).includes(user.id); } catch (e) { return false; } }
+  return ch.assignTo === user.id;
+};
 const uid = () => Math.random().toString(36).slice(2, 10);
 const shuffle = (a) => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[b[i], b[j]] = [b[j], b[i]]; } return b };
 const fmtDate = (d) => new Date(d).toLocaleDateString("vi-VN");
@@ -243,34 +249,30 @@ const bulletinToSnake = (b) => ({ id: b.id, title: b.title, content: b.content |
 const recognitionToCamel = (r) => ({ id: r.id, empId: r.emp_id, empName: r.emp_name || "", type: r.type, message: r.message, givenBy: r.given_by, createdAt: r.created_at });
 const recognitionToSnake = (r) => ({ id: r.id, emp_id: r.empId, emp_name: r.empName || "", type: r.type || "excellent", message: r.message || "", given_by: r.givenBy || "" });
 const pathToCamel = (r) => ({ id: r.id, title: r.title, dept: r.dept || "", description: r.description || "", stages: r.stages || [], assignedTo: r.assigned_to || [], createdAt: r.created_at || null });
-const pathToSnake = (p) => ({ id: p.id, title: p.title, dept: p.dept || "", description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [] });
+const pathToSnake = (p) => ({ id: p.id, title: p.title, dept: p.dept || "", description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [], ...(p.createdAt ? { created_at: p.createdAt } : {}) });
 
 var _pdfCache = {};
 
 // ─── DB layer backed by Supabase ───
 const DB = {
-  async get(k, fb = null, isAdmin = false) {
+  async get(k, fb = null, isAdmin = false, userId = null) {
     try {
       switch (k) {
         case "km-accounts": { const { data } = await supabase.from("profiles").select("*").order("created_at"); return data ? data.map(profileToCamel) : fb; }
         case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("*").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
-          const { data: userData } = await supabase.auth.getUser();
-          const userId = userData?.user?.id;
-          const selectFields = isAdmin ? "*" : "id, emp_id, quiz_id, quiz_title, score, total, pct, passed, time_taken, quiz_type, created_at";
-          const { data } = await supabase.from("results").select(selectFields).order("created_at");
-          if (!data) return fb;
-          let results = data;
-          if (userId && !isAdmin) {
-            const { data: myAnswers } = await supabase.from("results").select("id, answers").eq("emp_id", userId);
-            if (myAnswers) {
-              const answersMap = {};
-              myAnswers.forEach(r => answersMap[r.id] = r.answers);
-              results = results.map(r => ({ ...r, answers: answersMap[r.id] || [] }));
-            }
+          if (isAdmin) {
+            // Admins fetch everything — RLS allows this
+            const { data } = await supabase.from("results").select("*").order("created_at");
+            return data ? data.map(resultToCamel) : fb;
           }
-          return results.map(resultToCamel);
+          // Non-admins: single query filtered to own rows (explicit filter + RLS double protection)
+          // No second query needed — answers are included since we only fetch own rows
+          if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
+          if (!userId) return fb;
+          const { data } = await supabase.from("results").select("*").eq("emp_id", userId).order("created_at");
+          return data ? data.map(resultToCamel) : fb;
         }
         case "km-recognitions": { const { data } = await supabase.from("recognitions").select("*").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
         case "km-challenges": { const { data } = await supabase.from("challenges").select("*").order("created_at"); return data ? data.map(challengeToCamel) : fb; }
@@ -283,28 +285,24 @@ const DB = {
       }
     } catch (e) { console.error("DB.get error", k, e); return fb; }
   },
-  async set(k, v) {
+  async set(k, v, user = null, isAdmin = false) {
     try {
       if (!v) return false;
-      let { data: userData } = await supabase.auth.getUser();
-      let user = userData?.user;
-      // If user is null, try refreshing the session before giving up
-      if (!user) {
-        try { const { data: s } = await supabase.auth.getSession(); user = s?.session?.user || null; } catch (e2) {}
-      }
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
       let isAdmin = false;
       if (user) {
-         const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
-         isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+        const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+        isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
       }
 
       switch (k) {
-        case "km-accounts": { 
-           if (!Array.isArray(v)) return false;
-           if (!user && !isAdmin) { console.error("accounts save: no authenticated user"); return false; }
-           const rows = v.map(profileToSnake).filter(r => isAdmin || (user && r.id === user.id)); 
-           if (rows.length > 0) { const { error } = await supabase.from("profiles").upsert(rows); if (error) { console.error("profiles upsert err:", error.message); return false; } }
-           return rows.length > 0; 
+        case "km-accounts": {
+          if (!Array.isArray(v)) return false;
+          if (!user && !isAdmin) { console.error("accounts save: no authenticated user"); return false; }
+          const rows = v.map(profileToSnake).filter(r => isAdmin || (user && r.id === user.id));
+          if (rows.length > 0) { const { error } = await supabase.from("profiles").upsert(rows); if (error) { console.error("profiles upsert err:", error.message); return false; } }
+          return rows.length > 0;
         }
         case "km-quizzes": {
           if (!Array.isArray(v)) return false;
@@ -339,12 +337,12 @@ const DB = {
           }
           return true;
         }
-        case "km-results": { 
-           if (!Array.isArray(v)) return false;
-           if (!user && !isAdmin) { console.error("results save: no authenticated user"); return false; }
-           const rows = v.map(resultToSnake).filter(r => isAdmin || (user && r.emp_id === user.id)); 
-           if (rows.length > 0) { const { error } = await supabase.from("results").upsert(rows); if (error) { console.error("results upsert err:", error.message); return false; } }
-           return rows.length > 0; 
+        case "km-results": {
+          if (!Array.isArray(v)) return false;
+          if (!user && !isAdmin) { console.error("results save: no authenticated user"); return false; }
+          const rows = v.map(resultToSnake).filter(r => isAdmin || (user && r.emp_id === user.id));
+          if (rows.length > 0) { const { error } = await supabase.from("results").upsert(rows); if (error) { console.error("results upsert err:", error.message); return false; } }
+          return rows.length > 0;
         }
         case "km-recognitions": {
           if (!Array.isArray(v)) return false;
@@ -373,14 +371,14 @@ const DB = {
           }
           return false;
         }
-        case "km-notifications": { 
-           if (!Array.isArray(v)) return false; 
-           // Filter notifications to only upsert ones owned by user, OR new inserts
-           const { data: existingResp } = await supabase.from("notifications").select("id");
-           const existingIds = new Set(existingResp?.map(e => e.id) || []);
-           const rows = v.map(notifToSnake).filter(r => isAdmin || r.emp_id === user?.id || !existingIds.has(r.id)); 
-           if (rows.length > 0) { const { error } = await supabase.from("notifications").upsert(rows); if (error) { console.error("notif upsert err:", error.message); return false; } }
-           return true; 
+        case "km-notifications": {
+          if (!Array.isArray(v)) return false;
+          // Filter notifications to only upsert ones owned by user, OR new inserts
+          const { data: existingResp } = await supabase.from("notifications").select("id");
+          const existingIds = new Set(existingResp?.map(e => e.id) || []);
+          const rows = v.map(notifToSnake).filter(r => isAdmin || r.emp_id === user?.id || !existingIds.has(r.id));
+          if (rows.length > 0) { const { error } = await supabase.from("notifications").upsert(rows); if (error) { console.error("notif upsert err:", error.message); return false; } }
+          return true;
         }
         case "km-paths": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("paths").upsert(v.map(pathToSnake)); if (error) { console.error("paths upsert err:", error.message); return false; } return true; }
         case "km-bulletins": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("bulletins").upsert(v.map(bulletinToSnake)); if (error) { console.error("bulletins upsert err:", error.message); return false; } return true; }
@@ -389,6 +387,13 @@ const DB = {
         default: return false;
       }
     } catch (e) { console.error("DB.set error", k, e); return false; }
+  },
+  async updateOne(table, id, fields) {
+    try {
+      const { error } = await supabase.from(table).update(fields).eq('id', id);
+      if (error) { console.error('DB.updateOne error', table, error.message); return false; }
+      return true;
+    } catch (e) { console.error('DB.updateOne error', table, e); return false; }
   },
 };
 
@@ -416,6 +421,14 @@ export default function App() {
   const getNextLevel2 = (xp) => { const c = gL(xp); return c.idx >= LEVELS.length - 1 ? null : LEVELS[c.idx + 1] };
   const xpProgress2 = (xp) => { const c = gL(xp), n = getNextLevel2(xp); return n ? (xp - c.min) / (n.min - c.min) : 1 };
   const [saveStatus, setSaveStatus] = useState("");
+  const saveStatusTimerRef = useRef(null);
+  useEffect(() => {
+    if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+    if (!saveStatus) return;
+    const ms = saveStatus === "saved" ? 2500 : saveStatus === "error" ? 5000 : 3000;
+    saveStatusTimerRef.current = setTimeout(() => setSaveStatus(""), ms);
+    return () => { if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current); };
+  }, [saveStatus]);
   const [loginId, setLoginId] = useState(""); const [loginPw, setLoginPw] = useState(""); const [loginErr, setLoginErr] = useState("");
   const [activeQuiz, setActiveQuiz] = useState(null); const [qIdx, setQIdx] = useState(0);
   const [qAnswers, setQAnswers] = useState({}); const [qSel, setQSel] = useState(null); const [qShowExp, setQShowExp] = useState(false);
@@ -454,6 +467,7 @@ export default function App() {
   }, [formData._upSt, formData.docMsg, formData._impLessonStatus, formData.editPwMsg, formData.pwErr, formData.recMsg]);
   const qTimerRef = useRef(null); const qAnswersRef = useRef({}); const topRef = useRef(null);
   const accountsRef = useRef([]);
+  const lastAutoReloadRef = useRef(0); // tracks last auto-reload timestamp for throttling
   // Essay grading state
   const [essayGrading, setEssayGrading] = useState(false);
   const [essayResults, setEssayResults] = useState([]);
@@ -478,8 +492,8 @@ export default function App() {
 
   // ─── localStorage cache helpers (TTL-aware, cross-tab safe) ───
   const CACHE_TTL = { accounts: 30000, results: 30000, notifications: 30000, challenges: 30000, knowledge: 300000, quizzes: 300000, paths: 300000, settings: 300000, recognitions: 300000, bulletins: 300000, logo: 300000 };
-  const cacheGet = (key) => { try { const raw = localStorage.getItem("kc_" + key); if (!raw) return null; const { ts, data } = JSON.parse(raw); const ttl = CACHE_TTL[key] ?? 30000; if (Date.now() - ts > ttl) { localStorage.removeItem("kc_" + key); return null; } return data; } catch(e){} return null; };
-  const cacheSet = (key, data) => { try { localStorage.setItem("kc_" + key, JSON.stringify({ ts: Date.now(), data })); } catch(e){} };
+  const cacheGet = (key) => { try { const raw = localStorage.getItem("kc_" + key); if (!raw) return null; const { ts, data } = JSON.parse(raw); const ttl = CACHE_TTL[key] ?? 30000; if (Date.now() - ts > ttl) { localStorage.removeItem("kc_" + key); return null; } return data; } catch (e) { } return null; };
+  const cacheSet = (key, data) => { try { localStorage.setItem("kc_" + key, JSON.stringify({ ts: Date.now(), data })); } catch (e) { } };
   // Cross-tab cache invalidation: when another tab writes to cache, refresh volatile state
   useEffect(() => {
     const handler = (e) => {
@@ -549,17 +563,21 @@ export default function App() {
     })();
   }, []);
 
-  const save = async (k, d) => { const ok = await DB.set(k, d); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); } else { setSaveStatus("error"); console.error("Save failed for:", k); setTimeout(() => setSaveStatus(""), 4000); } };
+  const save = async (k, d) => { const u = currentUser ? { id: currentUser.id } : null; const ok = await DB.set(k, d, u, role === "admin"); if (ok) { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); } else { setSaveStatus("error"); console.error("Save failed for:", k); setTimeout(() => setSaveStatus(""), 4000); } };
 
   // ─── Fetch ALL data from database ───
-  const loadAllData = async () => {
+  const loadAllData = async (knownUser = null, knownIsAdmin = null) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      let isAdmin = false;
-      if (user) {
-         const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
-         isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+      let user = knownUser;
+      let isAdmin = knownIsAdmin !== null ? knownIsAdmin : false;
+      // Only fetch from auth when caller hasn't provided user context
+      if (!user) {
+        const { data: userData } = await supabase.auth.getUser();
+        user = userData?.user;
+        if (user) {
+          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+          isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+        }
       }
 
       // Batch 1: Critical data (accounts, knowledge, quizzes, settings)
@@ -572,12 +590,12 @@ export default function App() {
       if (Array.isArray(q)) { setQuizzes(q); cacheSet("quizzes", q); }
       if (s) { setSettings(s); cacheSet("settings", s); }
 
-      // Batch 2: Secondary data
+      // Batch 2: Secondary data — pass userId to avoid extra auth.getUser() inside km-results
       const [r, rec, ch, notif, p, bul] = await Promise.all([
-        DB.get("km-results", [], isAdmin), DB.get("km-recognitions", [], isAdmin), DB.get("km-challenges", [], isAdmin),
+        DB.get("km-results", [], isAdmin, user?.id), DB.get("km-recognitions", [], isAdmin), DB.get("km-challenges", [], isAdmin),
         DB.get("km-notifications", [], isAdmin), DB.get("km-paths", [], isAdmin), DB.get("km-bulletins", [], isAdmin),
       ]);
-      if (Array.isArray(r)) { setResults(r); cacheSet("results", r); }
+      if (Array.isArray(r)) { setResults(prev => { const merged = r.length >= prev.length ? r : [...r, ...prev.filter(x => !r.some(y => y.id === x.id))]; cacheSet("results", merged); return merged; }); }
       if (Array.isArray(rec)) { setRecognitions(rec); cacheSet("recognitions", rec); }
       if (Array.isArray(ch)) { setChallenges(ch); cacheSet("challenges", ch); }
       if (Array.isArray(notif)) { setNotifications(notif); cacheSet("notifications", notif); }
@@ -586,6 +604,9 @@ export default function App() {
 
       // Lowest priority
       try { const logoData = await DB.get("km-logo", null); if (logoData) { setCompanyLogo(logoData); cacheSet("logo", logoData); } } catch (e2) { }
+
+      // Stamp the ref so the navigation effect doesn't double-fire right after this completes
+      lastAutoReloadRef.current = Date.now();
     } catch (e) { console.error("loadAllData error:", e); }
   };
   const updAccounts = (d) => { setAccounts(d); accountsRef.current = d; save("km-accounts", d); };
@@ -602,23 +623,8 @@ export default function App() {
   const updPaths = (d) => { setPaths(d); save("km-paths", d); };
   const updSettings = (d) => { setSettings(d); save("km-settings", d); };
 
-  const addXP = async (userId, amount) => {
-    // Optimistic local update so UI responds immediately
-    const u = accountsRef.current.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a);
-    setAccounts(u); accountsRef.current = u;
-    if (currentUser && currentUser.id === userId) setCurrentUser(prev => ({ ...prev, xp: Math.max(0, (prev.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : prev.lastXpGainDate }));
-    // Atomic DB increment — no read-modify-write race
-    const { error } = await supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() });
-    if (error) console.error("addXP RPC error:", error.message);
-  };
-  const addNotif = async (empId, msg, type = "info") => {
-    const notif = { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false };
-    // Optimistic local update using functional form — no stale closure over notifications
-    setNotifications(prev => [...prev, notif]);
-    // Single-row insert — no full-array read-modify-write
-    const { error } = await supabase.from("notifications").insert([notifToSnake(notif)]);
-    if (error) console.error("addNotif insert error:", error.message);
-  };
+  const addXP = (userId, amount) => { const u = accountsRef.current.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a); updAccounts(u); };
+  const addNotif = (empId, msg, type = "info") => { const n = [...notifications, { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false }]; updNotifications(n); };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
@@ -677,17 +683,12 @@ export default function App() {
       }
     }
     const newXp = Math.max(0, (user.xp || 0) + xpChange);
-    const updatedCheckIns = [...(user.checkIns || []), t].slice(-90);
-    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: updatedCheckIns };
-    // Optimistic local update — no full-array read needed
-    const accs = accountsRef.current.map(a => a.id === user.id ? updated : a);
-    setAccounts(accs); accountsRef.current = accs;
-    if (currentUser && currentUser.id === user.id) setCurrentUser(updated);
-    // Targeted single-row update — no full-array upsert, no cross-user race
-    const { error: ciErr } = await supabase.from("profiles")
-      .update({ xp: newXp, streak: newStreak, last_check_in: t, check_ins: updatedCheckIns })
-      .eq("id", user.id);
-    if (ciErr) console.error("doCheckIn update error:", ciErr.message);
+    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: [...(user.checkIns || []), t].slice(-90) };
+    // Reload latest accounts from DB before saving
+    let latestAccs = accountsRef.current;
+    try { const acDB = await DB.get("km-accounts", []); if (Array.isArray(acDB) && acDB.length > 0) latestAccs = acDB; } catch (e) { }
+    const accs = latestAccs.map(a => a.id === user.id ? { ...updated, xp: newXp } : a);
+    setAccounts(accs); accountsRef.current = accs; await DB.set("km-accounts", accs);
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
     if (idleMsg) addNotif(user.id, idleMsg, "decay");
     return updated;
@@ -702,12 +703,17 @@ export default function App() {
 
   useEffect(() => { if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth" }); }, [screen, subScreen]);
   useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } })(); } }, [screen]);
-  // Auto-reload data when navigating screens
+  // Auto-reload data when navigating screens — throttled to at most once per 45 seconds
   useEffect(() => {
     if (role && (screen === "emp_challenges" || screen === "emp_quizzes" || screen === "emp_knowledge" || screen === "emp_home" || screen === "emp_pathway" || screen === "emp_bulletins" || screen === "dir_bulletins" || screen === "admin_challenges" || screen === "admin_home" || screen === "admin_analytics" || screen === "admin_ranking" || screen === "admin_bulletins" || screen === "admin_activity" || screen === "admin_lessons" || screen === "admin_quizzes" || screen === "admin_accounts")) {
+      const now = Date.now();
+      if (now - lastAutoReloadRef.current < 8000) return; // skip if reloaded within last 8s (prevents double-fire after login)
+      lastAutoReloadRef.current = now;
       (async () => {
         try {
-          const [ch, q, k, r, ac, p, bul] = await Promise.all([DB.get("km-challenges", []), DB.get("km-quizzes", []), DB.get("km-knowledge", []), DB.get("km-results", []), DB.get("km-accounts", []), DB.get("km-paths", []), DB.get("km-bulletins", [])]);
+          const uid = currentUser?.id || null;
+          const isAdm = role === "admin";
+          const [ch, q, k, r, ac, p, bul] = await Promise.all([DB.get("km-challenges", []), DB.get("km-quizzes", []), DB.get("km-knowledge", []), DB.get("km-results", [], isAdm, uid), DB.get("km-accounts", []), DB.get("km-paths", []), DB.get("km-bulletins", [])]);
           if (Array.isArray(ch)) setChallenges(ch); if (Array.isArray(q)) setQuizzes(q);
           if (Array.isArray(k)) {
             setKnowledge(function (prev) {
@@ -733,7 +739,7 @@ export default function App() {
   // Timer
   useEffect(() => { if (qActive && qTimer > 0) { qTimerRef.current = setInterval(() => setQTimer(t => t <= 1 ? (clearInterval(qTimerRef.current), 0) : t - 1), 1000); return () => clearInterval(qTimerRef.current); }; }, [qActive]);
   useEffect(() => { if (qTimer <= 0 && qActive) finishQuiz(); }, [qTimer, qActive]);
-  useEffect(() => { if (!qActive) return; if (qTimer === 60 || qTimer === 30) { try { if (navigator.vibrate) navigator.vibrate(qTimer === 30 ? [200, 100, 200] : [150]); } catch (e) {} } }, [qTimer, qActive]);
+  useEffect(() => { if (!qActive) return; if (qTimer === 60 || qTimer === 30) { try { if (navigator.vibrate) navigator.vibrate(qTimer === 30 ? [200, 100, 200] : [150]); } catch (e) { } } }, [qTimer, qActive]);
 
   const doEmployeeLogin = async () => {
     if (!loginId || !loginPw) { setLoginErr("Nhập mã NV và mật khẩu"); return; }
@@ -744,10 +750,11 @@ export default function App() {
     if (pErr || !profile) { setLoginErr("Không tìm thấy hồ sơ nhân viên"); return; }
     if (profile.status === "inactive") { await supabase.auth.signOut(); setLoginErr("Tài khoản đã bị vô hiệu hóa. Liên hệ Admin."); return; }
     // Admin user (emp_id === "admin") or Director → admin panel
-    if (profile.emp_id === "admin" || profile.acc_role === "director") {
+    const isAdminUser = profile.emp_id === "admin" || profile.acc_role === "director";
+    if (isAdminUser) {
       setRole("admin"); setScreen("admin_home");
       setLoginId(""); setLoginPw(""); setLoginErr("");
-      await loadAllData();
+      await loadAllData({ id: data.user.id }, true);
       return;
     }
     const acc = profileToCamel(profile);
@@ -755,7 +762,7 @@ export default function App() {
     setCurrentUser(updated); setRole("employee"); setScreen("emp_home");
     setLoginId(""); setLoginPw(""); setLoginErr("");
     setShowMotivation(getRandomQuote());
-    await loadAllData();
+    await loadAllData({ id: data.user.id }, false);
   };
   // doAdminLogin kept for any remaining UI references; routes through the unified Supabase flow
   const doAdminLogin = () => doEmployeeLogin();
@@ -1008,14 +1015,11 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
       sc = mcPts + essayPts; pct = total > 0 ? Math.round(sc / total * 100) : 0;
     }
     const _essayData = hasEssay && typeof essayGradingResults !== "undefined" ? { results: essayGradingResults, answers: Object.fromEntries(qs.map((q, i) => q.type === "essay" ? [i, (answers[i] && answers[i].selected) || ""] : null).filter(Boolean)) } : null;
-    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= settings.passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData, answers: Object.entries(answers).map(([idx, a]) => ({ qIdx: +idx, selected: a.selected, correct: a.correct })) };
-    // Optimistic local update — no full-array fetch needed
-    const newResults = [...results, result];
-    setResults(newResults);
-    cacheSet("results", newResults);
-    // Single-row insert — safe under concurrency, no last-writer-wins overwrite
-    const { error: resErr } = await supabase.from("results").insert([resultToSnake(result)]);
-    if (resErr) console.error("finishQuiz results insert error:", resErr.message);
+    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= settings.passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData };
+    // Reload latest results from DB before appending (prevent overwrite)
+    let latestResults = results;
+    try { const fromDB = await DB.get("km-results", []); if (Array.isArray(fromDB) && fromDB.length >= latestResults.length) latestResults = fromDB; } catch (e) { }
+    const newResults = [...latestResults, result]; setResults(newResults); await DB.set("km-results", newResults);
     let xp = sc * settings.xpCorrect; if (pct >= settings.passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
@@ -1623,10 +1627,10 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
         }
         if (data.knowledge) { setKnowledge(data.knowledge); await DB.set("km-knowledge", data.knowledge); }
         if (data.quizzes) { setQuizzes(data.quizzes); await DB.set("km-quizzes", data.quizzes); }
-        if (data.results) { 
-           // Safety: Drop results that have legacy non-UUID empIds to prevent FK crashes
-           const validResults = data.results.filter(r => r.empId && r.empId.length > 15);
-           setResults(validResults); await DB.set("km-results", validResults); 
+        if (data.results) {
+          // Safety: Drop results that have legacy non-UUID empIds to prevent FK crashes
+          const validResults = data.results.filter(r => r.empId && r.empId.length > 15);
+          setResults(validResults); await DB.set("km-results", validResults);
         }
         if (data.recognitions) { setRecognitions(data.recognitions); await DB.set("km-recognitions", data.recognitions); }
         if (data.challenges) { setChallenges(data.challenges); await DB.set("km-challenges", data.challenges); }
@@ -1640,7 +1644,7 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
           + ` · 📝 ${(data.quizzes || []).length} đề thi`
           + `\n🎯 ${(data.challenges || []).length} thử thách`
           + ` · 📋 ${(data.paths || []).length} lộ trình`;
-          + ` · 📢 ${(data.bulletins || []).length} bảng tin`;
+        + ` · 📢 ${(data.bulletins || []).length} bảng tin`;
         setImportStatus({ ok: true, msg });
         setSaveStatus("saved");
       } catch (err) {
@@ -1749,6 +1753,7 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Google Sans','Be Vietnam Pro',sans-serif", overflowX: "hidden" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Google+Sans:wght@400;500;600;700&display=swap');
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastSlideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes glowPulse{0%,100%{opacity:0.4;transform:translate(-50%,-50%) scale(1)}50%{opacity:0.7;transform:translate(-50%,-50%) scale(1.1)}}
 *{box-sizing:border-box;margin:0;padding:0}input:focus,textarea:focus,select:focus{outline:2px solid ${C.teal};outline-offset:1px}
@@ -1842,8 +1847,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
       {/* ═══ IMPORT PREVIEW OVERLAY ═══ */}
       {importPreview && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99997, background: "rgba(10,45,58,0.97)", display: "flex", flexDirection: "column", padding: 20, animation: "fadeIn .25s" }}>
-          <div style={{ maxWidth: "min(640px, 95vw)", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", height: "100%", maxHeight: "92vh" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99997, background: "rgba(10,45,58,0.97)", display: "flex", flexDirection: "column", padding: "16px 12px", animation: "fadeIn .25s", overflowY: "auto" }}>
+          <div style={{ maxWidth: "min(640px, 95vw)", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", minHeight: "min-content" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexShrink: 0 }}>
               <div>
@@ -1862,16 +1867,22 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </div>
               {/* Depts */}
               <div style={{ marginBottom: 12 }}>
-                <label style={lbl}>🏢 Phòng ban</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ ...lbl, marginBottom: 0 }}>🏢 Phòng ban</label>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => setImportPreview({ ...importPreview, quiz: { ...importPreview.quiz, depts: ["Tất cả"] } })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.teal}18`, color: C.teal, border: `1px solid ${C.teal}33`, cursor: "pointer" }}>Tất cả</button>
+                    <button onClick={() => setImportPreview({ ...importPreview, quiz: { ...importPreview.quiz, depts: DEPTS.filter(d => d !== "Tất cả") } })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: `1px solid ${C.border}`, cursor: "pointer" }}>Từng phòng</button>
+                  </div>
+                </div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {["Tất cả", ...DEPTS].map(d => {
+                  {["Tất cả", ...DEPTS.filter(d => d !== "Tất cả")].map(d => {
                     const on = (importPreview.quiz.depts || ["Tất cả"]).includes(d);
                     return <button key={d} onClick={() => {
                       let nd = on ? (importPreview.quiz.depts || []).filter(x => x !== d) : [...(importPreview.quiz.depts || []).filter(x => x !== "Tất cả"), d];
                       if (d === "Tất cả") nd = ["Tất cả"];
                       if (!nd.length) nd = ["Tất cả"];
                       setImportPreview({ ...importPreview, quiz: { ...importPreview.quiz, depts: nd } });
-                    }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: on ? 700 : 500, background: on ? `${C.teal}22` : "rgba(255,255,255,0.03)", color: on ? C.teal : "rgba(255,255,255,0.35)", border: `1px solid ${on ? C.teal + "44" : C.border}` }}>{on ? "✓ " : ""}{d}</button>;
+                    }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: on ? 700 : 500, background: on ? `${C.teal}22` : "rgba(255,255,255,0.03)", color: on ? C.teal : "rgba(255,255,255,0.35)", border: `1px solid ${on ? C.teal + "44" : C.border}`, cursor: "pointer" }}>{on ? "✓ " : ""}{d}</button>;
                   })}
                 </div>
               </div>
@@ -1925,8 +1936,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <div style={{ maxHeight: 130, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
                   {(importPreview.parseLog || []).map((entry, i) => {
                     const isWarn = entry.startsWith("⚠️");
-                    const isErr  = entry.startsWith("❌");
-                    const col    = isErr ? C.red : isWarn ? C.gold : C.green;
+                    const isErr = entry.startsWith("❌");
+                    const col = isErr ? C.red : isWarn ? C.gold : C.green;
                     return (
                       <div key={"pl" + i} style={{ fontSize: 10, color: col, fontFamily: "monospace", lineHeight: 1.5, padding: "1px 4px", borderLeft: `2px solid ${col}44` }}>{entry}</div>
                     );
@@ -1943,8 +1954,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               </div>
             )}
 
-            {/* Preview questions (scrollable) */}
-            <div style={{ flex: 1, overflowY: "auto", marginBottom: 12 }}>
+            {/* Preview questions */}
+            <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: C.goldL, fontWeight: 700, marginBottom: 6 }}>XEM TRƯỚC CÂU HỎI</div>
               {importPreview.quiz.questions.slice(0, 5).map((q, i) => (
                 <div key={i} style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${q.type === "essay" ? C.purple + "33" : q.type === "truefalse" ? C.gold + "33" : C.teal + "22"}`, marginBottom: 6 }}>
@@ -1958,7 +1969,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             </div>
 
             {/* Action buttons */}
-            <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 4, paddingBottom: 16 }}>
               <button onClick={() => {
                 if (!(importPreview.quiz.title || "").trim()) { setAiStatus("⚠️ Vui lòng nhập tên đề!"); return; }
                 const newQ = [...quizzes, importPreview.quiz];
@@ -2050,7 +2061,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleAvatarUpload(e, currentUser.id)} />
               </div>
             )}
-            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
+            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } ["accounts", "knowledge", "quizzes", "results", "recognitions", "challenges", "notifications", "paths", "settings", "bulletins", "logo"].forEach(k => localStorage.removeItem("kc_" + k)); setAccounts([]); setKnowledge([]); setQuizzes([]); setResults([]); setRecognitions([]); setChallenges([]); setNotifications([]); setPaths([]); setSettings({}); setBulletins([]); setCompanyLogo(null); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
           </div>
         </div>
         {role === "employee" && currentUser && (
@@ -2099,8 +2110,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             <div style={{ width: "100%", maxWidth: 360 }}>
               <div style={{ ...card, padding: 24 }}>
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 12, color: C.goldL, fontWeight: 700, display: "block", marginBottom: 4 }}>{"Mã NV hoặc Admin"}</label>
-                  <input value={formData.empId || ""} onChange={function (e) { setFormData(Object.assign({}, formData, { empId: e.target.value, loginErr: null })) }} placeholder="VD: 001 hoặc admin" style={{ ...inp, fontSize: 15, padding: "14px 16px" }} />
+                  <label style={{ fontSize: 12, color: C.goldL, fontWeight: 700, display: "block", marginBottom: 4 }}>{"Tên đăng nhập"}</label>
+                  <input value={formData.name || ""} onChange={function (e) { setFormData(Object.assign({}, formData, { name: e.target.value, loginErr: null })) }} placeholder="Nhập tên của bạn" style={{ ...inp, fontSize: 15, padding: "14px 16px" }} />
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ fontSize: 12, color: C.goldL, fontWeight: 700, display: "block", marginBottom: 4 }}>{"Mật khẩu"}</label>
@@ -2111,16 +2122,18 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 </div>
                 {formData.loginErr && <div style={{ color: C.red, fontSize: 12, marginBottom: 10, textAlign: "center" }}>{formData.loginErr}</div>}
                 <button id="km-login-btn" disabled={!!formData.loginLoading} onClick={async function () {
-                  var id = (formData.empId || "").trim(); var pw = (formData.pw || "").trim();
-                  if (!id || !pw) { setFormData(Object.assign({}, formData, { loginErr: "Nhập mã NV và mật khẩu" })); return }
+                  var name = (formData.name || "").trim(); var pw = (formData.pw || "").trim();
+                  if (!name || !pw) { setFormData(Object.assign({}, formData, { loginErr: "Nhập tên và mật khẩu" })); return }
                   setFormData(Object.assign({}, formData, { loginLoading: true, loginErr: null }));
                   try {
-                    var email = id.toLowerCase() + "@kingsmen.internal";
+                    var { data: rpcRows, error: nameErr } = await supabase.rpc("find_profile_by_name", { p_name: name });
+                    var profileByName = rpcRows && rpcRows[0];
+                    if (nameErr || !profileByName) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy tài khoản với tên này", loginLoading: false })); return }
+                    if (profileByName.status === "inactive") { setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin.", loginLoading: false })); return }
+                    var email = profileByName.emp_id.toLowerCase() + "@kingsmen.internal";
                     var { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password: pw });
-                    if (authErr) { setFormData(Object.assign({}, formData, { loginErr: "Sai mã NV hoặc mật khẩu", loginLoading: false })); return }
-                    var { data: profile, error: pErr } = await supabase.from("profiles").select("*").eq("id", authData.user.id).single();
-                    if (pErr || !profile) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy hồ sơ nhân viên", loginLoading: false })); return }
-                    if (profile.status === "inactive") { await supabase.auth.signOut({ scope: 'local' }); setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin.", loginLoading: false })); return }
+                    if (authErr) { setFormData(Object.assign({}, formData, { loginErr: "Sai mật khẩu", loginLoading: false })); return }
+                    var profile = profileByName;
                     if (profile.emp_id === "admin" || profile.acc_role === "director") { var adminAcc = profileToCamel(profile); var updatedAdmin = await doCheckIn(adminAcc); setCurrentUser(updatedAdmin); setRole("admin"); setScreen("admin_home"); setFormData({}); await loadAllData(); return }
                     var acc = profileToCamel(profile);
                     var updated = await doCheckIn(acc);
@@ -2267,7 +2280,16 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div style={{ ...card, padding: 16, marginBottom: 12 }}>
                         <div style={{ fontSize: 10, color: C.gold, letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>{"① NỘI DUNG KIẾN THỨC"}</div>
                         <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>{"Tên bài"}</div><input value={k.title || ""} onChange={function (e) { upd({ title: e.target.value }) }} style={{ ...inp, fontSize: 13, fontWeight: 700 }} /></div>
-                        <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2 }}>{"Phòng ban"}</div><div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{["Tất cả", "Sales", "Marketing", "Kế toán", "Kho", "HR", "Kỹ thuật"].map(function (d) { var sel = (k.depts || []).includes(d); return <button key={d} onClick={function () { upd({ depts: sel ? (k.depts || []).filter(function (dd) { return dd !== d }) : [].concat(k.depts || [], [d]) }) }} style={{ padding: "6px 12px", borderRadius: 5, fontSize: 10, background: sel ? C.teal + "18" : "transparent", color: sel ? C.teal : "rgba(255,255,255,0.3)", border: "1px solid " + (sel ? C.teal + "33" : "rgba(255,255,255,0.08)") }}>{d}</button> })}</div></div>
+                        <div style={{ marginBottom: 6 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{"Phòng ban"}</div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button onClick={function () { upd({ depts: ["Tất cả"] }) }} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: C.teal + "18", color: C.teal, border: "1px solid " + C.teal + "33", cursor: "pointer" }}>Tất cả</button>
+                              <button onClick={function () { upd({ depts: DEPTS.filter(function (d) { return d !== "Tất cả"; }) }) }} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>Từng phòng</button>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{["Tất cả", ...DEPTS.filter(function (d) { return d !== "Tất cả"; })].map(function (d) { var sel = (k.depts || []).includes(d); return <button key={d} onClick={function () { upd({ depts: sel ? (k.depts || []).filter(function (dd) { return dd !== d }) : [].concat(k.depts || [], [d]) }) }} style={{ padding: "6px 12px", borderRadius: 5, fontSize: 10, background: sel ? C.teal + "18" : "transparent", color: sel ? C.teal : "rgba(255,255,255,0.3)", border: "1px solid " + (sel ? C.teal + "33" : "rgba(255,255,255,0.08)"), cursor: "pointer" }}>{d}</button> })}</div>
+                        </div>
                         <div>
                           <button onClick={function () { setFormData(Object.assign({}, formData, { _editContent: k.id })) }} style={{ width: "100%", padding: "12px 16px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, textAlign: "left", cursor: "pointer" }}>
                             <div style={{ fontSize: 10, color: C.goldL, fontWeight: 700, marginBottom: 4 }}>{"📝 Nội dung (" + (k.content || "").length + " ký tự)"}</div>
@@ -2297,7 +2319,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2, letterSpacing: 1 }}>{"TỆP PDF ĐÍNH KÈM"}<span style={{ marginLeft: 8, fontSize: 9, color: "rgba(255,255,255,0.15)" }}>{"[hasPdf=" + String(k.hasPdf) + ", pdfName=" + String(k.pdfName || "") + "]"}</span></div>
                                 {k.hasPdf && k.pdfName
-                                  ? <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, wordBreak: "break-all", lineHeight: 1.4 }}>{k.pdfName}</div>
+                                  ? <div style={{ fontSize: 13, fontWeight: 700, color: C.purple, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", lineHeight: 1.4 }} title={k.pdfName}>{k.pdfName}</div>
                                   : <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>{"Chưa có PDF — bấm Tải lên để thêm"}</div>
                                 }
                               </div>
@@ -2314,7 +2336,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                 {k.hasPdf ? "🔄 Thay thế" : "📎 Tải lên PDF"}
                               </label>
                               <input id={"pdf-upload-" + k.id} key={"pdf-input-" + k.id + "-" + String(k.hasPdf)} type="file" accept=".pdf" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; e.target.value = ""; setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải lên..." })); var path = 'knowledge/' + k.id + '.pdf'; var { error: upErr } = await supabase.storage.from('pdfs').upload(path, file, { upsert: true, contentType: 'application/pdf' }); if (upErr) { setFormData(Object.assign({}, formData, { _upSt: "❌ Lỗi tải PDF: " + upErr.message })); return; } var fr = new FileReader(); fr.onload = function (ev) { _pdfCache[k.id] = ev.target.result; }; fr.readAsDataURL(file); upd({ hasPdf: true, pdfName: file.name }); setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã lưu vào Storage thành công!" })); }} />
-                              {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function(){}); upd({ hasPdf: false, pdfName: "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22", whiteSpace: "nowrap" }}>{"🗑 Xóa"}</button>}
+                              {k.hasPdf && <button onClick={async function () { delete _pdfCache[k.id]; await supabase.storage.from('pdfs').remove(['knowledge/' + k.id + '.pdf']).catch(function () { }); upd({ hasPdf: false, pdfName: "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa PDF" })); }} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22", whiteSpace: "nowrap" }}>{"🗑 Xóa"}</button>}
                             </div>
                           </div>
                           {formData._pdfSelK === k.id && formData._pdfSelList && (
@@ -2337,9 +2359,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                         }
                                         upd({ hasPdf: true, pdfName: f.name });
                                         setFormData(Object.assign({}, formData, { _upSt: "✅ PDF đã gán thành công!" }));
-                                      }} style={{ padding: "10px 12px", textAlign: "left", background: "rgba(255,255,255,0.03)", border: "1px solid " + C.border, borderRadius: 8, color: C.white, fontSize: 12, display: "flex", justifyContent: "space-between", cursor: "pointer" }}>
-                                        <span>📄 {f.name}</span>
-                                        <span style={{ color: "rgba(255,255,255,0.3)" }}>{(f.metadata ? Math.round(f.metadata.size / 1024) : 0)} KB</span>
+                                      }} style={{ padding: "10px 12px", textAlign: "left", background: "rgba(255,255,255,0.03)", border: "1px solid " + C.border, borderRadius: 8, color: C.white, fontSize: 12, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+                                        <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                          <span>📄 {(function () { var lesson = knowledge.find(function (kk) { return kk.id === f.name.replace('.pdf', ''); }); return lesson ? lesson.title : f.name; })()}</span>
+                                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{f.name}</span>
+                                        </span>
+                                        <span style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0, marginLeft: 8 }}>{(f.metadata ? Math.round(f.metadata.size / 1024) : 0)} KB</span>
                                       </button>
                                     )
                                   })}
@@ -2798,6 +2823,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => { setFormData({ viewAccDetail: a.id }); setScreen("admin_user_detail"); }} style={{ padding: "6px 8px", borderRadius: 6, background: `${C.teal}22`, color: C.tealL, fontSize: 11, fontWeight: 600, border: "none" }}>📋</button>
                     <button onClick={() => setFormData({ editAccId: formData.editAccId === a.id ? null : a.id })} style={{ padding: "6px 8px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }}>✏️</button>
                     {!isInactive ? <button onClick={async () => {
                       if (!window.confirm("Vô hiệu hóa tài khoản của " + a.name + "?\nNhân viên này sẽ không đăng nhập được nữa.")) return;
@@ -2821,6 +2847,140 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             })}
           </div>
         )}
+
+        {/* ═══ ADMIN: USER DETAIL / ACTIVITY ═══ */}
+        {role === "admin" && screen === "admin_user_detail" && (() => {
+          const a = accounts.find(x => x.id === formData.viewAccDetail);
+          if (!a) return <div><button onClick={() => setScreen("admin_accounts")} style={btnO}>← Quay lại</button></div>;
+          const lv = gL(a.xp || 0);
+          const userResults = [...results.filter(r => r.empId === a.id)].reverse();
+          const userReadLessons = a.readLessons || [];
+          const userChallenges = challenges.filter(c => (c.completedBy || []).includes(a.id));
+          const userPaths = paths.filter(p => (p.assignedTo || []).includes(a.id));
+          const passCount = userResults.filter(r => r.passed).length;
+          const avgPct = userResults.length ? Math.round(userResults.reduce((s, r) => s + r.pct, 0) / userResults.length) : null;
+          return (
+            <div style={{ animation: "fadeIn .4s" }}>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h2 style={hd(22)}>📋 Hoạt Động Nhân Viên</h2>
+                <button onClick={() => { setScreen("admin_accounts"); setFormData({}); }} style={btnO}>← Danh sách</button>
+              </div>
+
+              {/* User card */}
+              <div style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: `${C.teal}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>{a.avatar ? <img src={a.avatar} style={{ width: 48, height: 48, borderRadius: 12, objectFit: "cover" }} /> : lv.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: C.white }}>{a.name} <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>({a.empId})</span></div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{a.dept}{a.team ? " · " + a.team : ""} · {lv.name} · {a.xp || 0} XP · {a.checkIns?.length || 0} ngày</div>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {[{ label: "Bài thi", val: userResults.length, color: C.blue }, { label: "Đạt", val: passCount, color: C.green }, { label: "TB %", val: avgPct !== null ? avgPct + "%" : "—", color: C.gold }, { label: "Bài đọc", val: userReadLessons.length, color: C.purple }, { label: "Thử thách", val: userChallenges.length, color: C.orange }].map((s, i) => (
+                    <div key={i} style={{ textAlign: "center", minWidth: 52 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: s.color, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{s.val}</div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quiz history */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8, marginTop: 4 }}>LỊCH SỬ BÀI THI ({userResults.length})</div>
+              {userResults.length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa có bài thi nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+                  {userResults.map(r => (
+                    <div key={r.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12, padding: "10px 14px" }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 9, background: `${getRating(r.pct).color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: getRating(r.pct).color, fontFamily: "'Be Vietnam Pro',sans-serif", flexShrink: 0 }}>{r.pct}%</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.quizTitle}</div>
+                        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{r.score}/{r.total} câu · {fmtTime(r.time)} · {fmtDate(r.date)}</div>
+                      </div>
+                      <span style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, flexShrink: 0, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "CHƯA ĐẠT"}</span>
+                    </div>
+                  ))}
+                </div>
+              }
+
+              {/* Lessons read */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>BÀI HỌC ĐÃ ĐỌC ({userReadLessons.length}/{knowledge.length})</div>
+              {knowledge.length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa có bài học nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+                  {knowledge.map(k => {
+                    const done = userReadLessons.includes(k.id);
+                    return (
+                      <div key={k.id} style={{ ...card, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", opacity: done ? 1 : 0.45 }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{done ? "✅" : "⬜"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.title}</div>
+                          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{k.dept || "Tất cả"}{k.tags?.length ? " · " + k.tags.slice(0, 2).join(", ") : ""}</div>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: done ? C.green : "rgba(255,255,255,0.2)", flexShrink: 0 }}>{done ? "Đã đọc" : "Chưa đọc"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+
+              {/* Challenges completed */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>THỬ THÁCH ĐÃ HOÀN THÀNH ({userChallenges.length}/{challenges.filter(c => c.active !== false).length})</div>
+              {challenges.filter(c => c.active !== false).length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa có thử thách nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+                  {challenges.filter(c => c.active !== false).map(c => {
+                    const done = (c.completedBy || []).includes(a.id);
+                    return (
+                      <div key={c.id} style={{ ...card, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", opacity: done ? 1 : 0.45 }}>
+                        <span style={{ fontSize: 16, flexShrink: 0 }}>{done ? "🏆" : "🎯"}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
+                          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>+{c.xpReward || 0} XP · Min {c.minScore || settings.passScore}%{c.rewards?.length ? " · 🎁 " + c.rewards.length + " phần thưởng" : ""}</div>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: done ? C.green : "rgba(255,255,255,0.2)", flexShrink: 0 }}>{done ? "Hoàn thành" : "Chưa xong"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+
+              {/* Path progress */}
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: 2, marginBottom: 8 }}>LỘ TRÌNH ({userPaths.length})</div>
+              {userPaths.length === 0
+                ? <div style={{ ...card, color: "rgba(255,255,255,0.3)", fontSize: 13, textAlign: "center", padding: 20 }}>Chưa được gán lộ trình nào.</div>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                  {userPaths.map(p => {
+                    const prog = (a.pathProgress || {})[p.id] || {};
+                    const checks = prog.checks || {};
+                    const allMods = (p.stages || []).flatMap(st => st.modules || []);
+                    const totalChecks = allMods.reduce((s, m) => s + (m.checklist?.length || 0), 0);
+                    const quizMods = allMods.filter(m => m.quizId);
+                    const quizDone = quizMods.filter(m => results.some(r => r.empId === a.id && r.quizId === m.quizId && r.pct >= (m.minScore || 70))).length;
+                    const doneChecks = Object.values(checks).filter(Boolean).length;
+                    const totalItems = totalChecks + quizMods.length;
+                    const doneItems = doneChecks + quizDone;
+                    const pct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+                    return (
+                      <div key={p.id} style={{ ...card, padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                          <span style={{ fontSize: 18 }}>📋</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{p.title}</div>
+                            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{doneItems}/{totalItems} mục · {quizDone}/{quizMods.length} bài thi · {pct}% hoàn thành</div>
+                          </div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: pct === 100 ? C.green : C.gold, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{pct}%</div>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 3, width: pct + "%", background: pct === 100 ? C.green : `linear-gradient(90deg,${C.teal},${C.tealL})`, transition: "width .4s" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+            </div>
+          );
+        })()}
 
         {/* ═══ ADMIN: ANALYTICS ═══ */}
         {role === "admin" && screen === "admin_analytics" && (
@@ -3014,9 +3174,9 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               {/* Challenge list */}
               {challenges.length === 0 && <Empty msg="Chưa có thử thách nào." />}
               {challenges.map(ch => {
-                const assignee = ch.assignTo === "all" ? "Tất cả" : ch.assignTo === "dept" ? ch.assignDept : !ch.assignTo ? "Tất cả" : (() => { const _a = accounts.find(a => a.id === ch.assignTo); return _a ? _a.name : ch.assignTo; });
+                const assignee = ch.assignTo === "all" || !ch.assignTo ? "Tất cả" : ch.assignTo === "dept" ? ch.assignDept : ch.assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(ch.assignTo); return ids.map(id => { const _a = accounts.find(a => a.id === id); return _a ? _a.name : id; }).join(', '); } catch (e) { return ch.assignTo; } })() : (() => { const _a = accounts.find(a => a.id === ch.assignTo); return _a ? _a.name : ch.assignTo; })();
                 const completed = ch.completedBy || [];
-                const targetAccs = !ch.assignTo || ch.assignTo === "all" ? accounts : ch.assignTo === "dept" ? accounts.filter(a => a.dept === ch.assignDept) : accounts.filter(a => a.id === ch.assignTo);
+                const targetAccs = !ch.assignTo || ch.assignTo === "all" ? accounts : ch.assignTo === "dept" ? accounts.filter(a => a.dept === ch.assignDept) : ch.assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(ch.assignTo); return accounts.filter(a => ids.includes(a.id)); } catch (e) { return []; } })() : accounts.filter(a => a.id === ch.assignTo);
                 const expanded = formData.chExpand === ch.id;
                 return (
                   <div key={ch.id} style={{ ...card }}>
@@ -3091,7 +3251,23 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     {[{ v: "all", l: "Tất cả" }, { v: "dept", l: "Phòng ban" }, { v: "person", l: "Cá nhân" }].map(o => <button key={o.v} onClick={() => setFormData({ ...formData, chAssign: o.v })} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: (formData.chAssign || "all") === o.v ? 700 : 500, background: (formData.chAssign || "all") === o.v ? `${C.gold}22` : "rgba(255,255,255,0.03)", color: (formData.chAssign || "all") === o.v ? C.gold : "rgba(255,255,255,0.3)", border: `1px solid ${(formData.chAssign || "all") === o.v ? C.gold + "44" : C.border}` }}>{o.l}</button>)}
                   </div>
                   {formData.chAssign === "dept" && <select value={formData.chDept || DEPTS[0]} onChange={e => setFormData({ ...formData, chDept: e.target.value })} style={inp}>{DEPTS.map(d => <option key={d}>{d}</option>)}</select>}
-                  {formData.chAssign === "person" && <select value={formData.chPerson || ""} onChange={e => setFormData({ ...formData, chPerson: e.target.value })} style={inp}><option value="">— Chọn NV —</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.empId})</option>)}</select>}
+                  {formData.chAssign === "person" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{(formData.chPersons || []).length > 0 ? `Đã chọn ${(formData.chPersons || []).length} NV` : "Chọn nhân viên"}</span>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <button onClick={() => setFormData({ ...formData, chPersons: accounts.map(a => a.id) })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.gold}18`, color: C.gold, border: `1px solid ${C.gold}33`, cursor: "pointer" }}>Chọn tất cả</button>
+                          <button onClick={() => setFormData({ ...formData, chPersons: [] })} style={{ padding: "3px 8px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: `1px solid ${C.border}`, cursor: "pointer" }}>Bỏ chọn</button>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {accounts.map(a => {
+                          const on = (formData.chPersons || []).includes(a.id);
+                          return <button key={a.id} onClick={() => { const cur = formData.chPersons || []; const np = on ? cur.filter(x => x !== a.id) : [...cur, a.id]; setFormData({ ...formData, chPersons: np }); }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.gold}22` : "rgba(255,255,255,0.03)", color: on ? C.gold : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.gold + "44" : C.border}`, cursor: "pointer" }}>{on ? "✓ " : ""}{a.name}</button>;
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {/* Rewards */}
                 <div style={{ marginBottom: 12 }}>
@@ -3107,7 +3283,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={async () => {
                     if (!(formData.chTitle || "").trim() || !formData.chQuiz) return;
-                    const assignTo = formData.chAssign === "dept" ? "dept" : formData.chAssign === "person" ? (formData.chPerson || "all") : "all";
+                    const chPersons = formData.chPersons || [];
+                    const assignTo = formData.chAssign === "dept" ? "dept" : formData.chAssign === "person" ? (chPersons.length === 1 ? chPersons[0] : chPersons.length > 1 ? JSON.stringify(chPersons) : "all") : "all";
                     const selQuiz = quizzes.find(q => q.id === formData.chQuiz);
                     const ch = { id: uid(), title: formData.chTitle, quizId: formData.chQuiz, quizTitle: (selQuiz && selQuiz.title) || "", minScore: formData.chMinScore || 70, xpReward: formData.chXP || 50, deadline: formData.chDeadline || "", assignTo, assignDept: formData.chDept || "", rewards: (formData.chRewards || []).filter(r => r.trim()), createdAt: new Date().toISOString(), createdBy: currentUser ? currentUser.id : null, createdByName: currentUser ? currentUser.name : "Admin", active: true, completedBy: [], wonRewards: {} };
                     // Reload latest from storage before appending
@@ -3118,7 +3295,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     const saved = await DB.set("km-challenges", newCh);
                     if (!saved) { setSaveStatus("error"); return; }
                     // Notifications
-                    const targets = assignTo === "all" ? accounts : assignTo === "dept" ? accounts.filter(a => a.dept === formData.chDept) : accounts.filter(a => a.id === assignTo);
+                    const targets = assignTo === "all" ? accounts : assignTo === "dept" ? accounts.filter(a => a.dept === formData.chDept) : assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(assignTo); return accounts.filter(a => ids.includes(a.id)); } catch (e) { return []; } })() : accounts.filter(a => a.id === assignTo);
                     let curNotifs = notifications;
                     try { const nfDB = await DB.get("km-notifications", []); if (Array.isArray(nfDB) && nfDB.length >= curNotifs.length) curNotifs = nfDB; } catch (e) { }
                     const newNotifs = [...curNotifs];
@@ -3196,11 +3373,17 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                   {/* Assign employees */}
                   <div style={{ marginBottom: 12 }}>
-                    <label style={lbl}>Gán cho NV (chọn nhiều)</label>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <label style={{ ...lbl, marginBottom: 0 }}>Gán cho NV {pAssign.length > 0 ? `(${pAssign.length} đã chọn)` : "(chọn nhiều)"}</label>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button onClick={() => { const all = accounts.filter(a => a.dept === pDept || pDept === "Tất cả").map(a => a.id); setFormData({ ...formData, pAssign: all }); }} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.green}18`, color: C.green, border: `1px solid ${C.green}33`, cursor: "pointer" }}>Chọn tất cả</button>
+                        <button onClick={() => setFormData({ ...formData, pAssign: [] })} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: `1px solid ${C.border}`, cursor: "pointer" }}>Bỏ chọn</button>
+                      </div>
+                    </div>
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {accounts.filter(a => a.dept === pDept || pDept === "Tất cả").map(a => {
                         const on = pAssign.includes(a.id); return (
-                          <button key={a.id} onClick={() => { const na = on ? pAssign.filter(x => x !== a.id) : [...pAssign, a.id]; setFormData({ ...formData, pAssign: na }); }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.green}22` : "rgba(255,255,255,0.03)", color: on ? C.green : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.green + "44" : C.border}` }}>{on ? "✓ " : ""}{a.name}</button>
+                          <button key={a.id} onClick={() => { const na = on ? pAssign.filter(x => x !== a.id) : [...pAssign, a.id]; setFormData({ ...formData, pAssign: na }); }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.green}22` : "rgba(255,255,255,0.03)", color: on ? C.green : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.green + "44" : C.border}`, cursor: "pointer" }}>{on ? "✓ " : ""}{a.name}</button>
                         );
                       })}
                     </div>
@@ -3228,7 +3411,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               </div>
                               {/* Link quiz */}
                               <div style={{ marginBottom: 4 }}><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Bài kiểm tra (mở khóa tuần tự)</label>
-                                <select value={mod.quizId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], quizId: e.target.value, quizTitle: (() => { const _q = quizzes.find(q => q.id === e.target.value); return _q ? _q.title : ""; })() }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
+                                <select value={mod.quizId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], quizId: e.target.value, quizTitle: (() => { const _q = quizzes.find(q => q.id === e.target.value); return _q ? _q.title : ""; }) }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
                                   <option value="">— Không gắn đề —</option>{quizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
                                 </select>
                               </div>
@@ -3730,11 +3913,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <div style={{ ...card, background: `${C.orange}08`, border: `1px solid ${C.orange}22` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <div style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>🔔 THÔNG BÁO MỚI ({notifications.filter(n => n.empId === currentUser.id && !n.read).length})</div>
-                  <button onClick={() => { updNotifications(notifications.map(n => n.empId === currentUser.id ? { ...n, read: true } : n)); }} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "none", padding: "2px 6px" }}>Đã đọc tất cả</button>
+                  <button onClick={() => markAllNotifsRead()} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "none", padding: "2px 6px" }}>Đã đọc tất cả</button>
                 </div>
                 {notifications.filter(n => n.empId === currentUser.id && !n.read).slice(-5).reverse().map(n => (
                   <div key={n.id} onClick={() => {
-                    updNotifications(notifications.map(x => x.id === n.id ? { ...x, read: true } : x));
+                    markNotifRead(n.id);
                     if (n.msg.includes("Thử thách")) { setScreen("emp_challenges"); setSubScreen(null); }
                     else if (n.msg.includes("tuyên dương")) { }
                   }} style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", padding: "6px 8px", marginBottom: 2, borderRadius: 6, background: "rgba(255,255,255,0.03)", cursor: n.msg.includes("Thử thách") ? "pointer" : "default", display: "flex", gap: 8, alignItems: "center" }}>
@@ -3832,7 +4015,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               var isRead = (currentUser.readLessons || []).includes(k.id);
               return (
                 <div key={k.id} style={{ ...card, cursor: "pointer", border: "1px solid " + (isRead ? C.green + "33" : C.border) }} onClick={function () {
-                  if (!isRead) { var u = Object.assign({}, currentUser, { readLessons: [].concat(currentUser.readLessons || [], [k.id]) }); setCurrentUser(u); updAccounts(accounts.map(function (a) { return a.id === u.id ? u : a })); }
+                  if (!isRead) { var u = Object.assign({}, currentUser, { readLessons: [].concat(currentUser.readLessons || [], [k.id]) }); setCurrentUser(u); var na = accountsRef.current.map(function (a) { return a.id === u.id ? u : a }); setAccounts(na); accountsRef.current = na; save("km-accounts", na); }
                   setSubScreen(k.id); setFormData(Object.assign({}, formData, { learnTab: null }));
                 }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
@@ -4004,9 +4187,9 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         <h3 style={{ ...hd(20), marginBottom: 6 }}>{k.title}</h3>
                         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>{(k.depts || ["Tất cả"]).join(" · ")}</div>
                         {k.hasPdf && k.pdfName && (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, padding: "5px 14px", borderRadius: 20, background: C.purple + "18", border: "1px solid " + C.purple + "33" }}>
-                            <span style={{ fontSize: 13 }}>📄</span>
-                            <span style={{ fontSize: 12, color: C.purple, fontWeight: 600 }}>{k.pdfName}</span>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, padding: "5px 14px", borderRadius: 20, background: C.purple + "18", border: "1px solid " + C.purple + "33", maxWidth: "90vw", overflow: "hidden" }}>
+                            <span style={{ fontSize: 13, flexShrink: 0 }}>📄</span>
+                            <span style={{ fontSize: 12, color: C.purple, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={k.pdfName}>{k.pdfName}</span>
                           </div>
                         )}
                       </div>
@@ -4056,7 +4239,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                             <div style={{ width: 44, height: 44, borderRadius: 12, background: C.blue + "25", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{"🔗"}</div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 15, fontWeight: 700, color: C.blue, marginBottom: 3 }}>{"Tài liệu gốc"}</div>
-                              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(function(){ try { return new URL(k.docUrl).hostname.replace("www.", ""); } catch(e) { return k.docUrl.replace(/https?:\/\//, "").slice(0, 50); } })()}</div>
+                              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(function () { try { return new URL(k.docUrl).hostname.replace("www.", ""); } catch (e) { return k.docUrl.replace(/https?:\/\//, "").slice(0, 50); } })()}</div>
                             </div>
                             <div style={{ fontSize: 11, color: C.blue + "99", fontWeight: 600, flexShrink: 0 }}>{"↗ Mở"}</div>
                           </a>
@@ -4499,10 +4682,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             <h2 style={{ ...hd(20), marginBottom: 8 }}>AI đang chấm bài tự luận</h2>
             <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, marginBottom: 24 }}>Vui lòng chờ trong giây lát...</div>
             {aiStatus && (
-              <div style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, display: "inline-block", marginBottom: 16,
+              <div style={{
+                fontSize: 13, padding: "8px 16px", borderRadius: 8, display: "inline-block", marginBottom: 16,
                 background: aiStatus.startsWith("❌") ? C.red + "15" : C.gold + "15",
                 color: aiStatus.startsWith("❌") ? C.red : C.goldL,
-                animation: "pulse 1.5s infinite" }}>{aiStatus}</div>
+                animation: "pulse 1.5s infinite"
+              }}>{aiStatus}</div>
             )}
             <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 16 }}>
               {activeQuiz.questions.filter(q => q.type === "essay").map((_, i) => {
@@ -4545,121 +4730,121 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 const okEssays = curEssayResults.filter(r => r.grade !== "Lỗi");
                 const allOk = failedEssays.length === 0;
                 return (
-                <div style={{ ...card, background: "rgba(155,89,182,0.06)", border: `1px solid ${C.purple}22`, marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: C.purple, fontWeight: 700, marginBottom: 10 }}>📊 CHI TIẾT BÀI THI KẾT HỢP</div>
+                  <div style={{ ...card, background: "rgba(155,89,182,0.06)", border: `1px solid ${C.purple}22`, marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, color: C.purple, fontWeight: 700, marginBottom: 10 }}>📊 CHI TIẾT BÀI THI KẾT HỢP</div>
 
-                  {/* AI grading status banner */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 14px", borderRadius: 10, marginBottom: 14, background: allOk ? C.green + "12" : C.red + "12", border: `1px solid ${allOk ? C.green : C.red}33`, flexWrap: "wrap" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 18 }}>{allOk ? "✅" : "⚠️"}</span>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: allOk ? C.green : C.red }}>
-                          {allOk ? "AI chấm thành công " + okEssays.length + "/" + curEssayResults.length + " câu" : "Thất bại " + failedEssays.length + "/" + curEssayResults.length + " câu"}
+                    {/* AI grading status banner */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 14px", borderRadius: 10, marginBottom: 14, background: allOk ? C.green + "12" : C.red + "12", border: `1px solid ${allOk ? C.green : C.red}33`, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>{allOk ? "✅" : "⚠️"}</span>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: allOk ? C.green : C.red }}>
+                            {allOk ? "AI chấm thành công " + okEssays.length + "/" + curEssayResults.length + " câu" : "Thất bại " + failedEssays.length + "/" + curEssayResults.length + " câu"}
+                          </div>
+                          {!allOk && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Câu thất bại tính 0 điểm. Bấm Thử lại để chấm lại.</div>}
                         </div>
-                        {!allOk && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Câu thất bại tính 0 điểm. Bấm Thử lại để chấm lại.</div>}
+                      </div>
+                      {!allOk && (
+                        <button onClick={async () => {
+                          if (!activeQuiz) return;
+                          const qs = activeQuiz.questions;
+                          const answers = qAnswers;
+                          const updated = [...curEssayResults];
+                          setAiStatus("🔄 Đang chấm lại...");
+                          for (let ri = 0; ri < updated.length; ri++) {
+                            if (updated[ri].grade !== "Lỗi") continue;
+                            const i = updated[ri].qIdx;
+                            const q = qs[i];
+                            const userAns = (answers[i] && answers[i].selected) || "(Không trả lời)";
+                            try {
+                              const gp = `Chấm bài tự luận, trả về CHỈ JSON object (KHÔNG markdown, KHÔNG backtick):\n{"score":8,"maxScore":10,"grade":"Tốt","feedback":"nhận xét ngắn","explanation":"phân tích tiêu chí","strengthPoints":["điểm mạnh"],"improvementPoints":["cần cải thiện"]}\n\nCÂU HỎI: ${q.q}\nTIÊU CHÍ: ${q.rubric || "Chấm theo nội dung"}\nĐÁP ÁN MẪU: ${(q.modelAnswer || "").slice(0, 400)}\nBÀI LÀM: ${userAns.slice(0, 800)}\n\nCHỈ JSON thuần.`;
+                              const txt = await callAIWithRetry(gp, 1, 1000);
+                              const parsed = cleanJSON(txt, false);
+                              if (!parsed || typeof parsed.score !== "number") throw new Error("JSON không hợp lệ");
+                              updated[ri] = { ...updated[ri], score: parsed.score || 0, maxScore: parsed.maxScore || 10, grade: parsed.grade || "", feedback: parsed.feedback || "", explanation: parsed.explanation || "", strengthPoints: parsed.strengthPoints || [], improvementPoints: parsed.improvementPoints || [], _error: null };
+                            } catch (e) {
+                              updated[ri] = { ...updated[ri], _error: e.message || String(e) };
+                            }
+                          }
+                          setEssayResults([...updated]);
+                          setAiStatus("");
+                        }} style={{ padding: "8px 16px", borderRadius: 8, background: C.orange + "20", border: `1px solid ${C.orange}44`, color: C.orange, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer" }}>
+                          🔄 Thử lại
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 8, marginBottom: 14 }}>
+                      <div style={{ padding: "12px", borderRadius: 10, background: `${C.green}08`, border: `1px solid ${C.green}22`, textAlign: "center" }}>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: C.green, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{mcCorrect}/{mcQs.length}</div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>✅ Trắc nghiệm</div>
+                      </div>
+                      <div style={{ padding: "12px", borderRadius: 10, background: `${C.purple}08`, border: `1px solid ${C.purple}22`, textAlign: "center" }}>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: C.purple, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{curEssayResults.reduce((s, r) => s + r.score, 0)}/{curEssayResults.reduce((s, r) => s + r.maxScore, 0)}</div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>✍️ Tự luận (AI)</div>
                       </div>
                     </div>
-                    {!allOk && (
-                      <button onClick={async () => {
-                        if (!activeQuiz) return;
-                        const qs = activeQuiz.questions;
-                        const answers = qAnswers;
-                        const updated = [...curEssayResults];
-                        setAiStatus("🔄 Đang chấm lại...");
-                        for (let ri = 0; ri < updated.length; ri++) {
-                          if (updated[ri].grade !== "Lỗi") continue;
-                          const i = updated[ri].qIdx;
-                          const q = qs[i];
-                          const userAns = (answers[i] && answers[i].selected) || "(Không trả lời)";
-                          try {
-                            const gp = `Chấm bài tự luận, trả về CHỈ JSON object (KHÔNG markdown, KHÔNG backtick):\n{"score":8,"maxScore":10,"grade":"Tốt","feedback":"nhận xét ngắn","explanation":"phân tích tiêu chí","strengthPoints":["điểm mạnh"],"improvementPoints":["cần cải thiện"]}\n\nCÂU HỎI: ${q.q}\nTIÊU CHÍ: ${q.rubric || "Chấm theo nội dung"}\nĐÁP ÁN MẪU: ${(q.modelAnswer || "").slice(0, 400)}\nBÀI LÀM: ${userAns.slice(0, 800)}\n\nCHỈ JSON thuần.`;
-                            const txt = await callAIWithRetry(gp, 1, 1000);
-                            const parsed = cleanJSON(txt, false);
-                            if (!parsed || typeof parsed.score !== "number") throw new Error("JSON không hợp lệ");
-                            updated[ri] = { ...updated[ri], score: parsed.score || 0, maxScore: parsed.maxScore || 10, grade: parsed.grade || "", feedback: parsed.feedback || "", explanation: parsed.explanation || "", strengthPoints: parsed.strengthPoints || [], improvementPoints: parsed.improvementPoints || [], _error: null };
-                          } catch (e) {
-                            updated[ri] = { ...updated[ri], _error: e.message || String(e) };
-                          }
-                        }
-                        setEssayResults([...updated]);
-                        setAiStatus("");
-                      }} style={{ padding: "8px 16px", borderRadius: 8, background: C.orange + "20", border: `1px solid ${C.orange}44`, color: C.orange, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer" }}>
-                        🔄 Thử lại
-                      </button>
-                    )}
-                  </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 8, marginBottom: 14 }}>
-                    <div style={{ padding: "12px", borderRadius: 10, background: `${C.green}08`, border: `1px solid ${C.green}22`, textAlign: "center" }}>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: C.green, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{mcCorrect}/{mcQs.length}</div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>✅ Trắc nghiệm</div>
-                    </div>
-                    <div style={{ padding: "12px", borderRadius: 10, background: `${C.purple}08`, border: `1px solid ${C.purple}22`, textAlign: "center" }}>
-                      <div style={{ fontSize: 22, fontWeight: 900, color: C.purple, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{curEssayResults.reduce((s, r) => s + r.score, 0)}/{curEssayResults.reduce((s, r) => s + r.maxScore, 0)}</div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>✍️ Tự luận (AI)</div>
-                    </div>
-                  </div>
-
-                  {/* Per-essay grading details */}
-                  {curEssayResults.map((er, ei) => {
-                    const scoreColor = er.score >= er.maxScore * 0.8 ? C.green : er.score >= er.maxScore * 0.5 ? C.orange : C.red;
-                    return (
-                      <div key={ei} style={{ padding: "14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, marginBottom: 10 }}>
-                        {/* Question + score */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, gap: 10 }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 11, color: C.purple, fontWeight: 700, marginBottom: 4 }}>✍️ CÂU TỰ LUẬN {ei + 1}</div>
-                            <div style={{ color: C.white, fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>{er.q}</div>
+                    {/* Per-essay grading details */}
+                    {curEssayResults.map((er, ei) => {
+                      const scoreColor = er.score >= er.maxScore * 0.8 ? C.green : er.score >= er.maxScore * 0.5 ? C.orange : C.red;
+                      return (
+                        <div key={ei} style={{ padding: "14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, marginBottom: 10 }}>
+                          {/* Question + score */}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, gap: 10 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 11, color: C.purple, fontWeight: 700, marginBottom: 4 }}>✍️ CÂU TỰ LUẬN {ei + 1}</div>
+                              <div style={{ color: C.white, fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>{er.q}</div>
+                            </div>
+                            <div style={{ textAlign: "center", flexShrink: 0 }}>
+                              <div style={{ fontSize: 22, fontWeight: 900, color: scoreColor, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{er.score}<span style={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}>/{er.maxScore}</span></div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: scoreColor }}>{er.grade}</div>
+                            </div>
                           </div>
-                          <div style={{ textAlign: "center", flexShrink: 0 }}>
-                            <div style={{ fontSize: 22, fontWeight: 900, color: scoreColor, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{er.score}<span style={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}>/{er.maxScore}</span></div>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: scoreColor }}>{er.grade}</div>
-                          </div>
-                        </div>
 
-                        {/* User answer */}
-                        <div style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 4 }}>📝 BÀI LÀM CỦA BẠN</div>
-                          <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, fontSize: 13, color: "rgba(255,255,255,0.65)", lineHeight: 1.6 }}>{er.userAns || "(Không trả lời)"}</div>
-                        </div>
-
-                        {/* AI feedback — or error banner */}
-                        {er.grade === "Lỗi" ? (
-                          <div style={{ padding: "12px 14px", borderRadius: 10, background: C.red + "10", border: `1px solid ${C.red}33` }}>
-                            <div style={{ fontSize: 11, color: C.red, fontWeight: 700, marginBottom: 6 }}>⚠️ CHẤM BÀI THẤT BẠI</div>
-                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: 6 }}>AI không thể chấm câu này. Câu sẽ được tính 0 điểm.</div>
-                            {er._error && <div style={{ fontSize: 11, fontFamily: "monospace", color: C.red + "cc", background: "rgba(0,0,0,0.2)", padding: "6px 10px", borderRadius: 6, wordBreak: "break-all" }}>{"Lỗi: " + er._error}</div>}
+                          {/* User answer */}
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 4 }}>📝 BÀI LÀM CỦA BẠN</div>
+                            <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, fontSize: 13, color: "rgba(255,255,255,0.65)", lineHeight: 1.6 }}>{er.userAns || "(Không trả lời)"}</div>
                           </div>
-                        ) : (
-                        <div style={{ padding: "12px 14px", borderRadius: 10, background: `${scoreColor}08`, border: `1px solid ${scoreColor}22` }}>
-                          <div style={{ fontSize: 11, color: scoreColor, fontWeight: 700, marginBottom: 6 }}>🤖 NHẬN XÉT CỦA AI</div>
-                          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.7, marginBottom: 10 }}>{er.feedback}</div>
-                          {er.explanation && (
-                            <div style={{ marginBottom: 10 }}>
-                              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>📖 PHÂN TÍCH CHI TIẾT THEO TIÊU CHÍ</div>
-                              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{er.explanation}</div>
+
+                          {/* AI feedback — or error banner */}
+                          {er.grade === "Lỗi" ? (
+                            <div style={{ padding: "12px 14px", borderRadius: 10, background: C.red + "10", border: `1px solid ${C.red}33` }}>
+                              <div style={{ fontSize: 11, color: C.red, fontWeight: 700, marginBottom: 6 }}>⚠️ CHẤM BÀI THẤT BẠI</div>
+                              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, marginBottom: 6 }}>AI không thể chấm câu này. Câu sẽ được tính 0 điểm.</div>
+                              {er._error && <div style={{ fontSize: 11, fontFamily: "monospace", color: C.red + "cc", background: "rgba(0,0,0,0.2)", padding: "6px 10px", borderRadius: 6, wordBreak: "break-all" }}>{"Lỗi: " + er._error}</div>}
+                            </div>
+                          ) : (
+                            <div style={{ padding: "12px 14px", borderRadius: 10, background: `${scoreColor}08`, border: `1px solid ${scoreColor}22` }}>
+                              <div style={{ fontSize: 11, color: scoreColor, fontWeight: 700, marginBottom: 6 }}>🤖 NHẬN XÉT CỦA AI</div>
+                              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.7, marginBottom: 10 }}>{er.feedback}</div>
+                              {er.explanation && (
+                                <div style={{ marginBottom: 10 }}>
+                                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>📖 PHÂN TÍCH CHI TIẾT THEO TIÊU CHÍ</div>
+                                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{er.explanation}</div>
+                                </div>
+                              )}
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                {er.strengthPoints && er.strengthPoints.length > 0 && (
+                                  <div style={{ padding: "8px 10px", borderRadius: 8, background: `${C.green}08`, border: `1px solid ${C.green}22` }}>
+                                    <div style={{ fontSize: 10, color: C.green, fontWeight: 700, marginBottom: 4 }}>💪 ĐIỂM MẠNH</div>
+                                    {er.strengthPoints.map((s, si) => <div key={si} style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginBottom: 2 }}>• {s}</div>)}
+                                  </div>
+                                )}
+                                {er.improvementPoints && er.improvementPoints.length > 0 && (
+                                  <div style={{ padding: "8px 10px", borderRadius: 8, background: `${C.orange}08`, border: `1px solid ${C.orange}22` }}>
+                                    <div style={{ fontSize: 10, color: C.orange, fontWeight: 700, marginBottom: 4 }}>🎯 CẦN CẢI THIỆN</div>
+                                    {er.improvementPoints.map((s, si) => <div key={si} style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginBottom: 2 }}>• {s}</div>)}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                            {er.strengthPoints && er.strengthPoints.length > 0 && (
-                              <div style={{ padding: "8px 10px", borderRadius: 8, background: `${C.green}08`, border: `1px solid ${C.green}22` }}>
-                                <div style={{ fontSize: 10, color: C.green, fontWeight: 700, marginBottom: 4 }}>💪 ĐIỂM MẠNH</div>
-                                {er.strengthPoints.map((s, si) => <div key={si} style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginBottom: 2 }}>• {s}</div>)}
-                              </div>
-                            )}
-                            {er.improvementPoints && er.improvementPoints.length > 0 && (
-                              <div style={{ padding: "8px 10px", borderRadius: 8, background: `${C.orange}08`, border: `1px solid ${C.orange}22` }}>
-                                <div style={{ fontSize: 10, color: C.orange, fontWeight: 700, marginBottom: 4 }}>🎯 CẦN CẢI THIỆN</div>
-                                {er.improvementPoints.map((s, si) => <div key={si} style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginBottom: 2 }}>• {s}</div>)}
-                              </div>
-                            )}
-                          </div>
                         </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
                 );
               })()}
 
@@ -5280,7 +5465,10 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               const myChallenges = challenges.filter(ch => {
                 // No filter on active - show all
                 if (ch.assignTo === "dept" && ch.assignDept && ch.assignDept !== currentUser.dept) return false;
-                if (ch.assignTo && ch.assignTo !== "all" && ch.assignTo !== "dept" && ch.assignTo !== currentUser.id) return false;
+                if (ch.assignTo && ch.assignTo !== "all" && ch.assignTo !== "dept") {
+                  if (ch.assignTo.startsWith('[')) { try { if (!JSON.parse(ch.assignTo).includes(currentUser.id)) return false; } catch (e) { return false; } }
+                  else if (ch.assignTo !== currentUser.id) return false;
+                }
                 return true;
               });
               // Check completion from both completedBy AND quiz results
@@ -5395,23 +5583,23 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {/* ═══ SAVE STATUS TOAST ═══ */}
         {saveStatus && (
           <div style={{
-            position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+            position: "fixed", bottom: 28, left: "50%",
             zIndex: 99999, pointerEvents: "none",
-            animation: "fadeIn .25s ease-out"
+            animation: "toastSlideUp .3s cubic-bezier(0.34,1.56,0.64,1) both"
           }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,
-              padding: "10px 20px", borderRadius: 12,
+              padding: "11px 22px", borderRadius: 14,
               background: saveStatus === "saved"
-                ? "linear-gradient(135deg, rgba(12,123,111,0.95), rgba(10,100,90,0.95))"
-                : "linear-gradient(135deg, rgba(200,50,50,0.95), rgba(170,30,30,0.95))",
-              backdropFilter: "blur(12px)",
+                ? "linear-gradient(135deg, rgba(12,123,111,0.97), rgba(10,100,90,0.97))"
+                : "linear-gradient(135deg, rgba(200,50,50,0.97), rgba(170,30,30,0.97))",
+              backdropFilter: "blur(16px)",
               boxShadow: saveStatus === "saved"
-                ? "0 4px 20px rgba(12,123,111,0.4), 0 0 0 1px rgba(12,123,111,0.3)"
-                : "0 4px 20px rgba(200,50,50,0.4), 0 0 0 1px rgba(200,50,50,0.3)",
+                ? "0 6px 24px rgba(12,123,111,0.45), 0 0 0 1px rgba(12,123,111,0.35)"
+                : "0 6px 24px rgba(200,50,50,0.45), 0 0 0 1px rgba(200,50,50,0.35)",
               color: "#fff", fontSize: 13, fontWeight: 700,
               fontFamily: "'Be Vietnam Pro', sans-serif",
-              letterSpacing: 0.3
+              letterSpacing: 0.3, whiteSpace: "nowrap"
             }}>
               <span style={{ fontSize: 16 }}>{saveStatus === "saved" ? "✅" : "❌"}</span>
               <span>{saveStatus === "saved" ? "Đã lưu vào Supabase" : "Lỗi lưu dữ liệu — kiểm tra Console"}</span>
@@ -5421,7 +5609,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
       </div>
     </div>
-    
+
   );
 }
 
