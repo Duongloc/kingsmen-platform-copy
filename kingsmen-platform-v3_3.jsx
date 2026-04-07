@@ -1023,7 +1023,7 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     // Reload latest results from DB before appending (prevent overwrite)
     let latestResults = results;
     try { const fromDB = await DB.get("km-results", []); if (Array.isArray(fromDB) && fromDB.length >= latestResults.length) latestResults = fromDB; } catch (e) { }
-    const newResults = [...latestResults, result]; setResults(newResults); await DB.set("km-results", newResults);
+    const newResults = [...latestResults, result]; setResults(newResults); const saveOk = await DB.set("km-results", newResults); if (!saveOk) { console.error("Quiz result save failed for user:", currentUser.id); }
     let xp = sc * settings.xpCorrect; if (pct >= settings.passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
@@ -3390,7 +3390,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               </div>
                               {/* Link quiz */}
                               <div style={{ marginBottom: 4 }}><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Bài kiểm tra (mở khóa tuần tự)</label>
-                                <select value={mod.quizId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], quizId: e.target.value, quizTitle: (() => { const _q = quizzes.find(q => q.id === e.target.value); return _q ? _q.title : ""; }) }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
+                                <select value={mod.quizId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], quizId: e.target.value, quizTitle: (quizzes.find(q => q.id === e.target.value) || {}).title || "" }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
                                   <option value="">— Không gắn đề —</option>{quizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
                                 </select>
                               </div>
@@ -3994,7 +3994,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               var isRead = (currentUser.readLessons || []).includes(k.id);
               return (
                 <div key={k.id} style={{ ...card, cursor: "pointer", border: "1px solid " + (isRead ? C.green + "33" : C.border) }} onClick={function () {
-                  if (!isRead) { var u = Object.assign({}, currentUser, { readLessons: [].concat(currentUser.readLessons || [], [k.id]) }); setCurrentUser(u); updAccounts(accounts.map(function (a) { return a.id === u.id ? u : a })); }
+                  if (!isRead) { var u = Object.assign({}, currentUser, { readLessons: [].concat(currentUser.readLessons || [], [k.id]) }); setCurrentUser(u); var na = accountsRef.current.map(function (a) { return a.id === u.id ? u : a }); setAccounts(na); accountsRef.current = na; save("km-accounts", na); }
                   setSubScreen(k.id); setFormData(Object.assign({}, formData, { learnTab: null }));
                 }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
