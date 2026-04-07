@@ -249,7 +249,7 @@ const bulletinToSnake = (b) => ({ id: b.id, title: b.title, content: b.content |
 const recognitionToCamel = (r) => ({ id: r.id, empId: r.emp_id, empName: r.emp_name || "", type: r.type, message: r.message, givenBy: r.given_by, createdAt: r.created_at });
 const recognitionToSnake = (r) => ({ id: r.id, emp_id: r.empId, emp_name: r.empName || "", type: r.type || "excellent", message: r.message || "", given_by: r.givenBy || "" });
 const pathToCamel = (r) => ({ id: r.id, title: r.title, dept: r.dept || "", description: r.description || "", stages: r.stages || [], assignedTo: r.assigned_to || [], createdAt: r.created_at || null });
-const pathToSnake = (p) => ({ id: p.id, title: p.title, dept: p.dept || "", description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [] });
+const pathToSnake = (p) => ({ id: p.id, title: p.title, dept: p.dept || "", description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [], ...(p.createdAt ? { created_at: p.createdAt } : {}) });
 
 var _pdfCache = {};
 
