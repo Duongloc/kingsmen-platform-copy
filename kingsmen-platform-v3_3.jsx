@@ -623,8 +623,22 @@ export default function App() {
   const updPaths = (d) => { setPaths(d); save("km-paths", d); };
   const updSettings = (d) => { setSettings(d); save("km-settings", d); };
 
-  const addXP = (userId, amount) => { const u = accountsRef.current.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a); updAccounts(u); };
-  const addNotif = (empId, msg, type = "info") => { const n = [...notifications, { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false }]; updNotifications(n); };
+  const addXP = async (userId, amount) => {
+    // Optimistic local update
+    setAccounts(prev => { const u = prev.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a); accountsRef.current = u; return u; });
+    if (currentUser && currentUser.id === userId) setCurrentUser(prev => ({ ...prev, xp: Math.max(0, (prev.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : prev.lastXpGainDate }));
+    // Atomic DB increment — no read-modify-write race
+    const { error } = await supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() });
+    if (error) console.error("addXP RPC error:", error.message);
+  };
+  const addNotif = async (empId, msg, type = "info") => {
+    const row = { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false };
+    // Optimistic local update using functional form — no stale closure
+    setNotifications(prev => [...prev, row]);
+    // Direct insert — concurrent-safe
+    const { error } = await supabase.from("notifications").insert([notifToSnake(row)]);
+    if (error) console.error("addNotif insert error:", error.message);
+  };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
@@ -684,11 +698,15 @@ export default function App() {
     }
     const newXp = Math.max(0, (user.xp || 0) + xpChange);
     const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: [...(user.checkIns || []), t].slice(-90) };
-    // Reload latest accounts from DB before saving
-    let latestAccs = accountsRef.current;
-    try { const acDB = await DB.get("km-accounts", []); if (Array.isArray(acDB) && acDB.length > 0) latestAccs = acDB; } catch (e) { }
-    const accs = latestAccs.map(a => a.id === user.id ? { ...updated, xp: newXp } : a);
-    setAccounts(accs); accountsRef.current = accs; await DB.set("km-accounts", accs);
+    // Optimistic local update
+    setAccounts(prev => { const u = prev.map(a => a.id === user.id ? updated : a); accountsRef.current = u; return u; });
+    // Atomic XP via RPC + single-row update for checkin fields — no full-array upsert
+    const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: user.id, p_amount: xpChange, p_date: today() });
+    if (xpErr) console.error("doCheckIn XP RPC error:", xpErr.message);
+    const { error: ciErr } = await supabase.from("profiles").update({
+      last_check_in: t, streak: newStreak, check_ins: [...(user.checkIns || []), t].slice(-90)
+    }).eq("id", user.id);
+    if (ciErr) console.error("doCheckIn update error:", ciErr.message);
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
     if (idleMsg) addNotif(user.id, idleMsg, "decay");
     return updated;
@@ -1016,10 +1034,10 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     }
     const _essayData = hasEssay && typeof essayGradingResults !== "undefined" ? { results: essayGradingResults, answers: Object.fromEntries(qs.map((q, i) => q.type === "essay" ? [i, (answers[i] && answers[i].selected) || ""] : null).filter(Boolean)) } : null;
     const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= settings.passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData };
-    // Reload latest results from DB before appending (prevent overwrite)
-    let latestResults = results;
-    try { const fromDB = await DB.get("km-results", []); if (Array.isArray(fromDB) && fromDB.length >= latestResults.length) latestResults = fromDB; } catch (e) { }
-    const newResults = [...latestResults, result]; setResults(newResults); await DB.set("km-results", newResults);
+    // Direct insert — concurrent-safe, no full-array overwrite
+    setResults(prev => [...prev, result]);
+    const { error: resErr } = await supabase.from("results").insert([resultToSnake(result)]);
+    if (resErr) console.error("finishQuiz result insert error:", resErr.message);
     let xp = sc * settings.xpCorrect; if (pct >= settings.passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
@@ -1074,10 +1092,11 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     const newXpValue = (currentUser.xp || 0) + xp;
     const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: currentUser.id, p_amount: xp, p_date: today() });
     if (xpErr) console.error("finishQuiz XP RPC error:", xpErr.message);
-    // Targeted single-row update for path progress — only touches this user's row
+    // Atomic path progress merge — no JSON overwrite race
     if (quizPathContext && quizPathContext.pathId) {
-      const { error: ppErr } = await supabase.from("profiles").update({ path_progress: updatedPathProgress }).eq("id", currentUser.id);
-      if (ppErr) console.error("finishQuiz path progress update error:", ppErr.message);
+      const pathPatch = { [quizPathContext.pathId]: updatedPathProgress[quizPathContext.pathId] };
+      const { error: ppErr } = await supabase.rpc("merge_path_progress", { p_user_id: currentUser.id, p_progress: pathPatch });
+      if (ppErr) console.error("finishQuiz path progress merge error:", ppErr.message);
     }
     // Optimistic local state — computed deterministically from known inputs
     const newAccounts = accountsRef.current.map(a => a.id === currentUser.id ? { ...a, xp: newXpValue, lastXpGainDate: today(), pathProgress: updatedPathProgress } : a);
@@ -5046,8 +5065,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                               const newProg = { ...(currentUser.pathProgress || {}), [viewPath.id]: { ...(prog), checks: { ...(prog.checks || {}), [checkKey]: !checked } } };
                                               const u = { ...currentUser, pathProgress: newProg };
                                               setCurrentUser(u);
-                                              const na = accountsRef.current.map(a => a.id === u.id ? u : a);
-                                              setAccounts(na); accountsRef.current = na; await DB.set("km-accounts", na);
+                                              setAccounts(prev => { const na = prev.map(a => a.id === u.id ? u : a); accountsRef.current = na; return na; });
+                                              // Atomic path progress merge — no full-array upsert
+                                              const pathPatch = { [viewPath.id]: newProg[viewPath.id] };
+                                              const { error: ppErr } = await supabase.rpc("merge_path_progress", { p_user_id: currentUser.id, p_progress: pathPatch });
+                                              if (ppErr) console.error("checklist path progress merge error:", ppErr.message);
                                             }} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", cursor: "pointer" }}>
                                               <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${checked ? C.green : C.border}`, background: checked ? `${C.green}22` : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: C.green, flexShrink: 0 }}>{checked ? "✓" : ""}</div>
                                               <span style={{ fontSize: 13, color: checked ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.7)", textDecoration: checked ? "line-through" : "none" }}>{cl}</span>
