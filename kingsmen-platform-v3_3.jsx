@@ -234,7 +234,7 @@ const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content 
 const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] }; if (k.createdAt) base.created_at = k.createdAt; return base; };
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
-const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {} });
+const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {}, delivered: r.delivered || {} });
 const challengeToSnake = (c) => ({ id: c.id, title: c.title, quiz_id: c.quizId || null, quiz_title: c.quizTitle || "", min_score: c.minScore || 70, deadline: c.deadline || null, assign_to: c.assignTo || "all", assign_dept: c.assignDept || null, rewards: c.rewards || [], active: c.active !== false, xp_bonus: c.xpBonus || c.xpReward || 50, created_by: c.createdBy || null, created_by_name: c.createdByName || "", completed_by: c.completedBy || [], won_rewards: c.wonRewards || {} });
 const notifToCamel = (r) => ({ id: r.id, empId: r.emp_id, msg: r.msg, type: r.type, date: r.created_at, read: r.read });
 const notifToSnake = (n) => ({ id: n.id, emp_id: n.empId, msg: n.msg, type: n.type || "info", read: n.read || false });
@@ -286,8 +286,12 @@ const DB = {
   async set(k, v) {
     try {
       if (!v) return false;
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
+      let { data: userData } = await supabase.auth.getUser();
+      let user = userData?.user;
+      // If user is null, try refreshing the session before giving up
+      if (!user) {
+        try { const { data: s } = await supabase.auth.getSession(); user = s?.session?.user || null; } catch (e2) {}
+      }
       let isAdmin = false;
       if (user) {
          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
@@ -296,10 +300,11 @@ const DB = {
 
       switch (k) {
         case "km-accounts": { 
-           if (!Array.isArray(v)) return false; 
+           if (!Array.isArray(v)) return false;
+           if (!user && !isAdmin) { console.error("accounts save: no authenticated user"); return false; }
            const rows = v.map(profileToSnake).filter(r => isAdmin || (user && r.id === user.id)); 
-           if (rows.length > 0) { const { error } = await supabase.from("profiles").upsert(rows); if (error) console.error("profiles upsert err:", error.message); } 
-           return true; 
+           if (rows.length > 0) { const { error } = await supabase.from("profiles").upsert(rows); if (error) { console.error("profiles upsert err:", error.message); return false; } }
+           return rows.length > 0; 
         }
         case "km-quizzes": {
           if (!Array.isArray(v)) return false;
@@ -335,24 +340,26 @@ const DB = {
           return true;
         }
         case "km-results": { 
-           if (!Array.isArray(v)) return false; 
+           if (!Array.isArray(v)) return false;
+           if (!user && !isAdmin) { console.error("results save: no authenticated user"); return false; }
            const rows = v.map(resultToSnake).filter(r => isAdmin || (user && r.emp_id === user.id)); 
-           if (rows.length > 0) { const { error } = await supabase.from("results").upsert(rows); if (error) console.error("results upsert err:", error.message); } 
-           return true; 
+           if (rows.length > 0) { const { error } = await supabase.from("results").upsert(rows); if (error) { console.error("results upsert err:", error.message); return false; } }
+           return rows.length > 0; 
         }
         case "km-recognitions": {
           if (!Array.isArray(v)) return false;
           const { data: existingResp } = await supabase.from("recognitions").select("id");
           const existingIds = new Set(existingResp?.map(e => e.id) || []);
           const rows = v.map(recognitionToSnake).filter(r => isAdmin || r.given_by === user?.id || !existingIds.has(r.id));
-          if (rows.length > 0) { const { error } = await supabase.from("recognitions").upsert(rows); return !error; }
+          if (rows.length > 0) { const { error } = await supabase.from("recognitions").upsert(rows); if (error) { console.error("recognitions upsert err:", error.message); return false; } return true; }
           return true;
         }
         case "km-challenges": {
           if (!Array.isArray(v)) return false;
           if (isAdmin) {
             const { error } = await supabase.from("challenges").upsert(v.map(challengeToSnake));
-            return !error;
+            if (error) { console.error("challenges upsert err:", error.message); return false; }
+            return true;
           } else if (user) {
             // High concurrency safe path for employees: cannot mass overwrite challenges.
             // Finds any challenges the user completed and sends targeted atomic RPC updates instead.
@@ -372,13 +379,13 @@ const DB = {
            const { data: existingResp } = await supabase.from("notifications").select("id");
            const existingIds = new Set(existingResp?.map(e => e.id) || []);
            const rows = v.map(notifToSnake).filter(r => isAdmin || r.emp_id === user?.id || !existingIds.has(r.id)); 
-           if (rows.length > 0) { const { error } = await supabase.from("notifications").upsert(rows); if (error) console.error("notif upsert err:", error.message); } 
+           if (rows.length > 0) { const { error } = await supabase.from("notifications").upsert(rows); if (error) { console.error("notif upsert err:", error.message); return false; } }
            return true; 
         }
-        case "km-paths": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("paths").upsert(v.map(pathToSnake)); return !error; }
-        case "km-bulletins": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("bulletins").upsert(v.map(bulletinToSnake)); return !error; }
-        case "km-settings": { const { error } = await supabase.from("settings").upsert({ id: 1, config: v }); return !error; }
-        case "km-logo": { const { error } = await supabase.from("kingsmen_data").upsert({ id: "logo", value: v }); return !error; }
+        case "km-paths": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("paths").upsert(v.map(pathToSnake)); if (error) { console.error("paths upsert err:", error.message); return false; } return true; }
+        case "km-bulletins": { if (!Array.isArray(v)) return false; const { error } = await supabase.from("bulletins").upsert(v.map(bulletinToSnake)); if (error) { console.error("bulletins upsert err:", error.message); return false; } return true; }
+        case "km-settings": { const { error } = await supabase.from("settings").upsert({ id: 1, config: v }); if (error) { console.error("settings upsert err:", error.message); return false; } return true; }
+        case "km-logo": { const { error } = await supabase.from("kingsmen_data").upsert({ id: "logo", value: v }); if (error) { console.error("logo upsert err:", error.message); return false; } return true; }
         default: return false;
       }
     } catch (e) { console.error("DB.set error", k, e); return false; }
@@ -413,6 +420,7 @@ export default function App() {
   const [activeQuiz, setActiveQuiz] = useState(null); const [qIdx, setQIdx] = useState(0);
   const [qAnswers, setQAnswers] = useState({}); const [qSel, setQSel] = useState(null); const [qShowExp, setQShowExp] = useState(false);
   const [qTimer, setQTimer] = useState(0); const [qActive, setQActive] = useState(false);
+  const [quizPathContext, setQuizPathContext] = useState(null); // { pathId, pathTitle } — tracks if quiz was started from a pathway
   const [aiLoading, setAiLoading] = useState(false); const [aiStatus, setAiStatus] = useState("");
   const aiStatusTimerRef = useRef(null);
   useEffect(() => {
@@ -468,9 +476,23 @@ export default function App() {
   const avatarInputRef = useRef(null);
   useEffect(() => { accountsRef.current = accounts; }, [accounts]);
 
-  // ─── localStorage cache helpers ───
-  const cacheGet = (key) => { try { const raw = localStorage.getItem("kc_" + key); if (raw) return JSON.parse(raw); } catch(e){} return null; };
-  const cacheSet = (key, data) => { try { localStorage.setItem("kc_" + key, JSON.stringify(data)); } catch(e){} };
+  // ─── localStorage cache helpers (TTL-aware, cross-tab safe) ───
+  const CACHE_TTL = { accounts: 30000, results: 30000, notifications: 30000, challenges: 30000, knowledge: 300000, quizzes: 300000, paths: 300000, settings: 300000, recognitions: 300000, bulletins: 300000, logo: 300000 };
+  const cacheGet = (key) => { try { const raw = localStorage.getItem("kc_" + key); if (!raw) return null; const { ts, data } = JSON.parse(raw); const ttl = CACHE_TTL[key] ?? 30000; if (Date.now() - ts > ttl) { localStorage.removeItem("kc_" + key); return null; } return data; } catch(e){} return null; };
+  const cacheSet = (key, data) => { try { localStorage.setItem("kc_" + key, JSON.stringify({ ts: Date.now(), data })); } catch(e){} };
+  // Cross-tab cache invalidation: when another tab writes to cache, refresh volatile state
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.key || !e.key.startsWith("kc_")) return;
+      const key = e.key.slice(3);
+      if (key === "accounts") DB.get("km-accounts", []).then(d => { if (Array.isArray(d)) { setAccounts(d); accountsRef.current = d; } });
+      if (key === "results") DB.get("km-results", []).then(d => { if (Array.isArray(d)) setResults(d); });
+      if (key === "notifications") DB.get("km-notifications", []).then(d => { if (Array.isArray(d)) setNotifications(d); });
+      if (key === "challenges") DB.get("km-challenges", []).then(d => { if (Array.isArray(d)) setChallenges(d); });
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   useEffect(() => {
     const fallback = setTimeout(() => setReady(true), 3000);
@@ -580,8 +602,23 @@ export default function App() {
   const updPaths = (d) => { setPaths(d); save("km-paths", d); };
   const updSettings = (d) => { setSettings(d); save("km-settings", d); };
 
-  const addXP = (userId, amount) => { const u = accountsRef.current.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a); updAccounts(u); };
-  const addNotif = (empId, msg, type = "info") => { const n = [...notifications, { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false }]; updNotifications(n); };
+  const addXP = async (userId, amount) => {
+    // Optimistic local update so UI responds immediately
+    const u = accountsRef.current.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a);
+    setAccounts(u); accountsRef.current = u;
+    if (currentUser && currentUser.id === userId) setCurrentUser(prev => ({ ...prev, xp: Math.max(0, (prev.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : prev.lastXpGainDate }));
+    // Atomic DB increment — no read-modify-write race
+    const { error } = await supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() });
+    if (error) console.error("addXP RPC error:", error.message);
+  };
+  const addNotif = async (empId, msg, type = "info") => {
+    const notif = { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false };
+    // Optimistic local update using functional form — no stale closure over notifications
+    setNotifications(prev => [...prev, notif]);
+    // Single-row insert — no full-array read-modify-write
+    const { error } = await supabase.from("notifications").insert([notifToSnake(notif)]);
+    if (error) console.error("addNotif insert error:", error.message);
+  };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
@@ -640,12 +677,17 @@ export default function App() {
       }
     }
     const newXp = Math.max(0, (user.xp || 0) + xpChange);
-    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: [...(user.checkIns || []), t].slice(-90) };
-    // Reload latest accounts from DB before saving
-    let latestAccs = accountsRef.current;
-    try { const acDB = await DB.get("km-accounts", []); if (Array.isArray(acDB) && acDB.length > 0) latestAccs = acDB; } catch (e) { }
-    const accs = latestAccs.map(a => a.id === user.id ? { ...updated, xp: newXp } : a);
-    setAccounts(accs); accountsRef.current = accs; await DB.set("km-accounts", accs);
+    const updatedCheckIns = [...(user.checkIns || []), t].slice(-90);
+    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: updatedCheckIns };
+    // Optimistic local update — no full-array read needed
+    const accs = accountsRef.current.map(a => a.id === user.id ? updated : a);
+    setAccounts(accs); accountsRef.current = accs;
+    if (currentUser && currentUser.id === user.id) setCurrentUser(updated);
+    // Targeted single-row update — no full-array upsert, no cross-user race
+    const { error: ciErr } = await supabase.from("profiles")
+      .update({ xp: newXp, streak: newStreak, last_check_in: t, check_ins: updatedCheckIns })
+      .eq("id", user.id);
+    if (ciErr) console.error("doCheckIn update error:", ciErr.message);
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
     if (idleMsg) addNotif(user.id, idleMsg, "decay");
     return updated;
@@ -966,11 +1008,14 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
       sc = mcPts + essayPts; pct = total > 0 ? Math.round(sc / total * 100) : 0;
     }
     const _essayData = hasEssay && typeof essayGradingResults !== "undefined" ? { results: essayGradingResults, answers: Object.fromEntries(qs.map((q, i) => q.type === "essay" ? [i, (answers[i] && answers[i].selected) || ""] : null).filter(Boolean)) } : null;
-    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= settings.passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData };
-    // Reload latest results from DB before appending (prevent overwrite)
-    let latestResults = results;
-    try { const fromDB = await DB.get("km-results", []); if (Array.isArray(fromDB) && fromDB.length >= latestResults.length) latestResults = fromDB; } catch (e) { }
-    const newResults = [...latestResults, result]; setResults(newResults); await DB.set("km-results", newResults);
+    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= settings.passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData, answers: Object.entries(answers).map(([idx, a]) => ({ qIdx: +idx, selected: a.selected, correct: a.correct })) };
+    // Optimistic local update — no full-array fetch needed
+    const newResults = [...results, result];
+    setResults(newResults);
+    cacheSet("results", newResults);
+    // Single-row insert — safe under concurrency, no last-writer-wins overwrite
+    const { error: resErr } = await supabase.from("results").insert([resultToSnake(result)]);
+    if (resErr) console.error("finishQuiz results insert error:", resErr.message);
     let xp = sc * settings.xpCorrect; if (pct >= settings.passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
@@ -997,27 +1042,43 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     });
     if (chUpdated) {
       setChallenges(newChallenges); await DB.set("km-challenges", newChallenges);
-      // Save notifications for both employee and creator
-      // Reload latest notifications
-      let curNotifs = notifications;
-      try { const nfDB = await DB.get("km-notifications", []); if (Array.isArray(nfDB) && nfDB.length >= curNotifs.length) curNotifs = nfDB; } catch (e) { }
-      const newNotifs = [...curNotifs];
+      // Build notification rows for completed challenges — no stale array read needed
       const chDone = newChallenges.filter(ch => ch.quizId === activeQuiz.id && (ch.completedBy || []).includes(currentUser.id) && !challenges.find(c => c.id === ch.id && (c.completedBy || []).includes(currentUser.id)));
+      const newNotifRows = [];
       chDone.forEach(ch => {
         const wonR = (ch.wonRewards && ch.wonRewards[currentUser.id]);
-        newNotifs.push({ id: uid(), empId: currentUser.id, msg: "🎯 Thử thách hoàn thành: " + ch.title + " (+" + (ch.xpReward || 0) + " XP)" + (wonR ? " · 🎁 Bạn nhận: " + wonR : ""), type: "challenge", date: new Date().toISOString(), read: false });
-        if (ch.createdBy) newNotifs.push({ id: uid(), empId: ch.createdBy, msg: "✅ " + currentUser.name + " hoàn thành: " + ch.title + " (" + pct + "%)" + (wonR ? " · 🎁 Đã nhận: " + wonR : ""), type: "challenge", date: new Date().toISOString(), read: false });
+        newNotifRows.push({ id: uid(), empId: currentUser.id, msg: "🎯 Thử thách hoàn thành: " + ch.title + " (+" + (ch.xpReward || 0) + " XP)" + (wonR ? " · 🎁 Bạn nhận: " + wonR : ""), type: "challenge", date: new Date().toISOString(), read: false });
+        if (ch.createdBy) newNotifRows.push({ id: uid(), empId: ch.createdBy, msg: "✅ " + currentUser.name + " hoàn thành: " + ch.title + " (" + pct + "%)" + (wonR ? " · 🎁 Đã nhận: " + wonR : ""), type: "challenge", date: new Date().toISOString(), read: false });
       });
-      setNotifications(newNotifs); await DB.set("km-notifications", newNotifs);
+      if (newNotifRows.length > 0) {
+        // Optimistic local update using functional form — no stale closure
+        setNotifications(prev => [...prev, ...newNotifRows]);
+        // Multi-row insert — concurrent-safe, no full-array overwrite
+        const { error: nErr } = await supabase.from("notifications").insert(newNotifRows.map(notifToSnake));
+        if (nErr) console.error("finishQuiz notifications insert error:", nErr.message);
+      }
     }
-    // Save XP — reload accounts from DB first to avoid overwriting other users
-    let latestAccounts = accountsRef.current;
-    try { const acDB = await DB.get("km-accounts", []); if (Array.isArray(acDB) && acDB.length > 0) latestAccounts = acDB; } catch (e) { }
-    const newAccounts = latestAccounts.map(a => a.id === currentUser.id ? { ...a, xp: (a.xp || 0) + xp, lastXpGainDate: today() } : a);
-    setAccounts(newAccounts); accountsRef.current = newAccounts; await DB.set("km-accounts", newAccounts);
-    // Update currentUser from saved data (not stale state)
-    const savedUser = newAccounts.find(a => a.id === currentUser.id);
-    if (savedUser) setCurrentUser(savedUser);
+    // Build updated pathProgress if quiz was taken from a pathway
+    let updatedPathProgress = currentUser.pathProgress || {};
+    if (quizPathContext && quizPathContext.pathId) {
+      const pathId = quizPathContext.pathId;
+      const existingProg = updatedPathProgress[pathId] || {};
+      const quizRecord = { ...(existingProg.quizResults || {}), [activeQuiz.id]: { passed: pct >= settings.passScore, pct, date: new Date().toISOString() } };
+      updatedPathProgress = { ...updatedPathProgress, [pathId]: { ...existingProg, quizResults: quizRecord } };
+    }
+    // Atomic XP increment via RPC — no read-modify-write race across concurrent users
+    const newXpValue = (currentUser.xp || 0) + xp;
+    const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: currentUser.id, p_amount: xp, p_date: today() });
+    if (xpErr) console.error("finishQuiz XP RPC error:", xpErr.message);
+    // Targeted single-row update for path progress — only touches this user's row
+    if (quizPathContext && quizPathContext.pathId) {
+      const { error: ppErr } = await supabase.from("profiles").update({ path_progress: updatedPathProgress }).eq("id", currentUser.id);
+      if (ppErr) console.error("finishQuiz path progress update error:", ppErr.message);
+    }
+    // Optimistic local state — computed deterministically from known inputs
+    const newAccounts = accountsRef.current.map(a => a.id === currentUser.id ? { ...a, xp: newXpValue, lastXpGainDate: today(), pathProgress: updatedPathProgress } : a);
+    setAccounts(newAccounts); accountsRef.current = newAccounts;
+    setCurrentUser(prev => ({ ...prev, xp: newXpValue, lastXpGainDate: today(), pathProgress: updatedPathProgress }));
     if (wonRewardData) setRewardReveal(wonRewardData);
     setScreen("emp_quiz_result");
   };
@@ -2567,7 +2628,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <button onClick={() => setFormData({ ...formData, expandQ: isExpanded ? null : q.id })} style={{ padding: "5px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", fontSize: 11, border: `1px solid ${C.border}` }} title="Xem câu hỏi">{isExpanded ? "▲ Ẩn" : "▼ Xem"}</button>
                           <button onClick={() => exportQuizCSV(q)} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }} title="Xuất CSV">📥</button>
                           <button onClick={() => { const txt = buildPrompt({ type: "quiz_from_knowledge", knowledgeItem: knowledge.find(x => x.id === q.knowledgeId) || { title: q.title, content: "" }, numQ: q.questions.length, difficulty: q.difficulty || "medium", quizType: q.quizType || "mc", quizTitle: q.title }); setPromptPanel({ text: txt, title: q.title }); setPromptCopied(false); }} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.gold}15`, color: C.gold, fontSize: 11, fontWeight: 600, border: "none" }} title="Tạo lại với Claude">📋</button>
-                          <button onClick={async () => { if (window.confirm("Xóa đề \"" + q.title + "\"?\nThao tác này không thể hoàn tác.")) { await supabase.from("quizzes").delete().eq("id", q.id); updQuizzes(quizzes.filter(x => x.id !== q.id)); } }} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }} title="Xóa">🗑️</button>
+                          <button onClick={async () => { if (window.confirm("Xóa đề \"" + q.title + "\"?\nCác kết quả thi trước sẽ bị mất liên kết.\nThao tác này không thể hoàn tác.")) { const { error: resErr } = await supabase.from("results").update({ quiz_id: null }).eq("quiz_id", q.id); if (resErr) console.error("results unlink err:", resErr.message); const { error } = await supabase.from("quizzes").delete().eq("id", q.id); if (error) { alert("Không thể xóa đề: " + error.message); return; } updQuizzes(quizzes.filter(x => x.id !== q.id)); } }} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }} title="Xóa">🗑️</button>
                         </div>
                         {att > 0 && pr !== null && (
                           <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
@@ -2708,8 +2769,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                 if (resData.error) throw new Error(resData.error);
                               } catch (err) { alert("Lỗi cập nhật mã NV: " + err.message); return; }
                             }
-                            const updated = accounts.map(x => x.id === a.id ? { ...x, name: formData.editName || a.name, empId: newEmpId, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", accRole: formData.editRole || a.accRole } : x);
-                            setAccounts(updated); accountsRef.current = updated; await DB.set("km-accounts", updated);
+                            const patch = { emp_id: newEmpId, name: formData.editName || a.name, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", acc_role: formData.editRole || a.accRole };
+                            const optimistic = accounts.map(x => x.id === a.id ? { ...x, empId: patch.emp_id, name: patch.name, dept: patch.dept, team: patch.team, accRole: patch.acc_role } : x);
+                            setAccounts(optimistic); accountsRef.current = optimistic;
+                            const { error: aeErr } = await supabase.from("profiles").update(patch).eq("id", a.id);
+                            if (aeErr) { console.error("admin account update error:", aeErr.message); setSaveStatus("error"); return; }
                             setSaveStatus("saved"); setFormData({});
                           }} style={{ ...btnG, fontSize: 11, padding: "6px 14px" }}>💾 Lưu thông tin</button>
                           <button onClick={async () => {
@@ -2737,13 +2801,19 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <button onClick={() => setFormData({ editAccId: formData.editAccId === a.id ? null : a.id })} style={{ padding: "6px 8px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }}>✏️</button>
                     {!isInactive ? <button onClick={async () => {
                       if (!window.confirm("Vô hiệu hóa tài khoản của " + a.name + "?\nNhân viên này sẽ không đăng nhập được nữa.")) return;
-                      const updated = accounts.map(x => x.id === a.id ? { ...x, status: "inactive", deactivatedAt: new Date().toISOString() } : x);
-                      setAccounts(updated); accountsRef.current = updated; await DB.set("km-accounts", updated); setSaveStatus("saved");
+                      const optimistic = accounts.map(x => x.id === a.id ? { ...x, status: "inactive", deactivatedAt: new Date().toISOString() } : x);
+                      setAccounts(optimistic); accountsRef.current = optimistic;
+                      const { error: daErr } = await supabase.from("profiles").update({ status: "inactive" }).eq("id", a.id);
+                      if (daErr) { console.error("deactivate error:", daErr.message); setSaveStatus("error"); return; }
+                      setSaveStatus("saved");
                     }} style={{ padding: "6px 8px", borderRadius: 6, background: `${C.red}22`, color: C.red, fontSize: 11, fontWeight: 600, border: "none" }}>🚫</button>
                       : <button onClick={async () => {
                         if (!window.confirm("Kích hoạt lại tài khoản của " + a.name + "?")) return;
-                        const updated = accounts.map(x => x.id === a.id ? { ...x, status: "active", deactivatedAt: null } : x);
-                        setAccounts(updated); accountsRef.current = updated; await DB.set("km-accounts", updated); setSaveStatus("saved");
+                        const optimistic = accounts.map(x => x.id === a.id ? { ...x, status: "active", deactivatedAt: null } : x);
+                        setAccounts(optimistic); accountsRef.current = optimistic;
+                        const { error: raErr } = await supabase.from("profiles").update({ status: "active" }).eq("id", a.id);
+                        if (raErr) { console.error("reactivate error:", raErr.message); setSaveStatus("error"); return; }
+                        setSaveStatus("saved");
                       }} style={{ padding: "6px 8px", borderRadius: 6, background: `${C.green}22`, color: C.green, fontSize: 11, fontWeight: 600, border: "none" }}>✅</button>}
                   </div>
                 </div>
@@ -2976,7 +3046,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                   <span style={{ fontSize: 14 }}>{done ? "✅" : "⬜"}</span>
                                   <span style={{ flex: 1, color: done ? C.green : "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: done ? 600 : 400 }}>{a.name} ({a.empId})</span>
                                   <span style={{ fontSize: 10, color: done ? C.green : "rgba(255,255,255,0.2)" }}>{done ? "Đã hoàn thành" : "Chưa thực hiện"}{done && ch.wonRewards && ch.wonRewards[a.id] ? <span style={{ color: C.purple }}>{" · 🎁 " + ch.wonRewards[a.id]}</span> : null}{done && ch.wonRewards && ch.wonRewards[a.id] && (
-                                    <button onClick={async (ev) => { ev.stopPropagation(); const delivered = { ...(ch.delivered || {}), [a.id]: !(ch.delivered || {})[a.id] }; const upd = challenges.map(c => c.id === ch.id ? { ...c, delivered } : c); setChallenges(upd); await DB.set("km-challenges", upd); if (delivered[a.id]) addNotif(a.id, "🎁 Phần thưởng '" + ch.wonRewards[a.id] + "' đã được trao! Thử thách: " + ch.title); }} style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: (ch.delivered || {})[a.id] ? `${C.green}22` : "rgba(255,255,255,0.06)", color: (ch.delivered || {})[a.id] ? C.green : "rgba(255,255,255,0.3)", border: `1px solid ${(ch.delivered || {})[a.id] ? C.green + "44" : C.border}`, cursor: "pointer" }}>{(ch.delivered || {})[a.id] ? "✅ Đã trao" : "☐ Trao thưởng"}</button>
+                                    <button onClick={async (ev) => { ev.stopPropagation(); const newDelivered = { ...(ch.delivered || {}), [a.id]: !(ch.delivered || {})[a.id] }; const upd = challenges.map(c => c.id === ch.id ? { ...c, delivered: newDelivered } : c); setChallenges(upd); const { error: dErr } = await supabase.from("challenges").update({ delivered: newDelivered }).eq("id", ch.id); if (dErr) console.error("delivered update error:", dErr.message); if (newDelivered[a.id]) addNotif(a.id, "🎁 Phần thưởng '" + ch.wonRewards[a.id] + "' đã được trao! Thử thách: " + ch.title); }} style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: (ch.delivered || {})[a.id] ? `${C.green}22` : "rgba(255,255,255,0.06)", color: (ch.delivered || {})[a.id] ? C.green : "rgba(255,255,255,0.3)", border: `1px solid ${(ch.delivered || {})[a.id] ? C.green + "44" : C.border}`, cursor: "pointer" }}>{(ch.delivered || {})[a.id] ? "✅ Đã trao" : "☐ Trao thưởng"}</button>
                                   )}</span>
                                 </div>
                               );
@@ -3073,7 +3143,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 const assigned = (p.assignedTo || []).map(id => accounts.find(a => a.id === id)).filter(Boolean);
                 const expanded = formData.pathExpand === p.id;
                 // Calc progress per user
-                const getUserProg = (m) => { let total = 0, done = 0; (p.stages || []).forEach(st => (st.modules || []).forEach(mod => { total++; const prog = (m.pathProgress || {})[p.id] || {}; const checkDone = (mod.checklist || []).length === 0 || (mod.checklist || []).every((_, ci) => (prog.checks || {})[mod.id + "_" + ci]); const quizDone = !mod.quizId || results.some(r => r.empId === m.id && r.quizId === mod.quizId && r.pct >= (mod.minScore || 70)); if (checkDone && quizDone) done++; })); return { total, done, pct: total > 0 ? Math.round(done / total * 100) : 0 }; };
+                const getUserProg = (m) => { let total = 0, done = 0; (p.stages || []).forEach(st => (st.modules || []).forEach(mod => { total++; const prog = (m.pathProgress || {})[p.id] || {}; const checkDone = (mod.checklist || []).length === 0 || (mod.checklist || []).every((_, ci) => (prog.checks || {})[mod.id + "_" + ci]); const quizFromResults = !mod.quizId || results.some(r => r.empId === m.id && r.quizId === mod.quizId && r.pct >= (mod.minScore || 70)); const quizFromProgress = !mod.quizId || ((prog.quizResults || {})[mod.quizId] && (prog.quizResults || {})[mod.quizId].passed && (prog.quizResults || {})[mod.quizId].pct >= (mod.minScore || 70)); const quizDone = quizFromResults || quizFromProgress; if (checkDone && quizDone) done++; })); return { total, done, pct: total > 0 ? Math.round(done / total * 100) : 0 }; };
                 const completedCount = assigned.filter(a => getUserProg(a).pct === 100).length;
                 return (
                   <div key={p.id} style={{ ...card }}>
@@ -3158,7 +3228,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               </div>
                               {/* Link quiz */}
                               <div style={{ marginBottom: 4 }}><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Bài kiểm tra (mở khóa tuần tự)</label>
-                                <select value={mod.quizId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], quizId: e.target.value, quizTitle: (() => { const _q = quizzes.find(q => q.id === e.target.value); return _q ? _q.title : ""; }) }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
+                                <select value={mod.quizId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], quizId: e.target.value, quizTitle: (() => { const _q = quizzes.find(q => q.id === e.target.value); return _q ? _q.title : ""; })() }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
                                   <option value="">— Không gắn đề —</option>{quizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
                                 </select>
                               </div>
@@ -4339,7 +4409,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
                     {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {settings.quizFreq - daysSince(last.date)} ngày</div>}
                   </div>
-                  <button onClick={() => canTake && startQuiz(q)} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
+                  <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
                 </div>
               );
             })}
@@ -4626,8 +4696,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               })()}
 
               <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                <button onClick={() => setScreen("emp_home")} style={btnG}>← Dashboard</button>
-                <button onClick={() => setScreen("emp_quizzes")} style={btnO}>Làm đề khác</button>
+                {quizPathContext && (
+                  <button onClick={() => { setScreen("emp_pathway"); setFormData({ ...formData, viewPathId: quizPathContext.pathId }); setQuizPathContext(null); }} style={btnG}>← Lộ trình: {quizPathContext.pathTitle}</button>
+                )}
+                <button onClick={() => { setQuizPathContext(null); setScreen("emp_home"); }} style={quizPathContext ? btnO : btnG}>← Dashboard</button>
+                <button onClick={() => { setQuizPathContext(null); setScreen("emp_quizzes"); }} style={btnO}>Làm đề khác</button>
               </div>
             </div>
           );
@@ -4692,7 +4765,10 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               const isModuleComplete = (pathId, mod) => {
                 const prog = getProgress()[pathId] || {};
                 const checkDone = (mod.checklist || []).length === 0 || (mod.checklist || []).every((_, i) => (prog.checks || {})[mod.id + "_" + i]);
-                const quizDone = !mod.quizId || results.some(r => r.empId === currentUser.id && r.quizId === mod.quizId && r.pct >= (mod.minScore || 70));
+                // Check quiz completion from results array OR from stored pathProgress
+                const quizFromResults = !mod.quizId || results.some(r => r.empId === currentUser.id && r.quizId === mod.quizId && r.pct >= (mod.minScore || 70));
+                const quizFromProgress = !mod.quizId || ((prog.quizResults || {})[mod.quizId] && (prog.quizResults || {})[mod.quizId].passed && (prog.quizResults || {})[mod.quizId].pct >= (mod.minScore || 70));
+                const quizDone = quizFromResults || quizFromProgress;
                 return checkDone && quizDone;
               };
               const getPathProgress = (p) => {
@@ -4769,7 +4845,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                       <div style={{ padding: "8px 12px", borderRadius: 8, background: quizPassed ? `${C.green}08` : "rgba(255,255,255,0.03)", border: `1px solid ${quizPassed ? C.green + "33" : C.border}`, marginBottom: 6 }}>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                           <div><div style={{ fontSize: 12, fontWeight: 600, color: quizPassed ? C.green : C.white }}>📝 {mod.quizTitle || (linkedQuiz && linkedQuiz.title) || "Bài kiểm tra"}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{"Cần đạt ≥" + (mod.minScore || 70) + "%"}{bestResult ? " · Tốt nhất: " + bestResult.pct + "%" : ""}</div></div>
-                                          {quizPassed ? <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>✅ Đạt</span> : linkedQuiz ? <button onClick={() => startQuiz(linkedQuiz)} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.gold}22`, color: C.gold, fontSize: 11, fontWeight: 700, border: `1px solid ${C.gold}44` }}>Làm bài →</button> : <span style={{ color: C.red, fontSize: 10 }}>Đề không tìm thấy</span>}
+                                          {quizPassed ? <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>✅ Đạt</span> : linkedQuiz ? <button onClick={() => { setQuizPathContext({ pathId: viewPath.id, pathTitle: viewPath.title }); startQuiz(linkedQuiz); }} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.gold}22`, color: C.gold, fontSize: 11, fontWeight: 700, border: `1px solid ${C.gold}44` }}>Làm bài →</button> : <span style={{ color: C.red, fontSize: 10 }}>Đề không tìm thấy</span>}
                                         </div>
                                       </div>
                                     )}
@@ -5273,7 +5349,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                             )}
                             {/* Action button */}
                             {linkedQuiz ? (
-                              <button onClick={() => startQuiz(linkedQuiz)} style={{ width: "100%", padding: "14px", borderRadius: 12, background: `linear-gradient(135deg,${C.gold},${C.goldL})`, color: C.dark, fontSize: 15, fontWeight: 800, border: "none" }}>📝 Làm kiểm tra ngay →</button>
+                              <button onClick={() => { setQuizPathContext(null); startQuiz(linkedQuiz); }} style={{ width: "100%", padding: "14px", borderRadius: 12, background: `linear-gradient(135deg,${C.gold},${C.goldL})`, color: C.dark, fontSize: 15, fontWeight: 800, border: "none" }}>📝 Làm kiểm tra ngay →</button>
                             ) : ch.quizId ? (
                               <div style={{ padding: 10, borderRadius: 8, background: `${C.orange}08`, color: C.orange, fontSize: 12, textAlign: "center" }}>Đề thi chưa sẵn sàng. Quay lại sau hoặc liên hệ Admin.</div>
                             ) : (
