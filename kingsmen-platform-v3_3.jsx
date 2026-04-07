@@ -2114,7 +2114,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   if (!name || !pw) { setFormData(Object.assign({}, formData, { loginErr: "Nhập tên và mật khẩu" })); return }
                   setFormData(Object.assign({}, formData, { loginLoading: true, loginErr: null }));
                   try {
-                    var { data: profileByName, error: nameErr } = await supabase.from("profiles").select("*").eq("name", name).single();
+                    var { data: profileByName, error: nameErr } = await supabase.from("profiles").select("*").ilike("name", name).single();
                     if (nameErr || !profileByName) { setFormData(Object.assign({}, formData, { loginErr: "Không tìm thấy tài khoản với tên này", loginLoading: false })); return }
                     if (profileByName.status === "inactive") { setFormData(Object.assign({}, formData, { loginErr: "Tài khoản đã bị vô hiệu hóa. Liên hệ Admin.", loginLoading: false })); return }
                     var email = profileByName.emp_id.toLowerCase() + "@kingsmen.internal";
