@@ -234,8 +234,8 @@ const supabase = createClient(
 // ─── Field mapping: DB (snake_case) ↔ App (camelCase) ───
 const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, accRole: r.acc_role, xp: r.xp || 0, streak: r.streak || 0, status: r.status, lastCheckIn: r.last_check_in || null, lastXpGainDate: r.last_xp_gain_date || null, checkIns: r.check_ins || [], readLessons: r.read_lessons || [], pathProgress: r.path_progress || {}, avatar: r.avatar || null, team: r.team || "" });
 const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
-const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, createdAt: r.created_at });
-const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
+const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, hidden: r.hidden || false, createdAt: r.created_at });
+const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null, hidden: q.hidden || false }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
 const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
 const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] }; if (k.createdAt) base.created_at = k.createdAt; return base; };
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
@@ -2673,13 +2673,14 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               {filteredQ.map(q => {
                 const att = totalAttempts(q), pr = passRate(q), avg = avgScore(q), last = lastUsed(q);
                 const isExpanded = formData.expandQ === q.id;
+                const isEditing = formData.editPanel === q.id;
                 const dc = diffColor[q.difficulty || "medium"] || C.gold;
                 return (
-                  <div key={q.id} style={{ ...card, padding: 0, overflow: "hidden", marginBottom: 10 }}>
+                  <div key={q.id} style={{ ...card, padding: 0, overflow: "hidden", marginBottom: 10, opacity: q.hidden ? 0.55 : 1 }}>
                     {/* Main row */}
                     <div style={{ padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-start" }}>
                       {/* Left: diff color bar */}
-                      <div style={{ width: 4, borderRadius: 2, background: dc, alignSelf: "stretch", flexShrink: 0 }} />
+                      <div style={{ width: 4, borderRadius: 2, background: q.hidden ? C.red : dc, alignSelf: "stretch", flexShrink: 0 }} />
                       {/* Info */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {/* Title row */}
@@ -2690,8 +2691,9 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                               onKeyDown={e => { if (e.key === "Enter" && (formData.editQTitle || "").trim()) { updQuizzes(quizzes.map(x => x.id === q.id ? { ...x, title: formData.editQTitle.trim() } : x)); setFormData({ ...formData, editQId: null, editQTitle: "" }); } if (e.key === "Escape") setFormData({ ...formData, editQId: null, editQTitle: "" }); }}
                               style={{ ...inp, flex: 1, padding: "5px 10px", fontSize: 14, fontWeight: 700 }} autoFocus />
                           ) : (
-                            <span style={{ color: C.white, fontWeight: 700, fontSize: 14, cursor: "pointer" }} onClick={() => setFormData({ ...formData, editQId: q.id, editQTitle: q.title })} title="Bấm để sửa tên">{q.title} ✏️</span>
+                            <span style={{ color: q.hidden ? "rgba(255,255,255,0.5)" : C.white, fontWeight: 700, fontSize: 14, cursor: "pointer" }} onClick={() => setFormData({ ...formData, editQId: q.id, editQTitle: q.title })} title="Bấm để sửa tên">{q.title} ✏️</span>
                           )}
+                          {q.hidden && <span style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, background: `${C.red}22`, color: C.red, fontWeight: 700 }}>🔒 Ẩn</span>}
                         </div>
                         {/* Tags row */}
                         <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 6 }}>
@@ -2713,6 +2715,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       {/* Actions */}
                       <div style={{ display: "flex", gap: 5, flexShrink: 0, flexDirection: "column", alignItems: "flex-end" }}>
                         <div style={{ display: "flex", gap: 4 }}>
+                          <button onClick={() => setFormData({ ...formData, editPanel: isEditing ? null : q.id, _editDepts: isEditing ? undefined : [...(q.depts || ["Tất cả"])], _editHidden: isEditing ? undefined : !!q.hidden })} style={{ padding: "5px 8px", borderRadius: 6, background: isEditing ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: isEditing ? C.teal : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: isEditing ? 700 : 500, border: `1px solid ${isEditing ? C.teal + "44" : C.border}` }} title="Sửa phòng ban / Ẩn hiện">⚙️ Sửa</button>
                           <button onClick={() => setFormData({ ...formData, expandQ: isExpanded ? null : q.id })} style={{ padding: "5px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", fontSize: 11, border: `1px solid ${C.border}` }} title="Xem câu hỏi">{isExpanded ? "▲ Ẩn" : "▼ Xem"}</button>
                           <button onClick={() => exportQuizCSV(q)} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }} title="Xuất CSV">📥</button>
                           <button onClick={() => { const txt = buildPrompt({ type: "quiz_from_knowledge", knowledgeItem: knowledge.find(x => x.id === q.knowledgeId) || { title: q.title, content: "" }, numQ: q.questions.length, difficulty: q.difficulty || "medium", quizType: q.quizType || "mc", quizTitle: q.title }); setPromptPanel({ text: txt, title: q.title }); setPromptCopied(false); }} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.gold}15`, color: C.gold, fontSize: 11, fontWeight: 600, border: "none" }} title="Tạo lại với Claude">📋</button>
@@ -2728,6 +2731,94 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         )}
                       </div>
                     </div>
+                    {/* ── Edit panel: dept reassignment + show/hide ── */}
+                    {isEditing && (() => {
+                      const editDepts = formData._editDepts || ["Tất cả"];
+                      const editHidden = formData._editHidden ?? false;
+                      const allDeptOpts = ["Tất cả", ...DEPTS];
+                      const toggleDept = (d) => {
+                        let nd;
+                        if (d === "Tất cả") { nd = ["Tất cả"]; }
+                        else {
+                          nd = editDepts.filter(x => x !== "Tất cả");
+                          nd = nd.includes(d) ? nd.filter(x => x !== d) : [...nd, d];
+                          if (nd.length === 0) nd = ["Tất cả"];
+                        }
+                        setFormData({ ...formData, _editDepts: nd });
+                      };
+                      const linkedCh = challenges.filter(c => c.quizId === q.id);
+                      const linkedPaths = paths.filter(p => (p.stages || []).some(s => (s.modules || []).some(m => m.quizId === q.id)));
+                      const saveQuizEdits = async () => {
+                        const updated = { ...q, depts: editDepts, hidden: editHidden };
+                        // 1. Save quiz
+                        updQuizzes(quizzes.map(x => x.id === q.id ? updated : x));
+                        // 2. Cascade to challenges: update quiz_title + deactivate if hidden
+                        for (const ch of linkedCh) {
+                          const upd = { quiz_title: updated.title };
+                          if (editHidden && ch.active) upd.active = false;
+                          const { error } = await supabase.from("challenges").update(upd).eq("id", ch.id);
+                          if (error) console.error("cascade challenge err:", error.message);
+                        }
+                        if (linkedCh.length > 0) {
+                          setChallenges(prev => prev.map(c => {
+                            if (c.quizId !== q.id) return c;
+                            const u = { ...c, quizTitle: updated.title };
+                            if (editHidden && c.active) u.active = false;
+                            return u;
+                          }));
+                        }
+                        // 3. Cascade to paths: update quizTitle in modules
+                        for (const p of linkedPaths) {
+                          const newStages = (p.stages || []).map(s => ({
+                            ...s, modules: (s.modules || []).map(m => m.quizId === q.id ? { ...m, quizTitle: updated.title } : m)
+                          }));
+                          const { error } = await supabase.from("paths").update({ stages: newStages }).eq("id", p.id);
+                          if (error) console.error("cascade path err:", error.message);
+                        }
+                        if (linkedPaths.length > 0) {
+                          setPaths(prev => prev.map(p => {
+                            if (!linkedPaths.some(lp => lp.id === p.id)) return p;
+                            return { ...p, stages: (p.stages || []).map(s => ({ ...s, modules: (s.modules || []).map(m => m.quizId === q.id ? { ...m, quizTitle: updated.title } : m) })) };
+                          }));
+                        }
+                        setFormData({ ...formData, editPanel: null, _editDepts: undefined, _editHidden: undefined });
+                        setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000);
+                      };
+                      return (
+                        <div style={{ borderTop: `1px solid ${C.teal}33`, padding: "14px 16px", background: `${C.teal}06` }}>
+                          <div style={{ fontSize: 12, color: C.teal, fontWeight: 700, marginBottom: 10 }}>⚙️ CHỈNH SỬA ĐỀ THI</div>
+                          {/* Show/Hide toggle */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Trạng thái:</span>
+                            <button onClick={() => setFormData({ ...formData, _editHidden: !editHidden })} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 700, background: editHidden ? `${C.red}22` : `${C.green}22`, color: editHidden ? C.red : C.green, border: `1px solid ${editHidden ? C.red + "44" : C.green + "44"}` }}>
+                              {editHidden ? "🔒 Đã ẩn — Nhân viên không thấy" : "👁 Hiển thị — Nhân viên thấy"}
+                            </button>
+                            {editHidden && linkedCh.filter(c => c.active).length > 0 && <span style={{ fontSize: 10, color: C.orange }}>⚠ {linkedCh.filter(c => c.active).length} thử thách sẽ bị tắt</span>}
+                          </div>
+                          {/* Dept multi-select */}
+                          <div style={{ marginBottom: 12 }}>
+                            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 6, display: "block" }}>📌 Phòng ban được thi:</span>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {allDeptOpts.map(d => {
+                                const sel = editDepts.includes(d);
+                                return <button key={d} onClick={() => toggleDept(d)} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: sel ? 700 : 500, background: sel ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: sel ? C.teal : "rgba(255,255,255,0.35)", border: `1px solid ${sel ? C.teal + "44" : C.border}` }}>{sel ? "✓ " : ""}{d}</button>;
+                              })}
+                            </div>
+                          </div>
+                          {/* Linked info */}
+                          {(linkedCh.length > 0 || linkedPaths.length > 0) && (
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
+                              Liên kết: {linkedCh.length > 0 && `${linkedCh.length} thử thách`}{linkedCh.length > 0 && linkedPaths.length > 0 && " · "}{linkedPaths.length > 0 && `${linkedPaths.length} lộ trình`} — sẽ được cập nhật cùng lúc
+                            </div>
+                          )}
+                          {/* Save / Cancel */}
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={saveQuizEdits} style={{ ...btnG, fontSize: 12, padding: "8px 20px" }}>💾 Lưu & Cập nhật</button>
+                            <button onClick={() => setFormData({ ...formData, editPanel: null, _editDepts: undefined, _editHidden: undefined })} style={{ ...btnO, fontSize: 12, padding: "8px 16px" }}>Hủy</button>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* Expanded: question list */}
                     {isExpanded && (
                       <div style={{ borderTop: `1px solid ${C.border}`, padding: "12px 16px", background: "rgba(0,0,0,0.15)" }}>
@@ -4645,7 +4736,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {role === "employee" && screen === "emp_quizzes" && (
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>✏️ Kiểm Tra</h2><button onClick={() => setScreen("emp_home")} style={btnO}>← Dashboard</button></div>
-            {quizzes.filter(q => visibleToDept(q, (currentUser || {}).dept)).map(q => {
+            {quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept)).map(q => {
               const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
               const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
               return (
@@ -4659,7 +4750,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 </div>
               );
             })}
-            {quizzes.filter(q => visibleToDept(q, (currentUser || {}).dept)).length === 0 && <Empty msg="Chưa có đề cho phòng ban của bạn." />}
+            {quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept)).length === 0 && <Empty msg="Chưa có đề cho phòng ban của bạn." />}
           </div>
         )}
 
