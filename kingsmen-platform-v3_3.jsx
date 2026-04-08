@@ -583,9 +583,9 @@ export default function App() {
 
       // Batch 1: Critical data — skip if cache is fresh
       const batch1 = [];
-      if (!cacheGet("accounts")) batch1.push(["accounts", DB.get("km-accounts", [], isAdmin)]);
-      if (!cacheGet("knowledge")) batch1.push(["knowledge", DB.get("km-knowledge", [], isAdmin)]);
-      if (!cacheGet("quizzes")) batch1.push(["quizzes", DB.get("km-quizzes", [], isAdmin)]);
+      if (!cacheGet("accounts")?.length) batch1.push(["accounts", DB.get("km-accounts", [], isAdmin)]);
+      if (!cacheGet("knowledge")?.length) batch1.push(["knowledge", DB.get("km-knowledge", [], isAdmin)]);
+      if (!cacheGet("quizzes")?.length) batch1.push(["quizzes", DB.get("km-quizzes", [], isAdmin)]);
       if (!cacheGet("settings")) batch1.push(["settings", DB.get("km-settings", null, isAdmin)]);
       if (batch1.length > 0) {
         const vals = await Promise.all(batch1.map(x => x[1]));
@@ -600,12 +600,12 @@ export default function App() {
 
       // Batch 2: Secondary data — skip if cache is fresh
       const batch2 = [];
-      if (!cacheGet("results")) batch2.push(["results", DB.get("km-results", [], isAdmin, user?.id)]);
-      if (!cacheGet("recognitions")) batch2.push(["recognitions", DB.get("km-recognitions", [], isAdmin)]);
-      if (!cacheGet("challenges")) batch2.push(["challenges", DB.get("km-challenges", [], isAdmin)]);
-      if (!cacheGet("notifications")) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
-      if (!cacheGet("paths")) batch2.push(["paths", DB.get("km-paths", [], isAdmin)]);
-      if (!cacheGet("bulletins")) batch2.push(["bulletins", DB.get("km-bulletins", [], isAdmin)]);
+      if (!cacheGet("results")?.length) batch2.push(["results", DB.get("km-results", [], isAdmin, user?.id)]);
+      if (!cacheGet("recognitions")?.length) batch2.push(["recognitions", DB.get("km-recognitions", [], isAdmin)]);
+      if (!cacheGet("challenges")?.length) batch2.push(["challenges", DB.get("km-challenges", [], isAdmin)]);
+      if (!cacheGet("notifications")?.length) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
+      if (!cacheGet("paths")?.length) batch2.push(["paths", DB.get("km-paths", [], isAdmin)]);
+      if (!cacheGet("bulletins")?.length) batch2.push(["bulletins", DB.get("km-bulletins", [], isAdmin)]);
       if (batch2.length > 0) {
         const vals = await Promise.all(batch2.map(x => x[1]));
         batch2.forEach(([key], i) => {
@@ -771,14 +771,14 @@ export default function App() {
         const isAdm = role === "admin";
         // Only fetch tables that this screen needs AND whose cache has expired
         const fetchers = {};
-        if (needed.includes("accounts") && !cacheGet("accounts")) fetchers.accounts = DB.get("km-accounts", []);
-        if (needed.includes("results") && !cacheGet("results")) fetchers.results = DB.get("km-results", [], isAdm, uid);
-        if (needed.includes("quizzes") && !cacheGet("quizzes")) fetchers.quizzes = DB.get("km-quizzes", []);
-        if (needed.includes("knowledge") && !cacheGet("knowledge")) fetchers.knowledge = DB.get("km-knowledge", []);
-        if (needed.includes("challenges") && !cacheGet("challenges")) fetchers.challenges = DB.get("km-challenges", []);
-        if (needed.includes("notifications") && !cacheGet("notifications")) fetchers.notifications = DB.get("km-notifications", []);
-        if (needed.includes("paths") && !cacheGet("paths")) fetchers.paths = DB.get("km-paths", []);
-        if (needed.includes("bulletins") && !cacheGet("bulletins")) fetchers.bulletins = DB.get("km-bulletins", []);
+        if (needed.includes("accounts") && !cacheGet("accounts")?.length) fetchers.accounts = DB.get("km-accounts", []);
+        if (needed.includes("results") && !cacheGet("results")?.length) fetchers.results = DB.get("km-results", [], isAdm, uid);
+        if (needed.includes("quizzes") && !cacheGet("quizzes")?.length) fetchers.quizzes = DB.get("km-quizzes", []);
+        if (needed.includes("knowledge") && !cacheGet("knowledge")?.length) fetchers.knowledge = DB.get("km-knowledge", []);
+        if (needed.includes("challenges") && !cacheGet("challenges")?.length) fetchers.challenges = DB.get("km-challenges", []);
+        if (needed.includes("notifications") && !cacheGet("notifications")?.length) fetchers.notifications = DB.get("km-notifications", []);
+        if (needed.includes("paths") && !cacheGet("paths")?.length) fetchers.paths = DB.get("km-paths", []);
+        if (needed.includes("bulletins") && !cacheGet("bulletins")?.length) fetchers.bulletins = DB.get("km-bulletins", []);
         const keys = Object.keys(fetchers);
         if (keys.length === 0) return; // all caches fresh — skip entirely
         const vals = await Promise.all(keys.map(k => fetchers[k]));
@@ -2138,6 +2138,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
               { i: "🏆", t: "HẠNG", s: "emp_ranking" },
               { i: "🎯", t: "THÁCH", s: "emp_challenges" },
+              { i: "📋", t: "LỘ TRÌNH", s: "emp_pathway" },
               { i: "🧠", t: "NLỰC", s: "emp_competency" },
               { i: "📢", t: "TIN", s: "emp_bulletins" },
             ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44 }}>{m.i + " " + m.t}</button> })}
