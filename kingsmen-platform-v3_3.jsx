@@ -703,7 +703,7 @@ export default function App() {
     }
     // Decay 2: không tăng XP (mở app nhưng không học)
     let idleMsg = "";
-    const lastGain = user.lastXpGainDate || user.lastCheckIn || t;
+    const lastGain = user.lastXpGainDate || t;
     const idleThreshold = settings.idleDays || 7;
     const idlePenalty = settings.idleXP || 15;
     if (lastGain) {
@@ -716,14 +716,15 @@ export default function App() {
       }
     }
     const newXp = Math.max(0, (user.xp || 0) + xpChange);
-    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: [...(user.checkIns || []), t].slice(-90) };
+    const newLastXpGainDate = xpChange > 0 ? t : (user.lastXpGainDate || null);
+    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, lastXpGainDate: newLastXpGainDate, checkIns: [...(user.checkIns || []), t].slice(-90) };
     // Optimistic local update
     setAccounts(prev => { const u = prev.map(a => a.id === user.id ? updated : a); accountsRef.current = u; return u; });
     // Atomic XP via RPC + single-row update for checkin fields — no full-array upsert
     const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: user.id, p_amount: xpChange, p_date: today() });
     if (xpErr) console.error("doCheckIn XP RPC error:", xpErr.message);
     const { error: ciErr } = await supabase.from("profiles").update({
-      last_check_in: t, streak: newStreak, check_ins: [...(user.checkIns || []), t].slice(-90)
+      last_check_in: t, streak: newStreak, check_ins: [...(user.checkIns || []), t].slice(-90), last_xp_gain_date: newLastXpGainDate
     }).eq("id", user.id);
     if (ciErr) console.error("doCheckIn update error:", ciErr.message);
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
