@@ -1079,12 +1079,13 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
       sc = mcPts + essayPts; pct = total > 0 ? Math.round(sc / total * 100) : 0;
     }
     const _essayData = hasEssay && typeof essayGradingResults !== "undefined" ? { results: essayGradingResults, answers: Object.fromEntries(qs.map((q, i) => q.type === "essay" ? [i, (answers[i] && answers[i].selected) || ""] : null).filter(Boolean)) } : null;
-    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= settings.passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData };
+    const _passScore = settings.passScore || 70;
+    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= _passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData };
     // Direct insert — concurrent-safe, no full-array overwrite
     setResults(prev => [...prev, result]);
     const { error: resErr } = await supabase.from("results").insert([resultToSnake(result)]);
     if (resErr) console.error("finishQuiz result insert error:", resErr.message);
-    let xp = sc * settings.xpCorrect; if (pct >= settings.passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
+    let xp = sc * settings.xpCorrect; if (pct >= _passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
     let wonRewardData = null;
@@ -1131,7 +1132,7 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     if (quizPathContext && quizPathContext.pathId) {
       const pathId = quizPathContext.pathId;
       const existingProg = updatedPathProgress[pathId] || {};
-      const quizRecord = { ...(existingProg.quizResults || {}), [activeQuiz.id]: { passed: pct >= settings.passScore, pct, date: new Date().toISOString() } };
+      const quizRecord = { ...(existingProg.quizResults || {}), [activeQuiz.id]: { passed: pct >= _passScore, pct, date: new Date().toISOString() } };
       updatedPathProgress = { ...updatedPathProgress, [pathId]: { ...existingProg, quizResults: quizRecord } };
     }
     // Atomic XP increment via RPC — no read-modify-write race across concurrent users
@@ -1815,9 +1816,8 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Google Sans','Be Vietnam Pro',sans-serif", overflowX: "hidden" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Google+Sans:wght@400;500;600;700&display=swap');
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Be Vietnam Pro',sans-serif", overflowX: "hidden" }}>
+      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes toastSlideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes glowPulse{0%,100%{opacity:0.4;transform:translate(-50%,-50%) scale(1)}50%{opacity:0.7;transform:translate(-50%,-50%) scale(1.1)}}
@@ -3053,7 +3053,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.quizTitle}</div>
                         <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{r.score}/{r.total} câu · {fmtTime(r.time)} · {fmtDate(r.date)}</div>
                       </div>
-                      <span style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, flexShrink: 0, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "CHƯA ĐẠT"}</span>
+                      <span style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, flexShrink: 0, background: r.pct >= (settings.passScore || 70) ? `${C.green}18` : `${C.red}18`, color: r.pct >= (settings.passScore || 70) ? C.green : C.red }}>{r.pct >= (settings.passScore || 70) ? "ĐẠT" : "CHƯA ĐẠT"}</span>
                     </div>
                   ))}
                 </div>
@@ -3224,7 +3224,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: `${getRating(r.pct).color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: getRating(r.pct).color }}>{r.pct}%</div>
                         <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 12, fontWeight: 600 }}>{r.quizTitle}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 10 }}>{r.score}/{r.total} · {fmtDate(r.date)}</div></div>
-                        <span style={{ padding: "5px 10px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "X"}</span>
+                        <span style={{ padding: "5px 10px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: r.pct >= (settings.passScore || 70) ? `${C.green}18` : `${C.red}18`, color: r.pct >= (settings.passScore || 70) ? C.green : C.red }}>{r.pct >= (settings.passScore || 70) ? "ĐẠT" : "X"}</span>
                       </div>
                     ))}
                     {myR.length === 0 && <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, textAlign: "center", padding: 12 }}>Chưa có kết quả</div>}
@@ -3647,6 +3647,41 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 13 }}>{a.name}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{a.dept} · {a.lastCheckIn ? `${daysSince(a.lastCheckIn)} ngày trước` : "Chưa bao giờ đăng nhập"}</div></div>
                   </div>
                 ))}
+            </div>
+            {/* Old notifications cleanup */}
+            <div style={card}>
+              <div style={{ fontSize: 13, color: C.white, fontWeight: 700, marginBottom: 8 }}>🗑️ DỌN DẸP THÔNG BÁO CŨ</div>
+              {(() => {
+                const cutoff = "2026-04-01";
+                const oldCount = notifications.filter(n => n.date < cutoff).length;
+                return <>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>
+                    {oldCount > 0 ? `${oldCount} thông báo trước ngày 01/04/2026` : "Không có thông báo cũ nào trước ngày 01/04/2026"}
+                  </div>
+                  {oldCount > 0 && (
+                    formData._confirmDelNotif ? (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={async () => {
+                          const { error } = await supabase.from("notifications").delete().lt("created_at", cutoff);
+                          if (!error) {
+                            const kept = notifications.filter(n => n.date >= cutoff);
+                            setNotifications(kept);
+                            cacheSet("notifications", kept);
+                            setSaveStatus("saved");
+                            setTimeout(() => setSaveStatus(""), 2000);
+                          }
+                          setFormData({ ...formData, _confirmDelNotif: false });
+                        }} style={{ padding: "8px 16px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>✅ Xác nhận xóa {oldCount} thông báo</button>
+                        <button onClick={() => setFormData({ ...formData, _confirmDelNotif: false })} style={btnO}>Hủy</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setFormData({ ...formData, _confirmDelNotif: true })} style={{ padding: "8px 16px", borderRadius: 8, background: C.red + "22", color: C.red, fontSize: 12, fontWeight: 700, border: `1px solid ${C.red}44` }}>
+                        Xóa {oldCount} thông báo cũ
+                      </button>
+                    )
+                  )}
+                </>;
+              })()}
             </div>
           </div>
         )}
@@ -5057,7 +5092,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <div key={r.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 44, height: 44, borderRadius: 10, background: `${getRating(r.pct).color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: getRating(r.pct).color, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{r.pct}%</div>
                   <div style={{ flex: 1 }}><div style={{ color: C.white, fontWeight: 600, fontSize: 13 }}>{r.quizTitle}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{r.score}/{r.total} · {fmtTime(r.time)} · {fmtDate(r.date)}</div></div>
-                  <span style={{ padding: "5px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "CHƯA ĐẠT"}</span>
+                  <span style={{ padding: "5px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: r.pct >= (settings.passScore || 70) ? `${C.green}18` : `${C.red}18`, color: r.pct >= (settings.passScore || 70) ? C.green : C.red }}>{r.pct >= (settings.passScore || 70) ? "ĐẠT" : "CHƯA ĐẠT"}</span>
                 </div>
               ))}
           </div>
