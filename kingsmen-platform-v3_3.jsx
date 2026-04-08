@@ -467,7 +467,7 @@ export default function App() {
     }
     return () => { if (formStatusTimerRef.current) clearTimeout(formStatusTimerRef.current); };
   }, [formData._upSt, formData.docMsg, formData._impLessonStatus, formData.editPwMsg, formData.pwErr, formData.recMsg]);
-  const qTimerRef = useRef(null); const qAnswersRef = useRef({}); const topRef = useRef(null);
+  const qTimerRef = useRef(null); const qAnswersRef = useRef({}); const topRef = useRef(null); const finishingRef = useRef(false);
   const accountsRef = useRef([]);
   const lastAutoReloadRef = useRef(0); // tracks last auto-reload timestamp for throttling
   // Essay grading state
@@ -1011,7 +1011,7 @@ ${content}`);
   };
 
   // Quiz logic
-  const startQuiz = (quiz) => { const s = { ...quiz, questions: shuffle(quiz.questions) }; setActiveQuiz(s); setQIdx(0); setQAnswers({}); qAnswersRef.current = {}; setQSel(null); setQShowExp(false); setQTimer(quiz.timeLimit || quiz.questions.length * 90); setQActive(true); setEssayGrading(false); setEssayResults([]); setEssayDraft(""); setScreen("emp_quiz_play"); };
+  const startQuiz = (quiz) => { const s = { ...quiz, questions: shuffle(quiz.questions) }; setActiveQuiz(s); setQIdx(0); setQAnswers({}); qAnswersRef.current = {}; finishingRef.current = false; setQSel(null); setQShowExp(false); setQTimer(quiz.timeLimit || quiz.questions.length * 90); setQActive(true); setEssayGrading(false); setEssayResults([]); setEssayDraft(""); setScreen("emp_quiz_play"); };
   const answerQ = (val) => { if (qShowExp) return; setQSel(val); setQShowExp(true); const q = activeQuiz.questions[qIdx]; const correct = val === Number(q.ans); const newA = { ...qAnswersRef.current, [qIdx]: { selected: val, correct } }; setQAnswers(newA); qAnswersRef.current = newA; };
   const nextQ = () => {
     const q = activeQuiz.questions[qIdx];
@@ -1026,6 +1026,8 @@ ${content}`);
     else finishQuiz();
   };
   const finishQuiz = async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     setQActive(false); clearInterval(qTimerRef.current);
     const answers = qAnswersRef.current, qs = activeQuiz.questions;
     const hasEssay = qs.some(q => q.type === "essay");
