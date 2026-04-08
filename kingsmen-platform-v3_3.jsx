@@ -4129,7 +4129,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 { i: "🏆", t: "Xếp Hạng", d: "Toàn công ty", s: "emp_ranking" },
                 { i: "🎖️", t: "Huy Hiệu", d: `${getUserBadges(currentUser).length}/${BADGES.length}`, s: "emp_badges" },
                 { i: "🎯", t: "Thử Thách", d: `${challenges.filter(ch => challengeVisibleTo(ch, currentUser)).length} thử thách`, s: "emp_challenges" },
-                { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => { const assigned = (p.assignedTo || []).includes(currentUser.id); const hasProgress = !!(currentUser.pathProgress || {})[p.id]; const myQuizIds = results.filter(r => r.empId === currentUser.id).map(r => r.quizId); const hasQuizResult = (p.stages || []).some(st => (st.modules || []).some(m => m.quizId && myQuizIds.includes(m.quizId))); const deptMatch = p.dept && p.dept === currentUser.dept; return assigned || hasProgress || hasQuizResult || deptMatch; }).length} lộ trình`, s: "emp_pathway" },
+                { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => { const assigned = (p.assignedTo || []).includes(currentUser.id); const hasProgress = !!(currentUser.pathProgress || {})[p.id]; const deptMatch = p.dept && p.dept === currentUser.dept; return assigned || hasProgress || deptMatch; }).length} lộ trình`, s: "emp_pathway" },
                 { i: "📢", t: "Bảng Tin", d: `${bulletins.length} bài đăng`, s: "emp_bulletins" },
                 ...(currentUser.accRole === "director" ? [
                   { i: "📢", t: "Tạo Bảng Tin", d: "Đăng thông báo/chính sách", s: "dir_bulletins" },
@@ -5133,13 +5133,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <button onClick={() => { setScreen("emp_home"); setFormData({ ...formData, viewPathId: null }); }} style={btnO}>← Dashboard</button>
             </div>
             {(() => {
-              const myQuizIds = results.filter(r => r.empId === currentUser.id).map(r => r.quizId);
               const myPaths = paths.filter(p => {
                 const assigned = (p.assignedTo || []).includes(currentUser.id);
                 const hasProgress = !!(currentUser.pathProgress || {})[p.id];
-                const hasQuizResult = (p.stages || []).some(st => (st.modules || []).some(m => m.quizId && myQuizIds.includes(m.quizId)));
                 const deptMatch = p.dept && p.dept === currentUser.dept;
-                return assigned || hasProgress || hasQuizResult || deptMatch;
+                return assigned || hasProgress || deptMatch;
               });
               if (myPaths.length === 0) return <Empty msg="Chưa có lộ trình nào." />;
               const viewId = formData.viewPathId;
