@@ -639,13 +639,21 @@ export default function App() {
   const updPaths = (d) => { setPaths(d); save("km-paths", d); };
   const updSettings = (d) => { setSettings(d); save("km-settings", d); };
 
+  const rpcWithRetry = async (fn, retries = 3, delayMs = 1000) => {
+    for (let i = 0; i < retries; i++) {
+      const { error } = await fn();
+      if (!error) return null;
+      if (i < retries - 1) await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+      else return error;
+    }
+  };
   const addXP = async (userId, amount) => {
     // Optimistic local update
     setAccounts(prev => { const u = prev.map(a => a.id === userId ? { ...a, xp: Math.max(0, (a.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : a.lastXpGainDate } : a); accountsRef.current = u; return u; });
     if (currentUser && currentUser.id === userId) setCurrentUser(prev => ({ ...prev, xp: Math.max(0, (prev.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : prev.lastXpGainDate }));
-    // Atomic DB increment — no read-modify-write race
-    const { error } = await supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() });
-    if (error) { console.error("addXP RPC error:", error.message); if (currentUser && currentUser.id === userId) addNotif(userId, "⚠️ Lỗi cập nhật XP. Vui lòng liên hệ Admin.", "error"); }
+    // Atomic DB increment with retry — no read-modify-write race
+    const error = await rpcWithRetry(() => supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() }));
+    if (error) { console.error("addXP RPC error:", error.message); if (currentUser && currentUser.id === userId) addNotif(userId, "⚠️ Lỗi cập nhật XP sau 3 lần thử. Vui lòng liên hệ Admin.", "error"); }
   };
   const addNotif = async (empId, msg, type = "info") => {
     const row = { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false };
@@ -732,12 +740,12 @@ export default function App() {
     // Optimistic local update
     setAccounts(prev => { const u = prev.map(a => a.id === user.id ? updated : a); accountsRef.current = u; return u; });
     // Atomic XP via RPC + single-row update for checkin fields — no full-array upsert
-    const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: user.id, p_amount: xpChange, p_date: today() });
-    if (xpErr) { console.error("doCheckIn XP RPC error:", xpErr.message); addNotif(user.id, "⚠️ Lỗi cập nhật XP điểm danh. Vui lòng liên hệ Admin.", "error"); }
-    const { error: ciErr } = await supabase.from("profiles").update({
+    const xpErr = await rpcWithRetry(() => supabase.rpc("increment_xp", { p_user_id: user.id, p_amount: xpChange, p_date: today() }));
+    if (xpErr) { console.error("doCheckIn XP RPC error:", xpErr.message); addNotif(user.id, "⚠️ Lỗi cập nhật XP điểm danh sau 3 lần thử. Vui lòng liên hệ Admin.", "error"); }
+    const ciErr = await rpcWithRetry(() => supabase.from("profiles").update({
       last_check_in: t, streak: newStreak, check_ins: [...(user.checkIns || []), t].slice(-90), last_xp_gain_date: newLastXpGainDate
-    }).eq("id", user.id);
-    if (ciErr) { console.error("doCheckIn update error:", ciErr.message); addNotif(user.id, "⚠️ Lỗi lưu dữ liệu điểm danh. Vui lòng liên hệ Admin.", "error"); }
+    }).eq("id", user.id));
+    if (ciErr) { console.error("doCheckIn update error:", ciErr.message); addNotif(user.id, "⚠️ Lỗi lưu dữ liệu điểm danh sau 3 lần thử. Vui lòng liên hệ Admin.", "error"); }
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
     if (idleMsg) addNotif(user.id, idleMsg, "decay");
     return updated;
@@ -1150,8 +1158,8 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     }
     // Atomic XP increment via RPC — no read-modify-write race across concurrent users
     const newXpValue = (currentUser.xp || 0) + xp;
-    const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: currentUser.id, p_amount: xp, p_date: today() });
-    if (xpErr) { console.error("finishQuiz XP RPC error:", xpErr.message); addNotif(currentUser.id, "⚠️ Lỗi cập nhật XP. Vui lòng liên hệ Admin.", "error"); }
+    const xpErr = await rpcWithRetry(() => supabase.rpc("increment_xp", { p_user_id: currentUser.id, p_amount: xp, p_date: today() }));
+    if (xpErr) { console.error("finishQuiz XP RPC error:", xpErr.message); addNotif(currentUser.id, "⚠️ Lỗi cập nhật XP sau 3 lần thử. Vui lòng liên hệ Admin.", "error"); }
     // Atomic path progress merge — no JSON overwrite race
     if (quizPathContext && quizPathContext.pathId) {
       const pathPatch = { [quizPathContext.pathId]: updatedPathProgress[quizPathContext.pathId] };
