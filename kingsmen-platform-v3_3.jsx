@@ -583,9 +583,9 @@ export default function App() {
 
       // Batch 1: Critical data — skip if cache is fresh
       const batch1 = [];
-      if (!cacheGet("accounts")) batch1.push(["accounts", DB.get("km-accounts", [], isAdmin)]);
-      if (!cacheGet("knowledge")) batch1.push(["knowledge", DB.get("km-knowledge", [], isAdmin)]);
-      if (!cacheGet("quizzes")) batch1.push(["quizzes", DB.get("km-quizzes", [], isAdmin)]);
+      if (!cacheGet("accounts")?.length) batch1.push(["accounts", DB.get("km-accounts", [], isAdmin)]);
+      if (!cacheGet("knowledge")?.length) batch1.push(["knowledge", DB.get("km-knowledge", [], isAdmin)]);
+      if (!cacheGet("quizzes")?.length) batch1.push(["quizzes", DB.get("km-quizzes", [], isAdmin)]);
       if (!cacheGet("settings")) batch1.push(["settings", DB.get("km-settings", null, isAdmin)]);
       if (batch1.length > 0) {
         const vals = await Promise.all(batch1.map(x => x[1]));
@@ -600,12 +600,12 @@ export default function App() {
 
       // Batch 2: Secondary data — skip if cache is fresh
       const batch2 = [];
-      if (!cacheGet("results")) batch2.push(["results", DB.get("km-results", [], isAdmin, user?.id)]);
-      if (!cacheGet("recognitions")) batch2.push(["recognitions", DB.get("km-recognitions", [], isAdmin)]);
-      if (!cacheGet("challenges")) batch2.push(["challenges", DB.get("km-challenges", [], isAdmin)]);
-      if (!cacheGet("notifications")) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
-      if (!cacheGet("paths")) batch2.push(["paths", DB.get("km-paths", [], isAdmin)]);
-      if (!cacheGet("bulletins")) batch2.push(["bulletins", DB.get("km-bulletins", [], isAdmin)]);
+      if (!cacheGet("results")?.length) batch2.push(["results", DB.get("km-results", [], isAdmin, user?.id)]);
+      if (!cacheGet("recognitions")?.length) batch2.push(["recognitions", DB.get("km-recognitions", [], isAdmin)]);
+      if (!cacheGet("challenges")?.length) batch2.push(["challenges", DB.get("km-challenges", [], isAdmin)]);
+      if (!cacheGet("notifications")?.length) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
+      if (!cacheGet("paths")?.length) batch2.push(["paths", DB.get("km-paths", [], isAdmin)]);
+      if (!cacheGet("bulletins")?.length) batch2.push(["bulletins", DB.get("km-bulletins", [], isAdmin)]);
       if (batch2.length > 0) {
         const vals = await Promise.all(batch2.map(x => x[1]));
         batch2.forEach(([key], i) => {
@@ -714,7 +714,7 @@ export default function App() {
     }
     // Decay 2: không tăng XP (mở app nhưng không học)
     let idleMsg = "";
-    const lastGain = user.lastXpGainDate || user.lastCheckIn || t;
+    const lastGain = user.lastXpGainDate || t;
     const idleThreshold = settings.idleDays || 7;
     const idlePenalty = settings.idleXP || 15;
     if (lastGain) {
@@ -727,14 +727,15 @@ export default function App() {
       }
     }
     const newXp = Math.max(0, (user.xp || 0) + xpChange);
-    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, checkIns: [...(user.checkIns || []), t].slice(-90) };
+    const newLastXpGainDate = xpChange > 0 ? t : (user.lastXpGainDate || null);
+    const updated = { ...user, lastCheckIn: t, streak: newStreak, xp: newXp, lastXpGainDate: newLastXpGainDate, checkIns: [...(user.checkIns || []), t].slice(-90) };
     // Optimistic local update
     setAccounts(prev => { const u = prev.map(a => a.id === user.id ? updated : a); accountsRef.current = u; return u; });
     // Atomic XP via RPC + single-row update for checkin fields — no full-array upsert
     const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: user.id, p_amount: xpChange, p_date: today() });
     if (xpErr) console.error("doCheckIn XP RPC error:", xpErr.message);
     const { error: ciErr } = await supabase.from("profiles").update({
-      last_check_in: t, streak: newStreak, check_ins: [...(user.checkIns || []), t].slice(-90)
+      last_check_in: t, streak: newStreak, check_ins: [...(user.checkIns || []), t].slice(-90), last_xp_gain_date: newLastXpGainDate
     }).eq("id", user.id);
     if (ciErr) console.error("doCheckIn update error:", ciErr.message);
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
@@ -782,14 +783,14 @@ export default function App() {
         const isAdm = role === "admin";
         // Only fetch tables that this screen needs AND whose cache has expired
         const fetchers = {};
-        if (needed.includes("accounts") && !cacheGet("accounts")) fetchers.accounts = DB.get("km-accounts", []);
-        if (needed.includes("results") && !cacheGet("results")) fetchers.results = DB.get("km-results", [], isAdm, uid);
-        if (needed.includes("quizzes") && !cacheGet("quizzes")) fetchers.quizzes = DB.get("km-quizzes", []);
-        if (needed.includes("knowledge") && !cacheGet("knowledge")) fetchers.knowledge = DB.get("km-knowledge", []);
-        if (needed.includes("challenges") && !cacheGet("challenges")) fetchers.challenges = DB.get("km-challenges", []);
-        if (needed.includes("notifications") && !cacheGet("notifications")) fetchers.notifications = DB.get("km-notifications", []);
-        if (needed.includes("paths") && !cacheGet("paths")) fetchers.paths = DB.get("km-paths", []);
-        if (needed.includes("bulletins") && !cacheGet("bulletins")) fetchers.bulletins = DB.get("km-bulletins", []);
+        if (needed.includes("accounts") && !cacheGet("accounts")?.length) fetchers.accounts = DB.get("km-accounts", []);
+        if (needed.includes("results") && !cacheGet("results")?.length) fetchers.results = DB.get("km-results", [], isAdm, uid);
+        if (needed.includes("quizzes") && !cacheGet("quizzes")?.length) fetchers.quizzes = DB.get("km-quizzes", []);
+        if (needed.includes("knowledge") && !cacheGet("knowledge")?.length) fetchers.knowledge = DB.get("km-knowledge", []);
+        if (needed.includes("challenges") && !cacheGet("challenges")?.length) fetchers.challenges = DB.get("km-challenges", []);
+        if (needed.includes("notifications") && !cacheGet("notifications")?.length) fetchers.notifications = DB.get("km-notifications", []);
+        if (needed.includes("paths") && !cacheGet("paths")?.length) fetchers.paths = DB.get("km-paths", []);
+        if (needed.includes("bulletins") && !cacheGet("bulletins")?.length) fetchers.bulletins = DB.get("km-bulletins", []);
         const keys = Object.keys(fetchers);
         if (keys.length === 0) return; // all caches fresh — skip entirely
         const vals = await Promise.all(keys.map(k => fetchers[k]));
@@ -1090,12 +1091,13 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
       sc = mcPts + essayPts; pct = total > 0 ? Math.round(sc / total * 100) : 0;
     }
     const _essayData = hasEssay && typeof essayGradingResults !== "undefined" ? { results: essayGradingResults, answers: Object.fromEntries(qs.map((q, i) => q.type === "essay" ? [i, (answers[i] && answers[i].selected) || ""] : null).filter(Boolean)) } : null;
-    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= settings.passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData };
+    const _passScore = settings.passScore || 70;
+    const result = { id: uid(), empId: currentUser.id, empName: currentUser.name, quizId: activeQuiz.id, quizTitle: activeQuiz.title, score: sc, total, pct, passed: pct >= _passScore, time: (activeQuiz.timeLimit || total * 90) - qTimer, date: new Date().toISOString(), dept: currentUser.dept, quizType: activeQuiz.quizType || "mc", essayData: _essayData };
     // Direct insert — concurrent-safe, no full-array overwrite
     setResults(prev => [...prev, result]);
     const { error: resErr } = await supabase.from("results").insert([resultToSnake(result)]);
     if (resErr) console.error("finishQuiz result insert error:", resErr.message);
-    let xp = sc * settings.xpCorrect; if (pct >= settings.passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
+    let xp = sc * settings.xpCorrect; if (pct >= _passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
     let wonRewardData = null;
@@ -1142,7 +1144,7 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     if (quizPathContext && quizPathContext.pathId) {
       const pathId = quizPathContext.pathId;
       const existingProg = updatedPathProgress[pathId] || {};
-      const quizRecord = { ...(existingProg.quizResults || {}), [activeQuiz.id]: { passed: pct >= settings.passScore, pct, date: new Date().toISOString() } };
+      const quizRecord = { ...(existingProg.quizResults || {}), [activeQuiz.id]: { passed: pct >= _passScore, pct, date: new Date().toISOString() } };
       updatedPathProgress = { ...updatedPathProgress, [pathId]: { ...existingProg, quizResults: quizRecord } };
     }
     // Atomic XP increment via RPC — no read-modify-write race across concurrent users
@@ -1826,9 +1828,8 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Google Sans','Be Vietnam Pro',sans-serif", overflowX: "hidden" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Google+Sans:wght@400;500;600;700&display=swap');
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg,#0f2d3a,#1A3A4A)`, fontFamily: "'Be Vietnam Pro',sans-serif", overflowX: "hidden" }}>
+      <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes toastSlideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes glowPulse{0%,100%{opacity:0.4;transform:translate(-50%,-50%) scale(1)}50%{opacity:0.7;transform:translate(-50%,-50%) scale(1.1)}}
@@ -2149,6 +2150,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
               { i: "🏆", t: "HẠNG", s: "emp_ranking" },
               { i: "🎯", t: "THÁCH", s: "emp_challenges" },
+              { i: "📋", t: "LỘ TRÌNH", s: "emp_pathway" },
               { i: "🧠", t: "NLỰC", s: "emp_competency" },
               { i: "📢", t: "TIN", s: "emp_bulletins" },
             ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44 }}>{m.i + " " + m.t}</button> })}
@@ -3063,7 +3065,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         <div style={{ color: C.white, fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.quizTitle}</div>
                         <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{r.score}/{r.total} câu · {fmtTime(r.time)} · {fmtDate(r.date)}</div>
                       </div>
-                      <span style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, flexShrink: 0, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "CHƯA ĐẠT"}</span>
+                      <span style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, flexShrink: 0, background: r.pct >= (settings.passScore || 70) ? `${C.green}18` : `${C.red}18`, color: r.pct >= (settings.passScore || 70) ? C.green : C.red }}>{r.pct >= (settings.passScore || 70) ? "ĐẠT" : "CHƯA ĐẠT"}</span>
                     </div>
                   ))}
                 </div>
@@ -3234,7 +3236,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: `${getRating(r.pct).color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: getRating(r.pct).color }}>{r.pct}%</div>
                         <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 12, fontWeight: 600 }}>{r.quizTitle}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 10 }}>{r.score}/{r.total} · {fmtDate(r.date)}</div></div>
-                        <span style={{ padding: "5px 10px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "X"}</span>
+                        <span style={{ padding: "5px 10px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: r.pct >= (settings.passScore || 70) ? `${C.green}18` : `${C.red}18`, color: r.pct >= (settings.passScore || 70) ? C.green : C.red }}>{r.pct >= (settings.passScore || 70) ? "ĐẠT" : "X"}</span>
                       </div>
                     ))}
                     {myR.length === 0 && <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, textAlign: "center", padding: 12 }}>Chưa có kết quả</div>}
@@ -3657,6 +3659,41 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ flex: 1 }}><div style={{ color: C.white, fontSize: 13 }}>{a.name}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{a.dept} · {a.lastCheckIn ? `${daysSince(a.lastCheckIn)} ngày trước` : "Chưa bao giờ đăng nhập"}</div></div>
                   </div>
                 ))}
+            </div>
+            {/* Old notifications cleanup */}
+            <div style={card}>
+              <div style={{ fontSize: 13, color: C.white, fontWeight: 700, marginBottom: 8 }}>🗑️ DỌN DẸP THÔNG BÁO CŨ</div>
+              {(() => {
+                const cutoff = "2026-04-01";
+                const oldCount = notifications.filter(n => n.date < cutoff).length;
+                return <>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>
+                    {oldCount > 0 ? `${oldCount} thông báo trước ngày 01/04/2026` : "Không có thông báo cũ nào trước ngày 01/04/2026"}
+                  </div>
+                  {oldCount > 0 && (
+                    formData._confirmDelNotif ? (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={async () => {
+                          const { error } = await supabase.from("notifications").delete().lt("created_at", cutoff);
+                          if (!error) {
+                            const kept = notifications.filter(n => n.date >= cutoff);
+                            setNotifications(kept);
+                            cacheSet("notifications", kept);
+                            setSaveStatus("saved");
+                            setTimeout(() => setSaveStatus(""), 2000);
+                          }
+                          setFormData({ ...formData, _confirmDelNotif: false });
+                        }} style={{ padding: "8px 16px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>✅ Xác nhận xóa {oldCount} thông báo</button>
+                        <button onClick={() => setFormData({ ...formData, _confirmDelNotif: false })} style={btnO}>Hủy</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setFormData({ ...formData, _confirmDelNotif: true })} style={{ padding: "8px 16px", borderRadius: 8, background: C.red + "22", color: C.red, fontSize: 12, fontWeight: 700, border: `1px solid ${C.red}44` }}>
+                        Xóa {oldCount} thông báo cũ
+                      </button>
+                    )
+                  )}
+                </>;
+              })()}
             </div>
           </div>
         )}
@@ -4104,7 +4141,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 { i: "🏆", t: "Xếp Hạng", d: "Toàn công ty", s: "emp_ranking" },
                 { i: "🎖️", t: "Huy Hiệu", d: `${getUserBadges(currentUser).length}/${BADGES.length}`, s: "emp_badges" },
                 { i: "🎯", t: "Thử Thách", d: `${challenges.filter(ch => challengeVisibleTo(ch, currentUser)).length} thử thách`, s: "emp_challenges" },
-                { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => (p.assignedTo || []).includes(currentUser.id)).length} lộ trình`, s: "emp_pathway" },
+                { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => { const assigned = (p.assignedTo || []).includes(currentUser.id); const hasProgress = !!(currentUser.pathProgress || {})[p.id]; const deptMatch = p.dept && p.dept === currentUser.dept; return assigned || hasProgress || deptMatch; }).length} lộ trình`, s: "emp_pathway" },
                 { i: "📢", t: "Bảng Tin", d: `${bulletins.length} bài đăng`, s: "emp_bulletins" },
                 ...(currentUser.accRole === "director" ? [
                   { i: "📢", t: "Tạo Bảng Tin", d: "Đăng thông báo/chính sách", s: "dir_bulletins" },
@@ -5067,7 +5104,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <div key={r.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 44, height: 44, borderRadius: 10, background: `${getRating(r.pct).color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: getRating(r.pct).color, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{r.pct}%</div>
                   <div style={{ flex: 1 }}><div style={{ color: C.white, fontWeight: 600, fontSize: 13 }}>{r.quizTitle}</div><div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>{r.score}/{r.total} · {fmtTime(r.time)} · {fmtDate(r.date)}</div></div>
-                  <span style={{ padding: "5px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: r.passed ? `${C.green}18` : `${C.red}18`, color: r.passed ? C.green : C.red }}>{r.passed ? "ĐẠT" : "CHƯA ĐẠT"}</span>
+                  <span style={{ padding: "5px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: r.pct >= (settings.passScore || 70) ? `${C.green}18` : `${C.red}18`, color: r.pct >= (settings.passScore || 70) ? C.green : C.red }}>{r.pct >= (settings.passScore || 70) ? "ĐẠT" : "CHƯA ĐẠT"}</span>
                 </div>
               ))}
           </div>
@@ -5108,8 +5145,13 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <button onClick={() => { setScreen("emp_home"); setFormData({ ...formData, viewPathId: null }); }} style={btnO}>← Dashboard</button>
             </div>
             {(() => {
-              const myPaths = paths.filter(p => (p.assignedTo || []).includes(currentUser.id));
-              if (myPaths.length === 0) return <Empty msg="Chưa có lộ trình nào được gán cho bạn." />;
+              const myPaths = paths.filter(p => {
+                const assigned = (p.assignedTo || []).includes(currentUser.id);
+                const hasProgress = !!(currentUser.pathProgress || {})[p.id];
+                const deptMatch = p.dept && p.dept === currentUser.dept;
+                return assigned || hasProgress || deptMatch;
+              });
+              if (myPaths.length === 0) return <Empty msg="Chưa có lộ trình nào." />;
               const viewId = formData.viewPathId;
               const viewPath = viewId ? myPaths.find(p => p.id === viewId) : null;
               // Progress helper
