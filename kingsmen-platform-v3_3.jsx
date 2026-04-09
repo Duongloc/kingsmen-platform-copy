@@ -828,6 +828,7 @@ export default function App() {
     if (isAdminUser) {
       setRole("admin"); setScreen("admin_home");
       setLoginId(""); setLoginPw(""); setLoginErr("");
+      setShowMotivation(getRandomQuote());
       await loadAllData({ id: data.user.id }, true);
       return;
     }
@@ -2212,7 +2213,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     var { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password: pw });
                     if (authErr) { setFormData(Object.assign({}, formData, { loginErr: "Sai mật khẩu", loginLoading: false })); return }
                     var profile = profileByName;
-                    if (profile.emp_id === "admin" || profile.acc_role === "director") { var adminAcc = profileToCamel(profile); var updatedAdmin = await doCheckIn(adminAcc); setCurrentUser(updatedAdmin); setRole("admin"); setScreen("admin_home"); setFormData({}); await loadAllData(); return }
+                    if (profile.emp_id === "admin" || profile.acc_role === "director") { var adminAcc = profileToCamel(profile); var updatedAdmin = await doCheckIn(adminAcc); setCurrentUser(updatedAdmin); setRole("admin"); setScreen("admin_home"); setFormData({}); setShowMotivation(getRandomQuote()); await loadAllData(); return }
                     var acc = profileToCamel(profile);
                     var updated = await doCheckIn(acc);
                     setCurrentUser(updated); setRole("employee"); setScreen("emp_home"); setFormData({});
