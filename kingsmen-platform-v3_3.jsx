@@ -645,7 +645,7 @@ export default function App() {
     if (currentUser && currentUser.id === userId) setCurrentUser(prev => ({ ...prev, xp: Math.max(0, (prev.xp || 0) + amount), lastXpGainDate: amount > 0 ? today() : prev.lastXpGainDate }));
     // Atomic DB increment — no read-modify-write race
     const { error } = await supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() });
-    if (error) console.error("addXP RPC error:", error.message);
+    if (error) { console.error("addXP RPC error:", error.message); if (currentUser && currentUser.id === userId) addNotif(userId, "⚠️ Lỗi cập nhật XP. Vui lòng liên hệ Admin.", "error"); }
   };
   const addNotif = async (empId, msg, type = "info") => {
     const row = { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false };
@@ -733,11 +733,11 @@ export default function App() {
     setAccounts(prev => { const u = prev.map(a => a.id === user.id ? updated : a); accountsRef.current = u; return u; });
     // Atomic XP via RPC + single-row update for checkin fields — no full-array upsert
     const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: user.id, p_amount: xpChange, p_date: today() });
-    if (xpErr) console.error("doCheckIn XP RPC error:", xpErr.message);
+    if (xpErr) { console.error("doCheckIn XP RPC error:", xpErr.message); addNotif(user.id, "⚠️ Lỗi cập nhật XP điểm danh. Vui lòng liên hệ Admin.", "error"); }
     const { error: ciErr } = await supabase.from("profiles").update({
       last_check_in: t, streak: newStreak, check_ins: [...(user.checkIns || []), t].slice(-90), last_xp_gain_date: newLastXpGainDate
     }).eq("id", user.id);
-    if (ciErr) console.error("doCheckIn update error:", ciErr.message);
+    if (ciErr) { console.error("doCheckIn update error:", ciErr.message); addNotif(user.id, "⚠️ Lỗi lưu dữ liệu điểm danh. Vui lòng liên hệ Admin.", "error"); }
     if (decayMsg) addNotif(user.id, decayMsg, "decay");
     if (idleMsg) addNotif(user.id, idleMsg, "decay");
     return updated;
@@ -841,7 +841,7 @@ export default function App() {
   };
   // doAdminLogin kept for any remaining UI references; routes through the unified Supabase flow
   const doAdminLogin = () => doEmployeeLogin();
-  const getRating = (pct) => { if (pct >= 90) return { label: "XUẤT SẮC", color: C.green, emoji: "🏆" }; if (pct >= 75) return { label: "TỐT", color: C.blue, emoji: "⭐" }; if (pct >= settings.passScore) return { label: "ĐẠT", color: C.orange, emoji: "✅" }; return { label: "CHƯA ĐẠT", color: C.red, emoji: "📖" }; };
+  const getRating = (pct) => { if (pct >= 90) return { label: "XUẤT SẮC", color: C.green, emoji: "🏆" }; if (pct >= 75) return { label: "TỐT", color: C.blue, emoji: "⭐" }; if (pct >= (settings.passScore ?? 70)) return { label: "ĐẠT", color: C.orange, emoji: "✅" }; return { label: "CHƯA ĐẠT", color: C.red, emoji: "📖" }; };
 
   // AI Quiz & Lesson generation
   // Robust JSON cleaner
@@ -1097,7 +1097,7 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     // Direct insert — concurrent-safe, no full-array overwrite
     setResults(prev => [...prev, result]);
     const { error: resErr } = await supabase.from("results").insert([resultToSnake(result)]);
-    if (resErr) console.error("finishQuiz result insert error:", resErr.message);
+    if (resErr) { console.error("finishQuiz result insert error:", resErr.message); addNotif(currentUser.id, "⚠️ Lỗi lưu kết quả bài thi. Vui lòng liên hệ Admin.", "error"); }
     let xp = sc * (settings.xpCorrect ?? 5); if (pct >= _passScore) xp += (settings.xpPass ?? 20); if (pct >= 90) xp += (settings.xpBonus90 ?? 30); if (pct === 100) xp += (settings.xpPerfect ?? 50);
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
@@ -1109,7 +1109,7 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
       if (ch.active === false || ch.quizId !== activeQuiz.id) return ch;
       if ((ch.completedBy || []).includes(currentUser.id)) return ch;
       if (!challengeVisibleTo(ch, currentUser)) return ch;
-      const minScore = ch.minScore || settings.passScore;
+      const minScore = ch.minScore || (settings.passScore ?? 70);
       if (pct >= minScore) {
         chUpdated = true;
         xp += ch.xpReward || 0;
@@ -1151,7 +1151,7 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     // Atomic XP increment via RPC — no read-modify-write race across concurrent users
     const newXpValue = (currentUser.xp || 0) + xp;
     const { error: xpErr } = await supabase.rpc("increment_xp", { p_user_id: currentUser.id, p_amount: xp, p_date: today() });
-    if (xpErr) console.error("finishQuiz XP RPC error:", xpErr.message);
+    if (xpErr) { console.error("finishQuiz XP RPC error:", xpErr.message); addNotif(currentUser.id, "⚠️ Lỗi cập nhật XP. Vui lòng liên hệ Admin.", "error"); }
     // Atomic path progress merge — no JSON overwrite race
     if (quizPathContext && quizPathContext.pathId) {
       const pathPatch = { [quizPathContext.pathId]: updatedPathProgress[quizPathContext.pathId] };
@@ -4795,7 +4795,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div style={{ flex: 1 }}>
                     <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
                     <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
-                    {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {settings.quizFreq - daysSince(last.date)} ngày</div>}
+                    {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
                   </div>
                   <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
                 </div>
@@ -5690,7 +5690,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 // Also check if user already passed the quiz with required score
                 if (ch.quizId) {
                   const best = results.filter(r => r.empId === currentUser.id && r.quizId === ch.quizId).sort((a, b) => b.pct - a.pct)[0];
-                  if (best && best.pct >= (ch.minScore || settings.passScore)) return true;
+                  if (best && best.pct >= (ch.minScore || (settings.passScore ?? 70))) return true;
                 }
                 return false;
               };
@@ -5714,7 +5714,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     const daysLeft = ch.deadline ? -daysSince(ch.deadline + "T23:59") : null;
                     const linkedQuiz = ch.quizId ? quizzes.find(q => q.id === ch.quizId) : null;
                     const myBestResult = ch.quizId ? results.filter(r => r.empId === currentUser.id && r.quizId === ch.quizId).sort((a, b) => b.pct - a.pct)[0] : null;
-                    const minScore = ch.minScore || settings.passScore;
+                    const minScore = ch.minScore || (settings.passScore ?? 70);
                     return (
                       <div key={ch.id} style={{ ...card, border: `1px solid ${C.gold}33` }}>
                         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
