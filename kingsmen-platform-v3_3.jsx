@@ -1098,7 +1098,7 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
     setResults(prev => [...prev, result]);
     const { error: resErr } = await supabase.from("results").insert([resultToSnake(result)]);
     if (resErr) console.error("finishQuiz result insert error:", resErr.message);
-    let xp = sc * settings.xpCorrect; if (pct >= _passScore) xp += settings.xpPass; if (pct >= 90) xp += settings.xpBonus90; if (pct === 100) xp += settings.xpPerfect;
+    let xp = sc * (settings.xpCorrect ?? 5); if (pct >= _passScore) xp += (settings.xpPass ?? 20); if (pct >= 90) xp += (settings.xpBonus90 ?? 30); if (pct === 100) xp += (settings.xpPerfect ?? 50);
     // Auto-check challenges linked to this quiz
     let chUpdated = false;
     let wonRewardData = null;
