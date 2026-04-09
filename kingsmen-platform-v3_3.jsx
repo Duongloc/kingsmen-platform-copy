@@ -655,6 +655,17 @@ export default function App() {
     const { error } = await supabase.from("notifications").insert([notifToSnake(row)]);
     if (error) console.error("addNotif insert error:", error.message);
   };
+  const markNotifRead = async (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id);
+    if (error) console.error("markNotifRead error:", error.message);
+  };
+  const markAllNotifsRead = async () => {
+    if (!currentUser) return;
+    setNotifications(prev => prev.map(n => n.empId === currentUser.id ? { ...n, read: true } : n));
+    const { error } = await supabase.from("notifications").update({ read: true }).eq("emp_id", currentUser.id);
+    if (error) console.error("markAllNotifsRead error:", error.message);
+  };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
