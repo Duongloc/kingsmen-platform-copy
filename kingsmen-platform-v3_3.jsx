@@ -4829,7 +4829,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
                 </div>
               );
-            })})}
+            }); })()}
 
           </div>
         )}
