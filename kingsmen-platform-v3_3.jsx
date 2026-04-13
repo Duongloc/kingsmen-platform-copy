@@ -4795,7 +4795,28 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {role === "employee" && screen === "emp_quizzes" && (
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>✏️ Kiểm Tra</h2><button onClick={() => setScreen("emp_home")} style={btnO}>← Dashboard</button></div>
-            {quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept)).map(q => {
+            {/* ── Difficulty filter & sort bar ── */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginRight: 2 }}>Độ khó:</span>
+              {[{ v: "all", l: "Tất cả" }, { v: "easy", l: "🟢 Dễ" }, { v: "medium", l: "🟡 TB" }, { v: "hard", l: "🟠 Khó" }, { v: "advanced", l: "🔴 NC" }].map(f => (
+                <button key={f.v} onClick={() => setFormData({ ...formData, empDiffFilter: f.v })} style={{ padding: "5px 10px", borderRadius: 6, fontSize: 11, fontWeight: (formData.empDiffFilter || "all") === f.v ? 700 : 500, background: (formData.empDiffFilter || "all") === f.v ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: (formData.empDiffFilter || "all") === f.v ? C.teal : "rgba(255,255,255,0.4)", border: `1px solid ${(formData.empDiffFilter || "all") === f.v ? C.teal + "44" : C.border}`, cursor: "pointer", transition: "all .2s" }}>{f.l}</button>
+              ))}
+              <div style={{ marginLeft: "auto", display: "flex", gap: 4, alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Sắp xếp:</span>
+                {[{ v: "none", l: "Mặc định" }, { v: "asc", l: "Dễ → Khó" }, { v: "desc", l: "Khó → Dễ" }].map(s => (
+                  <button key={s.v} onClick={() => setFormData({ ...formData, empDiffSort: s.v })} style={{ padding: "5px 10px", borderRadius: 6, fontSize: 11, fontWeight: (formData.empDiffSort || "none") === s.v ? 700 : 500, background: (formData.empDiffSort || "none") === s.v ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: (formData.empDiffSort || "none") === s.v ? C.goldL : "rgba(255,255,255,0.4)", border: `1px solid ${(formData.empDiffSort || "none") === s.v ? C.gold + "44" : C.border}`, cursor: "pointer", transition: "all .2s" }}>{s.l}</button>
+                ))}
+              </div>
+            </div>
+            {(() => {
+              const diffOrder = { easy: 1, medium: 2, hard: 3, advanced: 4 };
+              const empDiffFilter = formData.empDiffFilter || "all";
+              const empDiffSort = formData.empDiffSort || "none";
+              let filtered = quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept));
+              if (empDiffFilter !== "all") filtered = filtered.filter(q => (q.difficulty || "medium") === empDiffFilter);
+              if (empDiffSort === "asc") filtered = [...filtered].sort((a, b) => (diffOrder[a.difficulty || "medium"] || 2) - (diffOrder[b.difficulty || "medium"] || 2));
+              else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
+              return filtered.length === 0 ? <Empty msg={empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : filtered.map(q => {
               const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
               const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
               return (
@@ -4808,8 +4829,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
                 </div>
               );
-            })}
-            {quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept)).length === 0 && <Empty msg="Chưa có đề cho phòng ban của bạn." />}
+            })})}
+
           </div>
         )}
 
