@@ -469,6 +469,7 @@ export default function App() {
   }, [formData._upSt, formData.docMsg, formData._impLessonStatus, formData.editPwMsg, formData.pwErr, formData.recMsg]);
   const qTimerRef = useRef(null); const qAnswersRef = useRef({}); const topRef = useRef(null); const finishingRef = useRef(false);
   const accountsRef = useRef([]);
+  const knowledgeSaveTimerRef = useRef(null);
   const lastAutoReloadRef = useRef(0); // tracks last auto-reload timestamp for throttling
   // Essay grading state
   const [essayGrading, setEssayGrading] = useState(false);
@@ -626,10 +627,30 @@ export default function App() {
     } catch (e) { console.error("loadAllData error:", e); }
   };
   const updAccounts = (d) => { setAccounts(d); accountsRef.current = d; save("km-accounts", d); };
-  const updKnowledge = (d) => {
+  const updKnowledgeNow = (d) => {
     setKnowledge(d);
     var clean = d.map(function (item) { var c2 = Object.assign({}, item); delete c2.videoData; delete c2.audioData; delete c2.videoFileName; delete c2.videoFileSize; delete c2.audioFileName; delete c2.audioFileSize; return c2 });
     save("km-knowledge", clean);
+  };
+  const updKnowledge = (d, changedId) => {
+    setKnowledge(d);
+    cacheSet("knowledge", d);
+    if (knowledgeSaveTimerRef.current) clearTimeout(knowledgeSaveTimerRef.current);
+    knowledgeSaveTimerRef.current = setTimeout(async () => {
+      if (changedId) {
+        const item = d.find(k => k.id === changedId);
+        if (item) {
+          var c2 = Object.assign({}, item); delete c2.videoData; delete c2.audioData; delete c2.videoFileName; delete c2.videoFileSize; delete c2.audioFileName; delete c2.audioFileSize;
+          const row = knowledgeToSnake(c2);
+          const { error } = await supabase.from("knowledge").upsert(row);
+          if (error) { console.error("knowledge single upsert err:", error.message); setSaveStatus("error"); }
+          else { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); }
+        }
+      } else {
+        var clean = d.map(function (item) { var c2 = Object.assign({}, item); delete c2.videoData; delete c2.audioData; delete c2.videoFileName; delete c2.videoFileSize; delete c2.audioFileName; delete c2.audioFileSize; return c2 });
+        save("km-knowledge", clean);
+      }
+    }, 800);
   };
   const updQuizzes = (d) => { setQuizzes(d); save("km-quizzes", d); };
   const updResults = (d) => { setResults(d); save("km-results", d); };
@@ -990,7 +1011,7 @@ ${knowledgeItem.title}
 ${content}`);
         const parsed = cleanJSON(txt, false);
         const lesson = { ...knowledgeItem, aiLesson: parsed, hasAiLesson: true };
-        updKnowledge(knowledge.map(k => k.id === knowledgeItem.id ? lesson : k));
+        updKnowledgeNow(knowledge.map(k => k.id === knowledgeItem.id ? lesson : k));
         setAiLoading(false); setAiStatus(""); return lesson;
       }
     } catch (e) { setAiLoading(false); setAiStatus("❌ Lỗi: " + (e.message || String(e)) + ". Bấm thử lại."); return null; }
@@ -2307,8 +2328,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{knowledge.length + " bài · " + knowledge.filter(function (k2) { return k2.interactive }).length + " có interactive"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledge([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
-                    <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, createdAt: new Date().toISOString() }; updKnowledge([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
+                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledgeNow([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
+                    <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, createdAt: new Date().toISOString() }; updKnowledgeNow([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
                     <button onClick={function () { setScreen("admin_home") }} style={{ ...btnO, padding: "8px 12px", fontSize: 11 }}>{"←"}</button>
                   </div>
                 </div>
@@ -2359,7 +2380,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   var hasL = !!k.interactive;
                   var sl = hasL && k.interactive.slides ? k.interactive.slides.length : 0;
                   var fc = hasL && k.interactive.flashcards ? k.interactive.flashcards.length : 0;
-                  var upd = function (obj) { updKnowledge(knowledge.map(function (x) { return x.id === k.id ? Object.assign({}, x, obj) : x })) };
+                  var upd = function (obj) { updKnowledge(knowledge.map(function (x) { return x.id === k.id ? Object.assign({}, x, obj) : x }), k.id) };
                   return (
                     <div>
 
@@ -2559,7 +2580,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           <div>
                             <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{"Xác nhận xóa \"" + k.title + "\"?"}</div>
                             <div style={{ display: "flex", gap: 8 }}>
-                              <button onClick={async function () { await supabase.from("knowledge").delete().eq("id", k.id); updKnowledge(knowledge.filter(function (x) { return x.id !== k.id })); setSubScreen(null); setFormData(Object.assign({}, formData, { _confirmDel: null })) }} style={{ padding: "10px 20px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>{"✅ Xác nhận xóa"}</button>
+                              <button onClick={async function () { await supabase.from("knowledge").delete().eq("id", k.id); updKnowledgeNow(knowledge.filter(function (x) { return x.id !== k.id })); setSubScreen(null); setFormData(Object.assign({}, formData, { _confirmDel: null })) }} style={{ padding: "10px 20px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>{"✅ Xác nhận xóa"}</button>
                               <button onClick={function () { setFormData(Object.assign({}, formData, { _confirmDel: null })) }} style={{ padding: "10px 20px", borderRadius: 8, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 12, border: "1px solid rgba(255,255,255,0.1)" }}>{"Hủy"}</button>
                             </div>
                           </div>
@@ -2586,7 +2607,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               <button onClick={function () { setFormData(Object.assign({}, formData, { _editContent: null })) }} style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(255,255,255,0.1)", color: C.white, fontSize: 18, border: "none" }}>{"✕"}</button>
             </div>
             <div style={{ flex: 1, padding: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <textarea value={(knowledge.find(function (x) { return x.id === formData._editContent }) || {}).content || ""} onChange={function (e) { var kid = formData._editContent; updKnowledge(knowledge.map(function (x) { return x.id === kid ? Object.assign({}, x, { content: e.target.value }) : x })) }} placeholder="Dán nội dung kiến thức vào đây..." style={{ flex: 1, width: "100%", padding: 14, borderRadius: 10, border: "1px solid " + C.teal + "33", background: "rgba(12,123,111,0.06)", color: C.white, fontSize: 13, lineHeight: 1.8, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+              <textarea value={(knowledge.find(function (x) { return x.id === formData._editContent }) || {}).content || ""} onChange={function (e) { var kid = formData._editContent; updKnowledge(knowledge.map(function (x) { return x.id === kid ? Object.assign({}, x, { content: e.target.value }) : x }), kid) }} placeholder="Dán nội dung kiến thức vào đây..." style={{ flex: 1, width: "100%", padding: 14, borderRadius: 10, border: "1px solid " + C.teal + "33", background: "rgba(12,123,111,0.06)", color: C.white, fontSize: 13, lineHeight: 1.8, resize: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{((knowledge.find(function (x) { return x.id === formData._editContent }) || {}).content || "").length + " ký tự"}</span>
                 <button onClick={function () { setFormData(Object.assign({}, formData, { _editContent: null })) }} style={{ ...btnG, padding: "10px 24px", fontSize: 13 }}>{"✅ Xong"}</button>
