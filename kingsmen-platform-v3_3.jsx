@@ -4272,7 +4272,13 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {role === "employee" && screen === "emp_knowledge" && !subScreen && currentUser && (
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>{"📚 Kiến Thức"}</h2>{formData._returnFrom ? <button onClick={function () { setScreen(formData._returnFrom.screen); setSubScreen(formData._returnFrom.subScreen || null); setFormData(Object.assign({}, formData, { _returnFrom: null })); }} style={btnO}>{"← " + formData._returnFrom.label}</button> : <button onClick={function () { setScreen("emp_home") }} style={btnO}>{"← Dashboard"}</button>}</div>
-            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) }).map(function (k) {
+            {/* ── Search bar ── */}
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "rgba(255,255,255,0.3)", pointerEvents: "none" }}>🔍</span>
+              <input type="text" value={formData.empKnowledgeSearch || ""} onChange={function (e) { setFormData(Object.assign({}, formData, { empKnowledgeSearch: e.target.value })) }} placeholder="Tìm bài kiến thức..." style={{ ...inp, paddingLeft: 38, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, borderRadius: 12, fontSize: 13 }} />
+              {formData.empKnowledgeSearch && <button onClick={function () { setFormData(Object.assign({}, formData, { empKnowledgeSearch: "" })) }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer" }}>✕</button>}
+            </div>
+            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) && (!formData.empKnowledgeSearch || k.title.toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase()) || (k.content || "").toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase())) }).map(function (k) {
               var isRead = (currentUser.readLessons || []).includes(k.id);
               return (
                 <div key={k.id} style={{ ...card, cursor: "pointer", border: "1px solid " + (isRead ? C.green + "33" : C.border) }} onClick={function () {
@@ -4297,7 +4303,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 </div>
               );
             })}
-            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) }).length === 0 && <Empty msg={"Chưa có bài nào."} />}
+            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) && (!formData.empKnowledgeSearch || k.title.toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase()) || (k.content || "").toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase())) }).length === 0 && <Empty msg={formData.empKnowledgeSearch ? "Không tìm thấy bài kiến thức nào phù hợp." : "Chưa có bài nào."} />}
           </div>
         )}
 
@@ -4843,6 +4849,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {role === "employee" && screen === "emp_quizzes" && (
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>✏️ Kiểm Tra</h2><button onClick={() => setScreen("emp_home")} style={btnO}>← Dashboard</button></div>
+            {/* ── Search bar ── */}
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "rgba(255,255,255,0.3)", pointerEvents: "none" }}>🔍</span>
+              <input type="text" value={formData.empQuizSearch || ""} onChange={(e) => setFormData({ ...formData, empQuizSearch: e.target.value })} placeholder="Tìm đề kiểm tra..." style={{ ...inp, paddingLeft: 38, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, borderRadius: 12, fontSize: 13 }} />
+              {formData.empQuizSearch && <button onClick={() => setFormData({ ...formData, empQuizSearch: "" })} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer" }}>✕</button>}
+            </div>
             {/* ── Difficulty filter & sort bar ── */}
             <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginRight: 2 }}>Độ khó:</span>
@@ -4860,11 +4872,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               const diffOrder = { easy: 1, medium: 2, hard: 3, advanced: 4 };
               const empDiffFilter = formData.empDiffFilter || "all";
               const empDiffSort = formData.empDiffSort || "none";
-              let filtered = quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept));
+              const empQuizSearch = (formData.empQuizSearch || "").toLowerCase();
+              let filtered = quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept) && (!empQuizSearch || q.title.toLowerCase().includes(empQuizSearch)));
               if (empDiffFilter !== "all") filtered = filtered.filter(q => (q.difficulty || "medium") === empDiffFilter);
               if (empDiffSort === "asc") filtered = [...filtered].sort((a, b) => (diffOrder[a.difficulty || "medium"] || 2) - (diffOrder[b.difficulty || "medium"] || 2));
               else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
-              return filtered.length === 0 ? <Empty msg={empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : filtered.map(q => {
+              return filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : filtered.map(q => {
               const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
               const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
               return (
