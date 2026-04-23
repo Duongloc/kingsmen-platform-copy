@@ -4271,7 +4271,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {/* ═══ EMPLOYEE: KNOWLEDGE ═══ */}
         {role === "employee" && screen === "emp_knowledge" && !subScreen && currentUser && (
           <div style={{ animation: "fadeIn .4s" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>{"📚 Kiến Thức"}</h2><button onClick={function () { setScreen("emp_home") }} style={btnO}>{"← Dashboard"}</button></div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>{"📚 Kiến Thức"}</h2>{formData._returnFrom ? <button onClick={function () { setScreen(formData._returnFrom.screen); setSubScreen(formData._returnFrom.subScreen || null); setFormData(Object.assign({}, formData, { _returnFrom: null })); }} style={btnO}>{"← " + formData._returnFrom.label}</button> : <button onClick={function () { setScreen("emp_home") }} style={btnO}>{"← Dashboard"}</button>}</div>
             {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) }).map(function (k) {
               var isRead = (currentUser.readLessons || []).includes(k.id);
               return (
@@ -4311,7 +4311,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           const sIdx = formData.slideIdx || 0;
           const mAns = formData.miniQAns || {};
           const exitLearn = () => setFormData({ ...formData, learnTab: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {} });
-          const exitAll = () => { if (formData._returnAdmin) { var rid = formData._returnAdmin; setRole("admin"); setScreen("admin_lessons"); setSubScreen(rid); setFormData({ ...formData, learnTab: null, _returnAdmin: null }); } else { setSubScreen(null); setFormData({ ...formData, learnTab: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {}, loadedPdf: null }); } };
+          const exitAll = () => { if (formData._returnAdmin) { var rid = formData._returnAdmin; setRole("admin"); setScreen("admin_lessons"); setSubScreen(rid); setFormData({ ...formData, learnTab: null, _returnAdmin: null }); } else if (formData._returnFrom) { var rf = formData._returnFrom; setScreen(rf.screen); setSubScreen(rf.subScreen || null); setFormData({ ...formData, learnTab: null, _returnFrom: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {}, loadedPdf: null }); } else { setSubScreen(null); setFormData({ ...formData, learnTab: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {}, loadedPdf: null }); } };
 
           // ── FULLSCREEN LEARNING MODE ──
           if (tab && it) {
@@ -4703,7 +4703,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           // ── NORMAL VIEW (chưa vào học) ──
           return (
             <div style={{ animation: "fadeIn .4s" }}>
-              <button onClick={exitAll} style={{ ...btnO, marginBottom: 14 }}>← Quay lại danh sách</button>
+              <button onClick={exitAll} style={{ ...btnO, marginBottom: 14 }}>{formData._returnFrom ? "← " + formData._returnFrom.label : formData._returnAdmin ? "← Quản lý bài học" : "← Quay lại danh sách"}</button>
 
               {/* Header */}
               <div style={{ background: `linear-gradient(135deg,${C.dark},#1a4a50)`, borderRadius: 16, padding: "24px 20px", marginBottom: 14, border: `1px solid ${C.gold}33` }}>
@@ -5320,7 +5320,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                         <div style={{ padding: "8px 12px", borderRadius: 8, background: hasRead ? `${C.green}08` : `${C.blue}08`, border: `1px solid ${hasRead ? C.green + "33" : C.blue + "33"}`, marginBottom: 6 }}>
                                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                             <div><div style={{ fontSize: 12, fontWeight: 600, color: hasRead ? C.green : C.blue }}>📖 {(kItem && kItem.title) || "Bài kiến thức"}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{hasRead ? "✅ Đã đọc" : "Đọc bài trước khi thi"}</div></div>
-                                            {!hasRead && kItem ? <button onClick={() => { setScreen("emp_knowledge"); setSubScreen(mod.knowledgeId); }} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}44` }}>Đọc bài →</button> : hasRead ? <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>✅</span> : null}
+                                            {!hasRead && kItem ? <button onClick={() => { setFormData({ ...formData, _returnFrom: { screen: "emp_pathway", subScreen: null, label: "Lộ trình" }, viewPathId: viewPath.id }); setScreen("emp_knowledge"); setSubScreen(mod.knowledgeId); }} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}44` }}>Đọc bài →</button> : hasRead ? <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>✅</span> : null}
                                           </div>
                                         </div>
                                       );
@@ -5849,7 +5849,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                       <div style={{ fontSize: 12, fontWeight: 600, color: hasRead ? C.green : C.blue }}>📖 {ch.knowledgeTitle || (kItem && kItem.title) || "Bài kiến thức"}</div>
                                       <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{hasRead ? "✅ Đã đọc" : "Đọc bài kiến thức trước khi làm bài"}</div>
                                     </div>
-                                    {!hasRead && kItem && <button onClick={() => { setScreen("emp_knowledge"); setSubScreen(ch.knowledgeId); }} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}44` }}>📖 Đọc bài →</button>}
+                                    {!hasRead && kItem && <button onClick={() => { setFormData({ ...formData, _returnFrom: { screen: "emp_challenges", subScreen: null, label: "Thử thách" } }); setScreen("emp_knowledge"); setSubScreen(ch.knowledgeId); }} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}44` }}>📖 Đọc bài →</button>}
                                     {hasRead && <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>✅</span>}
                                   </div>
                                 </div>
