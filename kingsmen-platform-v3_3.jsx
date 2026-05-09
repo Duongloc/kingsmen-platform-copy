@@ -610,7 +610,7 @@ export default function App() {
       if (!cacheGet("results")?.length) batch2.push(["results", DB.get("km-results", [], isAdmin, user?.id)]);
       if (!cacheGet("recognitions")?.length) batch2.push(["recognitions", DB.get("km-recognitions", [], isAdmin)]);
       if (!cacheGet("challenges")?.length) batch2.push(["challenges", DB.get("km-challenges", [], isAdmin)]);
-      if (!cacheGet("notifications")?.length) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
+      // if (!cacheGet("notifications")?.length) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
       if (!cacheGet("paths")?.length) batch2.push(["paths", DB.get("km-paths", [], isAdmin)]);
       if (!cacheGet("bulletins")?.length) batch2.push(["bulletins", DB.get("km-bulletins", [], isAdmin)]);
       if (batch2.length > 0) {
@@ -620,7 +620,7 @@ export default function App() {
           if (key === "results" && Array.isArray(d)) { setResults(prev => { const merged = d.length >= prev.length ? d : [...d, ...prev.filter(x => !d.some(y => y.id === x.id))]; cacheSet("results", merged); return merged; }); }
           if (key === "recognitions" && Array.isArray(d)) { setRecognitions(d); cacheSet("recognitions", d); }
           if (key === "challenges" && Array.isArray(d)) { setChallenges(d); cacheSet("challenges", d); }
-          if (key === "notifications" && Array.isArray(d)) { setNotifications(d); cacheSet("notifications", d); }
+          // if (key === "notifications" && Array.isArray(d)) { setNotifications(d); cacheSet("notifications", d); }
           if (key === "paths" && Array.isArray(d)) { setPaths(d); cacheSet("paths", d); }
           if (key === "bulletins" && Array.isArray(d)) { setBulletins(d); cacheSet("bulletins", d); }
         });
@@ -682,25 +682,9 @@ export default function App() {
     const error = await rpcWithRetry(() => supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() }));
     if (error) { console.error("addXP RPC error:", error.message); if (currentUser && currentUser.id === userId) addNotif(userId, "⚠️ Lỗi cập nhật XP sau 3 lần thử. Vui lòng liên hệ Admin.", "error"); }
   };
-  const addNotif = async (empId, msg, type = "info") => {
-    const row = { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false };
-    // Optimistic local update using functional form — no stale closure
-    setNotifications(prev => [...prev, row]);
-    // Direct insert — concurrent-safe
-    const { error } = await supabase.from("notifications").insert([notifToSnake(row)]);
-    if (error) console.error("addNotif insert error:", error.message);
-  };
-  const markNotifRead = async (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id);
-    if (error) console.error("markNotifRead error:", error.message);
-  };
-  const markAllNotifsRead = async () => {
-    if (!currentUser) return;
-    setNotifications(prev => prev.map(n => n.empId === currentUser.id ? { ...n, read: true } : n));
-    const { error } = await supabase.from("notifications").update({ read: true }).eq("emp_id", currentUser.id);
-    if (error) console.error("markAllNotifsRead error:", error.message);
-  };
+  const addNotif = async (empId, msg, type = "info") => { return; };
+  const markNotifRead = async (id) => { return; };
+  const markAllNotifsRead = async () => { return; };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
@@ -789,7 +773,7 @@ export default function App() {
   useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } })(); } }, [screen]);
   // Selective auto-reload — only fetch tables the current screen needs
   const SCREEN_TABLES = {
-    emp_home: ["accounts", "results", "challenges", "notifications"],
+    emp_home: ["accounts", "results", "challenges"],
     emp_quizzes: ["quizzes", "results"],
     emp_knowledge: ["knowledge"],
     emp_challenges: ["challenges", "results", "knowledge"],
@@ -804,7 +788,7 @@ export default function App() {
     admin_analytics: ["accounts", "results", "quizzes"],
     admin_ranking: ["accounts", "results"],
     admin_bulletins: ["bulletins"],
-    admin_activity: ["accounts", "results", "notifications"],
+    admin_activity: ["accounts", "results"],
   };
   useEffect(() => {
     const needed = SCREEN_TABLES[screen];
@@ -1169,10 +1153,10 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
       });
       if (newNotifRows.length > 0) {
         // Optimistic local update using functional form — no stale closure
-        setNotifications(prev => [...prev, ...newNotifRows]);
+        // setNotifications(prev => [...prev, ...newNotifRows]);
         // Multi-row insert — concurrent-safe, no full-array overwrite
-        const { error: nErr } = await supabase.from("notifications").insert(newNotifRows.map(notifToSnake));
-        if (nErr) console.error("finishQuiz notifications insert error:", nErr.message);
+        // const { error: nErr } = await supabase.from("notifications").insert(newNotifRows.map(notifToSnake));
+        // if (nErr) console.error("finishQuiz notifications insert error:", nErr.message);
       }
     }
     // Build updated pathProgress if quiz was taken from a pathway
@@ -3509,13 +3493,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     setChallenges(newCh);
                     const saved = await DB.set("km-challenges", newCh);
                     if (!saved) { setSaveStatus("error"); return; }
-                    // Notifications
-                    const targets = assignTo === "all" ? accounts : assignTo === "dept" ? accounts.filter(a => a.dept === formData.chDept) : assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(assignTo); return accounts.filter(a => ids.includes(a.id)); } catch (e) { return []; } })() : accounts.filter(a => a.id === assignTo);
-                    let curNotifs = notifications;
-                    try { const nfDB = await DB.get("km-notifications", []); if (Array.isArray(nfDB) && nfDB.length >= curNotifs.length) curNotifs = nfDB; } catch (e) { }
-                    const newNotifs = [...curNotifs];
-                    targets.forEach(t => newNotifs.push({ id: uid(), empId: t.id, msg: "🎯 Thử thách: " + formData.chTitle + " — Đạt ≥" + ch.minScore + "% bài " + ch.quizTitle + (ch.rewards.length > 0 ? " · 🎁 " + ch.rewards.length + " phần thưởng" : ""), type: "challenge", date: new Date().toISOString(), read: false }));
-                    setNotifications(newNotifs); await DB.set("km-notifications", newNotifs);
+                    // Notifications disabled
                     setSaveStatus("saved"); setFormData({}); setSubScreen(null);
                   }} style={{ ...btnG, opacity: (!(formData.chTitle || "").trim() || !formData.chQuiz) ? 0.4 : 1 }}>🎯 Tạo thử thách</button>
                   <button onClick={() => { setFormData({}); setSubScreen(null); }} style={btnO}>Hủy</button>
@@ -3717,41 +3695,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   </div>
                 ))}
             </div>
-            {/* Old notifications cleanup */}
-            <div style={card}>
-              <div style={{ fontSize: 13, color: C.white, fontWeight: 700, marginBottom: 8 }}>🗑️ DỌN DẸP THÔNG BÁO CŨ</div>
-              {(() => {
-                const cutoff = "2026-04-01";
-                const oldCount = notifications.filter(n => n.date < cutoff).length;
-                return <>
-                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>
-                    {oldCount > 0 ? `${oldCount} thông báo trước ngày 01/04/2026` : "Không có thông báo cũ nào trước ngày 01/04/2026"}
-                  </div>
-                  {oldCount > 0 && (
-                    formData._confirmDelNotif ? (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={async () => {
-                          const { error } = await supabase.from("notifications").delete().lt("created_at", cutoff);
-                          if (!error) {
-                            const kept = notifications.filter(n => n.date >= cutoff);
-                            setNotifications(kept);
-                            cacheSet("notifications", kept);
-                            setSaveStatus("saved");
-                            setTimeout(() => setSaveStatus(""), 2000);
-                          }
-                          setFormData({ ...formData, _confirmDelNotif: false });
-                        }} style={{ padding: "8px 16px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>✅ Xác nhận xóa {oldCount} thông báo</button>
-                        <button onClick={() => setFormData({ ...formData, _confirmDelNotif: false })} style={btnO}>Hủy</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setFormData({ ...formData, _confirmDelNotif: true })} style={{ padding: "8px 16px", borderRadius: 8, background: C.red + "22", color: C.red, fontSize: 12, fontWeight: 700, border: `1px solid ${C.red}44` }}>
-                        Xóa {oldCount} thông báo cũ
-                      </button>
-                    )
-                  )}
-                </>;
-              })()}
-            </div>
+            {/* Old notifications cleanup hidden */}
           </div>
         )}
 
@@ -3866,7 +3810,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             <div style={{ ...card, marginTop: 8 }}>
               <div style={{ fontSize: 13, color: C.gold, fontWeight: 700, marginBottom: 10 }}>THÔNG TIN DỮ LIỆU HIỆN TẠI</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))", gap: 8 }}>
-                {[["Tài khoản", accounts.length], ["Kiến thức", knowledge.length], ["Đề thi", quizzes.length], ["Kết quả", results.length], ["Tuyên dương", recognitions.length], ["Thử thách", challenges.length], ["Lộ trình", paths.length], ["Thông báo", notifications.length]].map(([l, v], i) => (
+                {[["Tài khoản", accounts.length], ["Kiến thức", knowledge.length], ["Đề thi", quizzes.length], ["Kết quả", results.length], ["Tuyên dương", recognitions.length], ["Thử thách", challenges.length], ["Lộ trình", paths.length]].map(([l, v], i) => (
                   <div key={i} style={{ textAlign: "center", padding: 8 }}><div style={{ fontSize: 16, fontWeight: 800, color: C.goldL }}>{v}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{l}</div></div>
                 ))}
               </div>
@@ -4169,26 +4113,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 ))}
               </div>
             )}
-            {/* Notifications */}
-            {notifications.filter(n => n.empId === currentUser.id && !n.read).length > 0 && (
-              <div style={{ ...card, background: `${C.orange}08`, border: `1px solid ${C.orange}22` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>🔔 THÔNG BÁO MỚI ({notifications.filter(n => n.empId === currentUser.id && !n.read).length})</div>
-                  <button onClick={() => markAllNotifsRead()} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "none", padding: "2px 6px" }}>Đã đọc tất cả</button>
-                </div>
-                {notifications.filter(n => n.empId === currentUser.id && !n.read).slice(-5).reverse().map(n => (
-                  <div key={n.id} onClick={() => {
-                    markNotifRead(n.id);
-                    if (n.msg.includes("Thử thách")) { setScreen("emp_challenges"); setSubScreen(null); }
-                    else if (n.msg.includes("tuyên dương")) { }
-                  }} style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", padding: "6px 8px", marginBottom: 2, borderRadius: 6, background: "rgba(255,255,255,0.03)", cursor: n.msg.includes("Thử thách") ? "pointer" : "default", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ flexShrink: 0 }}>{n.msg.includes("Thử thách") ? "🎯" : n.msg.includes("tuyên dương") ? "🎖️" : "📢"}</span>
-                    <span style={{ flex: 1 }}>{n.msg}</span>
-                    {n.msg.includes("Thử thách") && <span style={{ fontSize: 10, color: C.gold }}>Xem →</span>}
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Notifications hidden */}
             {/* Actions */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 8 }}>
               {[
@@ -5568,11 +5493,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         setChallenges(newCh);
                         const saved = await DB.set("km-challenges", newCh);
                         if (!saved) { setSaveStatus("error"); return; }
-                        let curNotifs = notifications;
-                        try { const nfDB = await DB.get("km-notifications", []); if (Array.isArray(nfDB) && nfDB.length >= curNotifs.length) curNotifs = nfDB; } catch (e) { }
-                        const newNotifs = [...curNotifs];
-                        targets.forEach(m => newNotifs.push({ id: uid(), empId: m.id, msg: "🎯 Thử thách từ " + currentUser.name + ": " + formData.mgrCh + " — Đạt ≥" + (formData.mgrChMin || 70) + "% bài " + ch.quizTitle + (ch.rewards.length > 0 ? " · 🎁 " + ch.rewards.length + " phần thưởng" : ""), type: "challenge", date: new Date().toISOString(), read: false }));
-                        setNotifications(newNotifs); await DB.set("km-notifications", newNotifs);
+                        // Notifications disabled
                         setSaveStatus("saved"); setFormData({});
                       }} style={{ ...btnG, opacity: (!(formData.mgrCh || "").trim() || !formData.mgrChQuiz) ? 0.4 : 1 }}>🎯 Gán</button>
                     </div>
