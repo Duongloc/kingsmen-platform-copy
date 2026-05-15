@@ -236,7 +236,7 @@ const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: 
 const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
 const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, hidden: r.hidden || false, createdAt: r.created_at });
 const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null, hidden: q.hidden || false }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
-const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], hasVideo: r.has_video || false, videoName: r.video_name || "", createdAt: r.created_at });
+const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], hasVideo: r.has_video || false, videoName: r.video_name || "", createdAt: r.created_at, _isPartial: !('content' in r) });
 const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [], has_video: k.hasVideo || false, video_name: k.videoName || "" }; if (k.createdAt) base.created_at = k.createdAt; return base; };
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
@@ -259,20 +259,20 @@ const DB = {
   async get(k, fb = null, isAdmin = false, userId = null) {
     try {
       switch (k) {
-        case "km-accounts": { const { data } = await supabase.from("profiles").select("*").order("created_at"); return data ? data.map(profileToCamel) : fb; }
+        case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at").order("created_at"); return data ? data.map(profileToCamel) : fb; }
         case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
-        case "km-knowledge": { const { data } = await supabase.from("knowledge").select("*").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
+        case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
             // Admins fetch everything — RLS allows this
-            const { data } = await supabase.from("results").select("*").order("created_at");
+            const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at");
             return data ? data.map(resultToCamel) : fb;
           }
           // Non-admins: single query filtered to own rows (explicit filter + RLS double protection)
           // No second query needed — answers are included since we only fetch own rows
           if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
           if (!userId) return fb;
-          const { data } = await supabase.from("results").select("*").eq("emp_id", userId).order("created_at");
+          const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").eq("emp_id", userId).order("created_at");
           return data ? data.map(resultToCamel) : fb;
         }
         case "km-recognitions": { const { data } = await supabase.from("recognitions").select("*").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
@@ -496,7 +496,7 @@ export default function App() {
   useEffect(() => { accountsRef.current = accounts; }, [accounts]);
 
   // ─── localStorage cache helpers (TTL-aware, cross-tab safe) ───
-  const CACHE_TTL = { accounts: 30000, results: 30000, notifications: 30000, challenges: 30000, knowledge: 300000, quizzes: 300000, paths: 300000, settings: 300000, recognitions: 300000, bulletins: 300000, logo: 300000 };
+  const CACHE_TTL = { accounts: 600000, results: 300000, notifications: 300000, challenges: 300000, knowledge: 600000, quizzes: 600000, paths: 600000, settings: 600000, recognitions: 600000, bulletins: 600000, logo: 600000 };
   const cacheGet = (key) => { try { const raw = localStorage.getItem("kc_" + key); if (!raw) return null; const { ts, data } = JSON.parse(raw); const ttl = CACHE_TTL[key] ?? 30000; if (Date.now() - ts > ttl) { localStorage.removeItem("kc_" + key); return null; } return data; } catch (e) { } return null; };
   const cacheSet = (key, data) => { try { localStorage.setItem("kc_" + key, JSON.stringify({ ts: Date.now(), data })); } catch (e) { } };
   // Cross-tab cache invalidation: when another tab writes to cache, refresh volatile state
@@ -583,8 +583,9 @@ export default function App() {
         const { data: userData } = await supabase.auth.getUser();
         user = userData?.user;
         if (user) {
-          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role, avatar").eq("id", user.id).single();
           isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+          if (p?.avatar) setCurrentUser(prev => prev ? ({ ...prev, avatar: p.avatar }) : null);
         }
       }
 
@@ -794,7 +795,7 @@ export default function App() {
     const needed = SCREEN_TABLES[screen];
     if (!role || !needed) return;
     const now = Date.now();
-    if (now - lastAutoReloadRef.current < 8000) return;
+    if (now - lastAutoReloadRef.current < 30000) return;
     lastAutoReloadRef.current = now;
     (async () => {
       try {
@@ -828,6 +829,33 @@ export default function App() {
       } catch (e) { }
     })();
   }, [screen, role]);
+
+  // Lazy-load full knowledge content when opened
+  useEffect(() => {
+    if (!subScreen || (screen !== "admin_lessons" && screen !== "emp_knowledge")) return;
+    const kItem = knowledge.find(k => k.id === subScreen);
+    if (!kItem || kItem.id === "add" || !kItem._isPartial) return;
+    
+    (async () => {
+      try {
+        const { data } = await supabase.from("knowledge").select("content,interactive,images").eq("id", kItem.id).single();
+        if (data) {
+          setKnowledge(prev => {
+            const next = prev.map(k => k.id === kItem.id ? { 
+              ...k, 
+              content: data.content || "", 
+              interactive: data.interactive || null, 
+              images: data.images || [],
+              _isPartial: false
+            } : k);
+            cacheSet("knowledge", next);
+            return next;
+          });
+        }
+      } catch (e) { console.error("Lazy load knowledge error:", e); }
+    })();
+  }, [subScreen, screen, knowledge]);
+
 
   // Timer
   useEffect(() => { if (qActive && qTimer > 0) { qTimerRef.current = setInterval(() => setQTimer(t => t <= 1 ? (clearInterval(qTimerRef.current), 0) : t - 1), 1000); return () => clearInterval(qTimerRef.current); }; }, [qActive]);
