@@ -236,8 +236,8 @@ const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: 
 const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
 const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, hidden: r.hidden || false, createdAt: r.created_at });
 const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null, hidden: q.hidden || false }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
-const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
-const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] }; if (k.createdAt) base.created_at = k.createdAt; return base; };
+const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], hasVideo: r.has_video || false, videoName: r.video_name || "", createdAt: r.created_at });
+const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [], has_video: k.hasVideo || false, video_name: k.videoName || "" }; if (k.createdAt) base.created_at = k.createdAt; return base; };
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
 const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", knowledgeId: r.knowledge_id || null, knowledgeTitle: r.knowledge_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {}, delivered: r.delivered || {} });
@@ -2318,8 +2318,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{knowledge.length + " bài · " + knowledge.filter(function (k2) { return k2.interactive }).length + " có interactive"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledgeNow([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
-                    <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, createdAt: new Date().toISOString() }; updKnowledgeNow([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
+                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledgeNow([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], hasVideo: false, videoName: "", createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
+                    <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, hasVideo: false, videoName: "", createdAt: new Date().toISOString() }; updKnowledgeNow([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
                     <button onClick={function () { setScreen("admin_home") }} style={{ ...btnO, padding: "8px 12px", fontSize: 11 }}>{"←"}</button>
                   </div>
                 </div>
@@ -2336,7 +2336,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           {(k.depts || []).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
                           {hasL && tag(sl + "S " + fc + "F", C.teal)}
                           {!!(k.docUrl) && tag("🔗 Link", C.blue)}
-                          {!!(k.videoUrl) && tag("🎬 Video", C.red)}
+                          {(k.hasVideo || k.videoUrl) && tag(k.hasVideo ? "🎬 Video ⬆️" : "🎬 Video 🔗", C.red)}
                           {!!(k.audioUrl) && tag("🎧 Audio", "#9b59b6")}
                           {k.images && k.images.length > 0 && tag(k.images.length + " 🖼️", C.gold)}
                         </div>
@@ -2402,10 +2402,35 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         {formData._upSt && <div onClick={function () { setFormData(Object.assign({}, formData, { _upSt: null })) }} style={{ padding: "6px 10px", borderRadius: 6, marginBottom: 8, fontSize: 11, fontWeight: 700, textAlign: "center", cursor: "pointer", background: formData._upSt.indexOf("✅") >= 0 ? C.green + "12" : formData._upSt.indexOf("❌") >= 0 ? C.red + "12" : C.gold + "12", color: formData._upSt.indexOf("✅") >= 0 ? C.green : formData._upSt.indexOf("❌") >= 0 ? C.red : C.gold }}>{formData._upSt}</div>}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🔗 Tài liệu gốc"}</div><input value={k.docUrl || ""} onChange={function (e) { upd({ docUrl: e.target.value }) }} placeholder="docs.google.com/..." style={{ ...inp, fontSize: 10 }} /></div>
-                          <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎬 Video (YouTube/hosting)"}</div><input value={k.videoUrl || ""} onChange={function (e) { upd({ videoUrl: e.target.value }) }} placeholder="youtube.com/... hoặc /media/video.mp4" style={{ ...inp, fontSize: 10 }} />{k.videoUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{/youtu/.test(k.videoUrl) ? "✓ YouTube" : /^(http|\/media)/.test(k.videoUrl) ? "✓ Direct URL" : "✓ Link"}</div>}</div>
+                          <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🔗 YouTube / Video link"}</div><input value={k.videoUrl || ""} onChange={function (e) { upd({ videoUrl: e.target.value }) }} placeholder="youtube.com/... hoặc link video" style={{ ...inp, fontSize: 10 }} />{k.videoUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{/youtu/.test(k.videoUrl) ? "✓ YouTube" : /^(http|\/media)/.test(k.videoUrl) ? "✓ Direct URL" : "✓ Link"}</div>}</div>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎧 Audio (hosting/link)"}</div><input value={k.audioUrl || ""} onChange={function (e) { upd({ audioUrl: e.target.value }) }} placeholder="/media/audio.mp3 hoặc link" style={{ ...inp, fontSize: 10 }} />{k.audioUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{"✓ " + (k.audioUrl.length > 35 ? k.audioUrl.slice(0, 35) + "..." : k.audioUrl)}</div>}</div>
+                        </div>
+
+                        {/* ── VIDEO MP4 UPLOAD — full-width row ── */}
+                        <div style={{ borderRadius: 10, border: "1px solid " + (k.hasVideo ? C.red + "44" : "rgba(255,255,255,0.1)"), background: k.hasVideo ? C.red + "08" : "rgba(255,255,255,0.02)", padding: "12px 14px", marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                            {/* Left: status + filename */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 8, background: k.hasVideo ? C.red + "25" : "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{k.hasVideo ? "🎬" : "📭"}</div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2, letterSpacing: 1 }}>{"VIDEO MP4 ĐÍNH KÈM"}<span style={{ marginLeft: 8, fontSize: 9, color: "rgba(255,255,255,0.15)" }}>{"[hasVideo=" + String(k.hasVideo) + "]"}</span></div>
+                                {k.hasVideo && k.videoName
+                                  ? <div style={{ fontSize: 13, fontWeight: 700, color: C.red, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", lineHeight: 1.4 }} title={k.videoName}>{k.videoName}</div>
+                                  : <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>{"Chưa có video — bấm Tải lên để thêm (MP4, tối đa 100MB)"}</div>
+                                }
+                              </div>
+                            </div>
+                            {/* Right: actions */}
+                            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                              <label htmlFor={"video-upload-" + k.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", borderRadius: 8, border: "1px solid " + (k.hasVideo ? C.red + "55" : C.border), background: k.hasVideo ? C.red + "15" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 11, fontWeight: 700, color: k.hasVideo ? C.red : "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>
+                                {k.hasVideo ? "🔄 Thay thế" : "📎 Tải lên MP4"}
+                              </label>
+                              <input id={"video-upload-" + k.id} key={"video-input-" + k.id + "-" + String(k.hasVideo)} type="file" accept=".mp4" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; e.target.value = ""; if (file.size > 100 * 1024 * 1024) { setFormData(Object.assign({}, formData, { _upSt: "❌ File quá lớn! Tối đa 100MB. File này: " + Math.round(file.size / 1024 / 1024) + "MB" })); return; } if (!file.name.toLowerCase().endsWith(".mp4")) { setFormData(Object.assign({}, formData, { _upSt: "❌ Chỉ chấp nhận file .mp4" })); return; } setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải video (" + Math.round(file.size / 1024 / 1024) + "MB)..." })); var path = 'knowledge/' + k.id + '.mp4'; var { error: upErr } = await supabase.storage.from('videos').upload(path, file, { upsert: true, contentType: 'video/mp4' }); if (upErr) { setFormData(Object.assign({}, formData, { _upSt: "❌ Lỗi tải video: " + upErr.message })); return; } var { data: urlData } = supabase.storage.from('videos').getPublicUrl(path); upd({ hasVideo: true, videoName: file.name, videoUrl: urlData.publicUrl || "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Video MP4 đã lưu vào Storage thành công!" })); }} />
+                              {k.hasVideo && <button onClick={async function () { await supabase.storage.from('videos').remove(['knowledge/' + k.id + '.mp4']).catch(function () { }); upd({ hasVideo: false, videoName: "", videoUrl: k.videoUrl && /youtu/.test(k.videoUrl) ? k.videoUrl : "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa video MP4" })); }} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22", whiteSpace: "nowrap" }}>{"🗑 Xóa"}</button>}
+                            </div>
+                          </div>
                         </div>
 
                         {/* ── PDF — full-width row ── */}
@@ -4220,7 +4245,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
                     {(k.depts || ["Tất cả"]).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
                     {k.hasPdf && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.purple + "22", color: C.purple, fontWeight: 600 }}>{"📄 " + (k.pdfName || "PDF")}</span>}
-                    {k.videoUrl && tag("🎬 Video", C.red)}
+                    {(k.hasVideo || k.videoUrl) && tag(k.hasVideo ? "🎬 Video ⬆️" : "🎬 Video 🔗", C.red)}
                     {k.audioUrl && tag("🎧 Nghe", "#9b59b6")}
                     {k.docUrl && tag("🔗 Link", C.blue)}
                   </div>
@@ -4518,13 +4543,24 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                 {/* ── VIDEO ── */}
                 {tab === "video" && (function () {
-                  var vUrl = k.videoUrl || "";
-                  var isYT = /youtu/.test(vUrl);
+                  // Priority: uploaded MP4 (hasVideo) > YouTube/external link (videoUrl)
+                  var uploadedUrl = "";
+                  if (k.hasVideo) {
+                    var sbUrl = import.meta.env.VITE_SUPABASE_URL;
+                    uploadedUrl = sbUrl + "/storage/v1/object/public/videos/knowledge/" + k.id + ".mp4";
+                  }
+                  var vUrl = uploadedUrl || k.videoUrl || "";
+                  var isYT = !uploadedUrl && /youtu/.test(vUrl);
                   var ytId = "";
                   if (isYT) { var m = vUrl.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/); if (m) ytId = m[1] }
                   var isDirect = !isYT && !!vUrl;
                   return (
                     <div style={{ ...fsBody, padding: 0, alignItems: "center" }}>
+                      {/* Uploaded MP4 badge */}
+                      {k.hasVideo && k.videoName && (
+                        <div style={{ padding: "6px 12px", fontSize: 10, color: C.green, textAlign: "center", background: C.green + "08", borderBottom: "1px solid " + C.green + "22" }}>{"✅ Video đã tải lên: " + k.videoName}</div>
+                      )}
+
                       {/* YouTube embed — works on hosting, blocked in artifact */}
                       {isYT && ytId && (
                         <div style={{ width: "100%", maxWidth: "min(1100px, 100%)", margin: "0 auto" }}>
@@ -4557,7 +4593,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       {!vUrl && (
                         <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.25)" }}>
                           <div style={{ fontSize: 28, marginBottom: 6 }}>{"🎬"}</div>
-                          <div style={{ fontSize: 12 }}>{"Admin thêm link video trong Bài học"}</div>
+                          <div style={{ fontSize: 12 }}>{"Admin thêm link video hoặc tải MP4 trong Bài học"}</div>
                         </div>
                       )}
                     </div>
