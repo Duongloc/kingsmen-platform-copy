@@ -1858,7 +1858,29 @@ button{cursor:pointer;border:none;transition:all .15s}button:hover{filter:bright
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:${C.teal}55;border-radius:3px}
 select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !important}select option{background-color:#1A3A4A !important;color:#FFFFFF !important}input[type="date"]{color-scheme:dark}
 .nav-scroll::-webkit-scrollbar{display:none}
-@media(max-width:480px){body{font-size:13px}}`}</style>
+/* ── MOBILE RESPONSIVE ── */
+@media(max-width:480px){
+body{font-size:13px;overflow-x:hidden !important}
+html{overflow-x:hidden !important}
+/* Header wrapping */
+header{padding:6px 10px !important}
+header>div{flex-wrap:wrap !important;gap:6px !important}
+/* Nav tabs: compact for mobile */
+.nav-scroll{-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scroll-behavior:smooth}
+.nav-scroll>button{padding:8px 10px !important;font-size:10px !important;min-height:40px !important}
+/* Inputs: larger touch targets on mobile */
+input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="date"],input[type="search"],textarea,select{min-height:42px !important;font-size:14px !important}
+/* Video player sizing */
+video{max-height:60vh !important;width:100% !important}
+/* Tables: allow horizontal scroll */
+table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+/* Modals: full-width on mobile */
+.km-modal{max-width:95vw !important;width:95vw !important}
+}
+@media(max-width:360px){
+header{padding:6px 8px !important}
+.nav-scroll>button{padding:6px 8px !important;font-size:9px !important}
+}`}</style>
       <div ref={topRef} />
 
       {/* ═══ MOTIVATIONAL QUOTE POPUP ═══ */}
@@ -2195,7 +2217,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         )}
       </header>
 
-      <div style={{ maxWidth: 920, margin: "0 auto", padding: "12px 10px 60px" }}>
+      <div style={{ maxWidth: 920, margin: "0 auto", padding: "12px max(10px, 2vw) 60px" }}>
 
         {/* ═══ LOGIN ═══ */}
         {screen === "login" && (
@@ -2400,11 +2422,11 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div style={{ ...card, padding: 16, marginBottom: 12 }}>
                         <div style={{ fontSize: 10, color: C.blue, letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>{"② TÀI NGUYÊN"}</div>
                         {formData._upSt && <div onClick={function () { setFormData(Object.assign({}, formData, { _upSt: null })) }} style={{ padding: "6px 10px", borderRadius: 6, marginBottom: 8, fontSize: 11, fontWeight: 700, textAlign: "center", cursor: "pointer", background: formData._upSt.indexOf("✅") >= 0 ? C.green + "12" : formData._upSt.indexOf("❌") >= 0 ? C.red + "12" : C.gold + "12", color: formData._upSt.indexOf("✅") >= 0 ? C.green : formData._upSt.indexOf("❌") >= 0 ? C.red : C.gold }}>{formData._upSt}</div>}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(160px,100%),1fr))", gap: 8, marginBottom: 8 }}>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🔗 Tài liệu gốc"}</div><input value={k.docUrl || ""} onChange={function (e) { upd({ docUrl: e.target.value }) }} placeholder="docs.google.com/..." style={{ ...inp, fontSize: 10 }} /></div>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🔗 YouTube / Video link"}</div><input value={k.videoUrl || ""} onChange={function (e) { upd({ videoUrl: e.target.value }) }} placeholder="youtube.com/... hoặc link video" style={{ ...inp, fontSize: 10 }} />{k.videoUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{/youtu/.test(k.videoUrl) ? "✓ YouTube" : /^(http|\/media)/.test(k.videoUrl) ? "✓ Direct URL" : "✓ Link"}</div>}</div>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(160px,100%),1fr))", gap: 8, marginBottom: 8 }}>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎧 Audio (hosting/link)"}</div><input value={k.audioUrl || ""} onChange={function (e) { upd({ audioUrl: e.target.value }) }} placeholder="/media/audio.mp3 hoặc link" style={{ ...inp, fontSize: 10 }} />{k.audioUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{"✓ " + (k.audioUrl.length > 35 ? k.audioUrl.slice(0, 35) + "..." : k.audioUrl)}</div>}</div>
                         </div>
 
@@ -4275,13 +4297,13 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             const fsHead = { padding: "6px 8px", display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid " + C.border, flexShrink: 0 };
             const fsBody = { flex: 1, overflow: "auto", padding: "16px", display: "flex", flexDirection: "column" };
             const fsNav = { padding: "12px 16px", display: "flex", gap: 8, justifyContent: "center", alignItems: "center", borderTop: `1px solid ${C.border}`, flexShrink: 0 };
-            const tabBtn = (id, icon, label) => <button key={id} onClick={() => setFormData({ ...formData, learnTab: id, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {} })} style={{ padding: "8px 12px", borderRadius: 8, fontSize: 11, whiteSpace: "nowrap", minHeight: 36, fontWeight: 700, background: tab === id ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: tab === id ? C.goldL : "rgba(255,255,255,0.3)", border: `1px solid ${tab === id ? C.gold + "44" : C.border}` }}>{icon} {label}</button>;
+            const tabBtn = (id, icon, label) => <button key={id} onClick={() => setFormData({ ...formData, learnTab: id, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {} })} style={{ padding: "6px 10px", borderRadius: 8, fontSize: 10, whiteSpace: "nowrap", minHeight: 32, fontWeight: 700, flexShrink: 0, background: tab === id ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: tab === id ? C.goldL : "rgba(255,255,255,0.3)", border: `1px solid ${tab === id ? C.gold + "44" : C.border}` }}>{icon} {label}</button>;
 
             return (
               <div style={fs}>
                 {/* Fullscreen header */}
                 <div style={fsHead}>
-                  <div style={{ display: "flex", gap: 3, flex: 1, overflowX: "scroll", WebkitOverflowScrolling: "touch", paddingBottom: 2, msOverflowStyle: "none" }}>{tabBtn("docs", "📄", "Tài liệu")}{tabBtn("slides", "📊", "Slides")}{tabBtn("audio", "🔊", "Nghe")}{tabBtn("video", "🎬", "Video")}<div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)", margin: "0 2px", flexShrink: 0 }} />{tabBtn("cards", "🎴", "Cards")}{tabBtn("sheet", "📋", "Sheet")}{tabBtn("quiz", "✏️", "Quiz")}{tabBtn("info", "🖼️", "Ảnh")}{tabBtn("mind", "🧠", "Sơ đồ")}</div>
+                  <div className="nav-scroll" style={{ display: "flex", gap: 3, flex: 1, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2, scrollbarWidth: "none", msOverflowStyle: "none" }}>{tabBtn("docs", "📄", "Tài liệu")}{tabBtn("slides", "📊", "Slides")}{tabBtn("audio", "🔊", "Nghe")}{tabBtn("video", "🎬", "Video")}<div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)", margin: "0 2px", flexShrink: 0 }} />{tabBtn("cards", "🎴", "Cards")}{tabBtn("sheet", "📋", "Sheet")}{tabBtn("quiz", "✏️", "Quiz")}{tabBtn("info", "🖼️", "Ảnh")}{tabBtn("mind", "🧠", "Sơ đồ")}</div>
                   <button onClick={exitLearn} style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 18, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
                 </div>
 
