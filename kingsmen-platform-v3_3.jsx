@@ -236,20 +236,21 @@ const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: 
 const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
 const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, hidden: r.hidden || false, createdAt: r.created_at });
 const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null, hidden: q.hidden || false }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
-const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], createdAt: r.created_at });
-const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [] }; if (k.createdAt) base.created_at = k.createdAt; return base; };
+const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], hasVideo: r.has_video || false, videoName: r.video_name || "", createdAt: r.created_at, _isPartial: !('content' in r) });
+const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [], has_video: k.hasVideo || false, video_name: k.videoName || "" }; if (k.createdAt) base.created_at = k.createdAt; return base; };
 const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
 const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
-const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {}, delivered: r.delivered || {} });
-const challengeToSnake = (c) => ({ id: c.id, title: c.title, quiz_id: c.quizId || null, quiz_title: c.quizTitle || "", min_score: c.minScore || 70, deadline: c.deadline || null, assign_to: c.assignTo || "all", assign_dept: c.assignDept || null, rewards: c.rewards || [], active: c.active !== false, xp_bonus: c.xpBonus || c.xpReward || 50, created_by: c.createdBy || null, created_by_name: c.createdByName || "", completed_by: c.completedBy || [], won_rewards: c.wonRewards || {} });
+const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", knowledgeId: r.knowledge_id || null, knowledgeTitle: r.knowledge_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {}, delivered: r.delivered || {} });
+const challengeToSnake = (c) => ({ id: c.id, title: c.title, quiz_id: c.quizId || null, quiz_title: c.quizTitle || "", knowledge_id: c.knowledgeId || null, knowledge_title: c.knowledgeTitle || "", min_score: c.minScore || 70, deadline: c.deadline || null, assign_to: c.assignTo || "all", assign_dept: c.assignDept || null, rewards: c.rewards || [], active: c.active !== false, xp_bonus: c.xpBonus || c.xpReward || 50, created_by: c.createdBy || null, created_by_name: c.createdByName || "", completed_by: c.completedBy || [], won_rewards: c.wonRewards || {} });
 const notifToCamel = (r) => ({ id: r.id, empId: r.emp_id, msg: r.msg, type: r.type, date: r.created_at, read: r.read });
 const notifToSnake = (n) => ({ id: n.id, emp_id: n.empId, msg: n.msg, type: n.type || "info", read: n.read || false });
 const bulletinToCamel = (r) => ({ id: r.id, title: r.title, content: r.content, type: r.type, pinned: r.pinned, author: r.author, createdAt: r.created_at });
 const bulletinToSnake = (b) => ({ id: b.id, title: b.title, content: b.content || "", type: b.type || "announce", pinned: b.pinned || false, author: b.author || "" });
 const recognitionToCamel = (r) => ({ id: r.id, empId: r.emp_id, empName: r.emp_name || "", type: r.type, message: r.message, givenBy: r.given_by, createdAt: r.created_at });
 const recognitionToSnake = (r) => ({ id: r.id, emp_id: r.empId, emp_name: r.empName || "", type: r.type || "excellent", message: r.message || "", given_by: r.givenBy || "" });
-const pathToCamel = (r) => ({ id: r.id, title: r.title, dept: r.dept || "", description: r.description || "", stages: r.stages || [], assignedTo: r.assigned_to || [], createdAt: r.created_at || null });
-const pathToSnake = (p) => ({ id: p.id, title: p.title, dept: p.dept || "", description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [], ...(p.createdAt ? { created_at: p.createdAt } : {}) });
+const parseDepts = (d) => { if (Array.isArray(d)) return d; if (!d) return ["Tất cả"]; try { const arr = JSON.parse(d); if (Array.isArray(arr)) return arr; } catch (e) { } return d === "Tất cả" || d === "" ? ["Tất cả"] : [d]; };
+const pathToCamel = (r) => ({ id: r.id, title: r.title, depts: parseDepts(r.dept), description: r.description || "", stages: r.stages || [], assignedTo: r.assigned_to || [], createdAt: r.created_at || null });
+const pathToSnake = (p) => ({ id: p.id, title: p.title, dept: JSON.stringify(p.depts || ["Tất cả"]), description: p.description || "", stages: p.stages || [], assigned_to: p.assignedTo || [], ...(p.createdAt ? { created_at: p.createdAt } : {}) });
 
 var _pdfCache = {};
 
@@ -258,20 +259,20 @@ const DB = {
   async get(k, fb = null, isAdmin = false, userId = null) {
     try {
       switch (k) {
-        case "km-accounts": { const { data } = await supabase.from("profiles").select("*").order("created_at"); return data ? data.map(profileToCamel) : fb; }
+        case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at").order("created_at"); return data ? data.map(profileToCamel) : fb; }
         case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
-        case "km-knowledge": { const { data } = await supabase.from("knowledge").select("*").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
+        case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
             // Admins fetch everything — RLS allows this
-            const { data } = await supabase.from("results").select("*").order("created_at");
+            const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at");
             return data ? data.map(resultToCamel) : fb;
           }
           // Non-admins: single query filtered to own rows (explicit filter + RLS double protection)
           // No second query needed — answers are included since we only fetch own rows
           if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
           if (!userId) return fb;
-          const { data } = await supabase.from("results").select("*").eq("emp_id", userId).order("created_at");
+          const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").eq("emp_id", userId).order("created_at");
           return data ? data.map(resultToCamel) : fb;
         }
         case "km-recognitions": { const { data } = await supabase.from("recognitions").select("*").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
@@ -405,7 +406,8 @@ const DB = {
 export default function App() {
   const [ready, setReady] = useState(false);
   const [role, setRole] = useState(null);
-  const [screen, setScreen] = useState("login");
+  const [screen, setScreenRaw] = useState("login");
+  const setScreen = (s) => { setScreenRaw(s); if (s !== "login") { try { sessionStorage.setItem("km_screen", s); } catch(e){} } };
   const [currentUser, setCurrentUser] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [knowledge, setKnowledge] = useState([]);
@@ -494,7 +496,7 @@ export default function App() {
   useEffect(() => { accountsRef.current = accounts; }, [accounts]);
 
   // ─── localStorage cache helpers (TTL-aware, cross-tab safe) ───
-  const CACHE_TTL = { accounts: 30000, results: 30000, notifications: 30000, challenges: 30000, knowledge: 300000, quizzes: 300000, paths: 300000, settings: 300000, recognitions: 300000, bulletins: 300000, logo: 300000 };
+  const CACHE_TTL = { accounts: 600000, results: 300000, notifications: 300000, challenges: 300000, knowledge: 600000, quizzes: 600000, paths: 600000, settings: 600000, recognitions: 600000, bulletins: 600000, logo: 600000 };
   const cacheGet = (key) => { try { const raw = localStorage.getItem("kc_" + key); if (!raw) return null; const { ts, data } = JSON.parse(raw); const ttl = CACHE_TTL[key] ?? 30000; if (Date.now() - ts > ttl) { localStorage.removeItem("kc_" + key); return null; } return data; } catch (e) { } return null; };
   const cacheSet = (key, data) => { try { localStorage.setItem("kc_" + key, JSON.stringify({ ts: Date.now(), data })); } catch (e) { } };
   // Cross-tab cache invalidation: when another tab writes to cache, refresh volatile state
@@ -544,9 +546,13 @@ export default function App() {
               const activeAcc = (Array.isArray(cached.accounts) && cached.accounts.find(x => x.id === acc.id)) || acc;
               setCurrentUser(activeAcc);
               if (profile.emp_id === "admin" || profile.acc_role === "director") {
-                setRole("admin"); setScreen("admin_home");
+                setRole("admin");
+                const saved = sessionStorage.getItem("km_screen");
+                setScreen(saved && saved.startsWith("admin_") ? saved : "admin_home");
               } else {
-                setRole("employee"); setScreen("emp_home");
+                setRole("employee");
+                const saved = sessionStorage.getItem("km_screen");
+                setScreen(saved && saved.startsWith("emp_") ? saved : "emp_home");
               }
             } else {
               await supabase.auth.signOut();
@@ -577,8 +583,9 @@ export default function App() {
         const { data: userData } = await supabase.auth.getUser();
         user = userData?.user;
         if (user) {
-          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role").eq("id", user.id).single();
+          const { data: p } = await supabase.from("profiles").select("emp_id, acc_role, avatar").eq("id", user.id).single();
           isAdmin = p?.emp_id === "admin" || p?.acc_role === "director";
+          if (p?.avatar) setCurrentUser(prev => prev ? ({ ...prev, avatar: p.avatar }) : null);
         }
       }
 
@@ -604,7 +611,7 @@ export default function App() {
       if (!cacheGet("results")?.length) batch2.push(["results", DB.get("km-results", [], isAdmin, user?.id)]);
       if (!cacheGet("recognitions")?.length) batch2.push(["recognitions", DB.get("km-recognitions", [], isAdmin)]);
       if (!cacheGet("challenges")?.length) batch2.push(["challenges", DB.get("km-challenges", [], isAdmin)]);
-      if (!cacheGet("notifications")?.length) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
+      // if (!cacheGet("notifications")?.length) batch2.push(["notifications", DB.get("km-notifications", [], isAdmin)]);
       if (!cacheGet("paths")?.length) batch2.push(["paths", DB.get("km-paths", [], isAdmin)]);
       if (!cacheGet("bulletins")?.length) batch2.push(["bulletins", DB.get("km-bulletins", [], isAdmin)]);
       if (batch2.length > 0) {
@@ -614,7 +621,7 @@ export default function App() {
           if (key === "results" && Array.isArray(d)) { setResults(prev => { const merged = d.length >= prev.length ? d : [...d, ...prev.filter(x => !d.some(y => y.id === x.id))]; cacheSet("results", merged); return merged; }); }
           if (key === "recognitions" && Array.isArray(d)) { setRecognitions(d); cacheSet("recognitions", d); }
           if (key === "challenges" && Array.isArray(d)) { setChallenges(d); cacheSet("challenges", d); }
-          if (key === "notifications" && Array.isArray(d)) { setNotifications(d); cacheSet("notifications", d); }
+          // if (key === "notifications" && Array.isArray(d)) { setNotifications(d); cacheSet("notifications", d); }
           if (key === "paths" && Array.isArray(d)) { setPaths(d); cacheSet("paths", d); }
           if (key === "bulletins" && Array.isArray(d)) { setBulletins(d); cacheSet("bulletins", d); }
         });
@@ -676,25 +683,9 @@ export default function App() {
     const error = await rpcWithRetry(() => supabase.rpc("increment_xp", { p_user_id: userId, p_amount: amount, p_date: today() }));
     if (error) { console.error("addXP RPC error:", error.message); if (currentUser && currentUser.id === userId) addNotif(userId, "⚠️ Lỗi cập nhật XP sau 3 lần thử. Vui lòng liên hệ Admin.", "error"); }
   };
-  const addNotif = async (empId, msg, type = "info") => {
-    const row = { id: uid(), empId, msg, type, date: new Date().toISOString(), read: false };
-    // Optimistic local update using functional form — no stale closure
-    setNotifications(prev => [...prev, row]);
-    // Direct insert — concurrent-safe
-    const { error } = await supabase.from("notifications").insert([notifToSnake(row)]);
-    if (error) console.error("addNotif insert error:", error.message);
-  };
-  const markNotifRead = async (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id);
-    if (error) console.error("markNotifRead error:", error.message);
-  };
-  const markAllNotifsRead = async () => {
-    if (!currentUser) return;
-    setNotifications(prev => prev.map(n => n.empId === currentUser.id ? { ...n, read: true } : n));
-    const { error } = await supabase.from("notifications").update({ read: true }).eq("emp_id", currentUser.id);
-    if (error) console.error("markAllNotifsRead error:", error.message);
-  };
+  const addNotif = async (empId, msg, type = "info") => { return; };
+  const markNotifRead = async (id) => { return; };
+  const markAllNotifsRead = async () => { return; };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
@@ -783,28 +774,28 @@ export default function App() {
   useEffect(() => { if (screen === "login") { (async () => { try { const a = await DB.get("km-accounts", []); if (a.length > 0) { setAccounts(a); accountsRef.current = a; } } catch (e) { } })(); } }, [screen]);
   // Selective auto-reload — only fetch tables the current screen needs
   const SCREEN_TABLES = {
-    emp_home: ["accounts", "results", "challenges", "notifications"],
+    emp_home: ["accounts", "results", "challenges"],
     emp_quizzes: ["quizzes", "results"],
     emp_knowledge: ["knowledge"],
-    emp_challenges: ["challenges", "results"],
-    emp_pathway: ["paths", "results", "quizzes"],
+    emp_challenges: ["challenges", "results", "knowledge"],
+    emp_pathway: ["paths", "results", "quizzes", "knowledge"],
     emp_bulletins: ["bulletins"],
     dir_bulletins: ["bulletins"],
     admin_home: ["accounts", "results", "challenges", "knowledge", "quizzes"],
     admin_accounts: ["accounts"],
     admin_lessons: ["knowledge"],
     admin_quizzes: ["quizzes", "results", "knowledge"],
-    admin_challenges: ["challenges", "accounts"],
+    admin_challenges: ["challenges", "accounts", "knowledge"],
     admin_analytics: ["accounts", "results", "quizzes"],
     admin_ranking: ["accounts", "results"],
     admin_bulletins: ["bulletins"],
-    admin_activity: ["accounts", "results", "notifications"],
+    admin_activity: ["accounts", "results"],
   };
   useEffect(() => {
     const needed = SCREEN_TABLES[screen];
     if (!role || !needed) return;
     const now = Date.now();
-    if (now - lastAutoReloadRef.current < 8000) return;
+    if (now - lastAutoReloadRef.current < 30000) return;
     lastAutoReloadRef.current = now;
     (async () => {
       try {
@@ -838,6 +829,33 @@ export default function App() {
       } catch (e) { }
     })();
   }, [screen, role]);
+
+  // Lazy-load full knowledge content when opened
+  useEffect(() => {
+    if (!subScreen || (screen !== "admin_lessons" && screen !== "emp_knowledge")) return;
+    const kItem = knowledge.find(k => k.id === subScreen);
+    if (!kItem || kItem.id === "add" || !kItem._isPartial) return;
+    
+    (async () => {
+      try {
+        const { data } = await supabase.from("knowledge").select("content,interactive,images").eq("id", kItem.id).single();
+        if (data) {
+          setKnowledge(prev => {
+            const next = prev.map(k => k.id === kItem.id ? { 
+              ...k, 
+              content: data.content || "", 
+              interactive: data.interactive || null, 
+              images: data.images || [],
+              _isPartial: false
+            } : k);
+            cacheSet("knowledge", next);
+            return next;
+          });
+        }
+      } catch (e) { console.error("Lazy load knowledge error:", e); }
+    })();
+  }, [subScreen, screen, knowledge]);
+
 
   // Timer
   useEffect(() => { if (qActive && qTimer > 0) { qTimerRef.current = setInterval(() => setQTimer(t => t <= 1 ? (clearInterval(qTimerRef.current), 0) : t - 1), 1000); return () => clearInterval(qTimerRef.current); }; }, [qActive]);
@@ -1163,10 +1181,10 @@ CHỈ JSON thuần. KHÔNG thêm gì khác.`;
       });
       if (newNotifRows.length > 0) {
         // Optimistic local update using functional form — no stale closure
-        setNotifications(prev => [...prev, ...newNotifRows]);
+        // setNotifications(prev => [...prev, ...newNotifRows]);
         // Multi-row insert — concurrent-safe, no full-array overwrite
-        const { error: nErr } = await supabase.from("notifications").insert(newNotifRows.map(notifToSnake));
-        if (nErr) console.error("finishQuiz notifications insert error:", nErr.message);
+        // const { error: nErr } = await supabase.from("notifications").insert(newNotifRows.map(notifToSnake));
+        // if (nErr) console.error("finishQuiz notifications insert error:", nErr.message);
       }
     }
     // Build updated pathProgress if quiz was taken from a pathway
@@ -1868,7 +1886,29 @@ button{cursor:pointer;border:none;transition:all .15s}button:hover{filter:bright
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:${C.teal}55;border-radius:3px}
 select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !important}select option{background-color:#1A3A4A !important;color:#FFFFFF !important}input[type="date"]{color-scheme:dark}
 .nav-scroll::-webkit-scrollbar{display:none}
-@media(max-width:480px){body{font-size:13px}}`}</style>
+/* ── MOBILE RESPONSIVE ── */
+@media(max-width:480px){
+body{font-size:13px;overflow-x:hidden !important}
+html{overflow-x:hidden !important}
+/* Header wrapping */
+header{padding:6px 10px !important}
+header>div{flex-wrap:wrap !important;gap:6px !important}
+/* Nav tabs: compact for mobile */
+.nav-scroll{-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scroll-behavior:smooth}
+.nav-scroll>button{padding:8px 10px !important;font-size:10px !important;min-height:40px !important}
+/* Inputs: larger touch targets on mobile */
+input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="date"],input[type="search"],textarea,select{min-height:42px !important;font-size:14px !important}
+/* Video player sizing */
+video{max-height:60vh !important;width:100% !important}
+/* Tables: allow horizontal scroll */
+table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+/* Modals: full-width on mobile */
+.km-modal{max-width:95vw !important;width:95vw !important}
+}
+@media(max-width:360px){
+header{padding:6px 8px !important}
+.nav-scroll>button{padding:6px 8px !important;font-size:9px !important}
+}`}</style>
       <div ref={topRef} />
 
       {/* ═══ MOTIVATIONAL QUOTE POPUP ═══ */}
@@ -2168,7 +2208,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleAvatarUpload(e, currentUser.id)} />
               </div>
             )}
-            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } ["accounts", "knowledge", "quizzes", "results", "recognitions", "challenges", "notifications", "paths", "settings", "bulletins", "logo"].forEach(k => localStorage.removeItem("kc_" + k)); setAccounts([]); setKnowledge([]); setQuizzes([]); setResults([]); setRecognitions([]); setChallenges([]); setNotifications([]); setPaths([]); setSettings({}); setBulletins([]); setCompanyLogo(null); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
+            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } ["accounts", "knowledge", "quizzes", "results", "recognitions", "challenges", "notifications", "paths", "settings", "bulletins", "logo"].forEach(k => localStorage.removeItem("kc_" + k)); try { sessionStorage.removeItem("km_screen"); } catch(e){} setAccounts([]); setKnowledge([]); setQuizzes([]); setResults([]); setRecognitions([]); setChallenges([]); setNotifications([]); setPaths([]); setSettings({}); setBulletins([]); setCompanyLogo(null); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
           </div>
         </div>
         {role === "employee" && currentUser && (
@@ -2205,7 +2245,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         )}
       </header>
 
-      <div style={{ maxWidth: 920, margin: "0 auto", padding: "12px 10px 60px" }}>
+      <div style={{ maxWidth: 920, margin: "0 auto", padding: "12px max(10px, 2vw) 60px" }}>
 
         {/* ═══ LOGIN ═══ */}
         {screen === "login" && (
@@ -2328,8 +2368,8 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{knowledge.length + " bài · " + knowledge.filter(function (k2) { return k2.interactive }).length + " có interactive"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledgeNow([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
-                    <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, createdAt: new Date().toISOString() }; updKnowledgeNow([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
+                    <button onClick={function () { var nid = "k" + Date.now(); updKnowledgeNow([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], hasVideo: false, videoName: "", createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
+                    <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, hasVideo: false, videoName: "", createdAt: new Date().toISOString() }; updKnowledgeNow([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
                     <button onClick={function () { setScreen("admin_home") }} style={{ ...btnO, padding: "8px 12px", fontSize: 11 }}>{"←"}</button>
                   </div>
                 </div>
@@ -2346,7 +2386,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                           {(k.depts || []).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
                           {hasL && tag(sl + "S " + fc + "F", C.teal)}
                           {!!(k.docUrl) && tag("🔗 Link", C.blue)}
-                          {!!(k.videoUrl) && tag("🎬 Video", C.red)}
+                          {(k.hasVideo || k.videoUrl) && tag(k.hasVideo ? "🎬 Video ⬆️" : "🎬 Video 🔗", C.red)}
                           {!!(k.audioUrl) && tag("🎧 Audio", "#9b59b6")}
                           {k.images && k.images.length > 0 && tag(k.images.length + " 🖼️", C.gold)}
                         </div>
@@ -2410,12 +2450,37 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div style={{ ...card, padding: 16, marginBottom: 12 }}>
                         <div style={{ fontSize: 10, color: C.blue, letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>{"② TÀI NGUYÊN"}</div>
                         {formData._upSt && <div onClick={function () { setFormData(Object.assign({}, formData, { _upSt: null })) }} style={{ padding: "6px 10px", borderRadius: 6, marginBottom: 8, fontSize: 11, fontWeight: 700, textAlign: "center", cursor: "pointer", background: formData._upSt.indexOf("✅") >= 0 ? C.green + "12" : formData._upSt.indexOf("❌") >= 0 ? C.red + "12" : C.gold + "12", color: formData._upSt.indexOf("✅") >= 0 ? C.green : formData._upSt.indexOf("❌") >= 0 ? C.red : C.gold }}>{formData._upSt}</div>}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(160px,100%),1fr))", gap: 8, marginBottom: 8 }}>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🔗 Tài liệu gốc"}</div><input value={k.docUrl || ""} onChange={function (e) { upd({ docUrl: e.target.value }) }} placeholder="docs.google.com/..." style={{ ...inp, fontSize: 10 }} /></div>
-                          <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎬 Video (YouTube/hosting)"}</div><input value={k.videoUrl || ""} onChange={function (e) { upd({ videoUrl: e.target.value }) }} placeholder="youtube.com/... hoặc /media/video.mp4" style={{ ...inp, fontSize: 10 }} />{k.videoUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{/youtu/.test(k.videoUrl) ? "✓ YouTube" : /^(http|\/media)/.test(k.videoUrl) ? "✓ Direct URL" : "✓ Link"}</div>}</div>
+                          <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🔗 YouTube / Video link"}</div><input value={k.videoUrl || ""} onChange={function (e) { upd({ videoUrl: e.target.value }) }} placeholder="youtube.com/... hoặc link video" style={{ ...inp, fontSize: 10 }} />{k.videoUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{/youtu/.test(k.videoUrl) ? "✓ YouTube" : /^(http|\/media)/.test(k.videoUrl) ? "✓ Direct URL" : "✓ Link"}</div>}</div>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(160px,100%),1fr))", gap: 8, marginBottom: 8 }}>
                           <div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginBottom: 2 }}>{"🎧 Audio (hosting/link)"}</div><input value={k.audioUrl || ""} onChange={function (e) { upd({ audioUrl: e.target.value }) }} placeholder="/media/audio.mp3 hoặc link" style={{ ...inp, fontSize: 10 }} />{k.audioUrl && <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>{"✓ " + (k.audioUrl.length > 35 ? k.audioUrl.slice(0, 35) + "..." : k.audioUrl)}</div>}</div>
+                        </div>
+
+                        {/* ── VIDEO MP4 UPLOAD — full-width row ── */}
+                        <div style={{ borderRadius: 10, border: "1px solid " + (k.hasVideo ? C.red + "44" : "rgba(255,255,255,0.1)"), background: k.hasVideo ? C.red + "08" : "rgba(255,255,255,0.02)", padding: "12px 14px", marginBottom: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                            {/* Left: status + filename */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 8, background: k.hasVideo ? C.red + "25" : "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{k.hasVideo ? "🎬" : "📭"}</div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginBottom: 2, letterSpacing: 1 }}>{"VIDEO MP4 ĐÍNH KÈM"}<span style={{ marginLeft: 8, fontSize: 9, color: "rgba(255,255,255,0.15)" }}>{"[hasVideo=" + String(k.hasVideo) + "]"}</span></div>
+                                {k.hasVideo && k.videoName
+                                  ? <div style={{ fontSize: 13, fontWeight: 700, color: C.red, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%", lineHeight: 1.4 }} title={k.videoName}>{k.videoName}</div>
+                                  : <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>{"Chưa có video — bấm Tải lên để thêm (MP4, tối đa 100MB)"}</div>
+                                }
+                              </div>
+                            </div>
+                            {/* Right: actions */}
+                            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                              <label htmlFor={"video-upload-" + k.id} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 14px", borderRadius: 8, border: "1px solid " + (k.hasVideo ? C.red + "55" : C.border), background: k.hasVideo ? C.red + "15" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 11, fontWeight: 700, color: k.hasVideo ? C.red : "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>
+                                {k.hasVideo ? "🔄 Thay thế" : "📎 Tải lên MP4"}
+                              </label>
+                              <input id={"video-upload-" + k.id} key={"video-input-" + k.id + "-" + String(k.hasVideo)} type="file" accept=".mp4" style={{ display: "none" }} onChange={async function (e) { if (!e.target.files[0]) return; var file = e.target.files[0]; e.target.value = ""; if (file.size > 100 * 1024 * 1024) { setFormData(Object.assign({}, formData, { _upSt: "❌ File quá lớn! Tối đa 100MB. File này: " + Math.round(file.size / 1024 / 1024) + "MB" })); return; } if (!file.name.toLowerCase().endsWith(".mp4")) { setFormData(Object.assign({}, formData, { _upSt: "❌ Chỉ chấp nhận file .mp4" })); return; } setFormData(Object.assign({}, formData, { _upSt: "⏳ Đang tải video (" + Math.round(file.size / 1024 / 1024) + "MB)..." })); var path = 'knowledge/' + k.id + '.mp4'; var { error: upErr } = await supabase.storage.from('videos').upload(path, file, { upsert: true, contentType: 'video/mp4' }); if (upErr) { setFormData(Object.assign({}, formData, { _upSt: "❌ Lỗi tải video: " + upErr.message })); return; } var { data: urlData } = supabase.storage.from('videos').getPublicUrl(path); upd({ hasVideo: true, videoName: file.name, videoUrl: urlData.publicUrl || "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Video MP4 đã lưu vào Storage thành công!" })); }} />
+                              {k.hasVideo && <button onClick={async function () { await supabase.storage.from('videos').remove(['knowledge/' + k.id + '.mp4']).catch(function () { }); upd({ hasVideo: false, videoName: "", videoUrl: k.videoUrl && /youtu/.test(k.videoUrl) ? k.videoUrl : "" }); setFormData(Object.assign({}, formData, { _upSt: "✅ Đã xóa video MP4" })); }} style={{ padding: "7px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: C.red, background: C.red + "08", border: "1px solid " + C.red + "22", whiteSpace: "nowrap" }}>{"🗑 Xóa"}</button>}
+                            </div>
+                          </div>
                         </div>
 
                         {/* ── PDF — full-width row ── */}
@@ -3427,6 +3492,16 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 <div style={{ fontSize: 13, color: C.gold, fontWeight: 700, marginBottom: 12 }}>TẠO THỬ THÁCH MỚI</div>
                 <div style={{ marginBottom: 10 }}><label style={lbl}>Tên thử thách *</label><input value={formData.chTitle || ""} onChange={e => setFormData({ ...formData, chTitle: e.target.value })} placeholder="VD: Chinh phục kiến thức Polyurea" style={inp} /></div>
 
+                {/* Knowledge link */}
+                <div style={{ marginBottom: 10, padding: 14, borderRadius: 10, background: `${C.blue}06`, border: `1px solid ${C.blue}22` }}>
+                  <label style={{ ...lbl, color: C.blue }}>📖 Bài kiến thức liên kết (tùy chọn)</label>
+                  <select value={formData.chKnowledge || ""} onChange={e => { const kId = e.target.value; const kItem = knowledge.find(k => k.id === kId); setFormData({ ...formData, chKnowledge: kId, chKnowledgeTitle: kItem ? kItem.title : "" }); }} style={inp}>
+                    <option value="">— Không gắn bài kiến thức —</option>
+                    {knowledge.map(k => <option key={k.id} value={k.id}>{k.title}</option>)}
+                  </select>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 6 }}>Gắn bài kiến thức để học viên đọc trước khi làm bài kiểm tra</div>
+                </div>
+
                 {/* Quiz selection */}
                 <div style={{ marginBottom: 10, padding: 14, borderRadius: 10, background: `${C.green}06`, border: `1px solid ${C.green}22` }}>
                   <label style={{ ...lbl, color: C.green }}>📝 Bài kiểm tra gắn kết *</label>
@@ -3485,7 +3560,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     const chPersons = formData.chPersons || [];
                     const assignTo = formData.chAssign === "dept" ? "dept" : formData.chAssign === "person" ? (chPersons.length === 1 ? chPersons[0] : chPersons.length > 1 ? JSON.stringify(chPersons) : "all") : "all";
                     const selQuiz = quizzes.find(q => q.id === formData.chQuiz);
-                    const ch = { id: uid(), title: formData.chTitle, quizId: formData.chQuiz, quizTitle: (selQuiz && selQuiz.title) || "", minScore: formData.chMinScore || 70, xpReward: formData.chXP || 50, deadline: formData.chDeadline || "", assignTo, assignDept: formData.chDept || "", rewards: (formData.chRewards || []).filter(r => r.trim()), createdAt: new Date().toISOString(), createdBy: currentUser ? currentUser.id : null, createdByName: currentUser ? currentUser.name : "Admin", active: true, completedBy: [], wonRewards: {} };
+                    const ch = { id: uid(), title: formData.chTitle, quizId: formData.chQuiz, quizTitle: (selQuiz && selQuiz.title) || "", knowledgeId: formData.chKnowledge || null, knowledgeTitle: formData.chKnowledgeTitle || "", minScore: formData.chMinScore || 70, xpReward: formData.chXP || 50, deadline: formData.chDeadline || "", assignTo, assignDept: formData.chDept || "", rewards: (formData.chRewards || []).filter(r => r.trim()), createdAt: new Date().toISOString(), createdBy: currentUser ? currentUser.id : null, createdByName: currentUser ? currentUser.name : "Admin", active: true, completedBy: [], wonRewards: {} };
                     // Reload latest from storage before appending
                     let existing = challenges;
                     try { const fromDB = await DB.get("km-challenges", []); if (Array.isArray(fromDB) && fromDB.length >= existing.length) existing = fromDB; } catch (e) { }
@@ -3493,13 +3568,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     setChallenges(newCh);
                     const saved = await DB.set("km-challenges", newCh);
                     if (!saved) { setSaveStatus("error"); return; }
-                    // Notifications
-                    const targets = assignTo === "all" ? accounts : assignTo === "dept" ? accounts.filter(a => a.dept === formData.chDept) : assignTo.startsWith('[') ? (() => { try { const ids = JSON.parse(assignTo); return accounts.filter(a => ids.includes(a.id)); } catch (e) { return []; } })() : accounts.filter(a => a.id === assignTo);
-                    let curNotifs = notifications;
-                    try { const nfDB = await DB.get("km-notifications", []); if (Array.isArray(nfDB) && nfDB.length >= curNotifs.length) curNotifs = nfDB; } catch (e) { }
-                    const newNotifs = [...curNotifs];
-                    targets.forEach(t => newNotifs.push({ id: uid(), empId: t.id, msg: "🎯 Thử thách: " + formData.chTitle + " — Đạt ≥" + ch.minScore + "% bài " + ch.quizTitle + (ch.rewards.length > 0 ? " · 🎁 " + ch.rewards.length + " phần thưởng" : ""), type: "challenge", date: new Date().toISOString(), read: false }));
-                    setNotifications(newNotifs); await DB.set("km-notifications", newNotifs);
+                    // Notifications disabled
                     setSaveStatus("saved"); setFormData({}); setSubScreen(null);
                   }} style={{ ...btnG, opacity: (!(formData.chTitle || "").trim() || !formData.chQuiz) ? 0.4 : 1 }}>🎯 Tạo thử thách</button>
                   <button onClick={() => { setFormData({}); setSubScreen(null); }} style={btnO}>Hủy</button>
@@ -3527,7 +3596,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       <div style={{ width: 44, height: 44, borderRadius: 12, background: `${C.gold}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>📋</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ color: C.white, fontWeight: 700, fontSize: 15 }}>{p.title}</div>
-                        <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>{tag(p.dept || "Tất cả", C.blue)}{tag(stageCount + " giai đoạn", C.gold)}{tag(moduleCount + " module", C.purple)}</div>
+                        <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>{(p.depts || ["Tất cả"]).map((d, di) => <span key={di} style={{ fontSize: 10, padding: "5px 10px", borderRadius: 4, background: `${C.blue}22`, color: C.blue, fontWeight: 600 }}>{d}</span>)}{tag(stageCount + " giai đoạn", C.gold)}{tag(moduleCount + " module", C.purple)}</div>
                         {assigned.length > 0 && (
                           <button onClick={() => setFormData({ ...formData, pathExpand: expanded ? null : p.id })} style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 6, fontSize: 10, fontWeight: 700, color: completedCount > 0 ? C.green : "rgba(255,255,255,0.4)", background: completedCount > 0 ? `${C.green}22` : "rgba(255,255,255,0.06)", padding: "3px 10px", borderRadius: 4, border: `1px solid ${completedCount > 0 ? C.green + "44" : C.border}`, cursor: "pointer" }}>{completedCount}/{assigned.length} hoàn thành {expanded ? "▲" : "▼"}</button>
                         )}
@@ -3559,15 +3628,20 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               const isEdit = subScreen === "editPath";
               const editPath = isEdit ? paths.find(p => p.id === formData.editPathId) : null;
               const pTitle = isEdit ? (formData.pTitle !== undefined ? formData.pTitle : (editPath && editPath.title) || "") : (formData.pTitle || "");
-              const pDept = isEdit ? (formData.pDept !== undefined ? formData.pDept : (editPath && editPath.dept) || DEPTS[0]) : (formData.pDept || DEPTS[0]);
+              const pDepts = isEdit ? (formData.pDepts !== undefined ? formData.pDepts : (editPath && editPath.depts) || ["Tất cả"]) : (formData.pDepts || ["Tất cả"]);
               const pStages = isEdit ? (formData.pStages !== undefined ? formData.pStages : (editPath && editPath.stages) || []) : (formData.pStages || []);
               const pAssign = isEdit ? (formData.pAssign !== undefined ? formData.pAssign : (editPath && editPath.assignedTo) || []) : (formData.pAssign || []);
               return (
                 <div style={{ ...card, background: "rgba(197,153,62,0.04)", border: "1px solid rgba(197,153,62,0.15)" }}>
                   <div style={{ fontSize: 13, color: C.gold, fontWeight: 700, marginBottom: 12 }}>{isEdit ? "CHỈNH SỬA" : "TẠO"} LỘ TRÌNH</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8, marginBottom: 10 }}>
-                    <div><label style={lbl}>Tên lộ trình *</label><input value={pTitle} onChange={e => setFormData({ ...formData, pTitle: e.target.value })} placeholder="VD: Onboarding NV Kinh doanh" style={inp} /></div>
-                    <div><label style={lbl}>Phòng ban</label><select value={pDept} onChange={e => setFormData({ ...formData, pDept: e.target.value })} style={inp}>{DEPTS.map(d => <option key={d}>{d}</option>)}</select></div>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={lbl}>Tên lộ trình *</label><input value={pTitle} onChange={e => setFormData({ ...formData, pTitle: e.target.value })} placeholder="VD: Onboarding NV Kinh doanh" style={inp} />
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={lbl}>Phòng ban (chọn nhiều)</label>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {["Tất cả", ...DEPTS].map(d => { const on = pDepts.includes(d); return <button key={d} onClick={() => { if (d === "Tất cả") { setFormData({ ...formData, pDepts: ["Tất cả"] }); } else { const next = on ? pDepts.filter(x => x !== d) : [...pDepts.filter(x => x !== "Tất cả"), d]; setFormData({ ...formData, pDepts: next.length === 0 ? ["Tất cả"] : next }); } }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.blue}22` : "rgba(255,255,255,0.03)", color: on ? C.blue : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.blue + "44" : C.border}`, cursor: "pointer", fontWeight: on ? 700 : 400 }}>{on ? "✓ " : ""}{d}</button> })}
+                    </div>
                   </div>
 
                   {/* Assign employees */}
@@ -3575,12 +3649,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <label style={{ ...lbl, marginBottom: 0 }}>Gán cho NV {pAssign.length > 0 ? `(${pAssign.length} đã chọn)` : "(chọn nhiều)"}</label>
                       <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={() => { const all = accounts.filter(a => a.dept === pDept || pDept === "Tất cả").map(a => a.id); setFormData({ ...formData, pAssign: all }); }} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.green}18`, color: C.green, border: `1px solid ${C.green}33`, cursor: "pointer" }}>Chọn tất cả</button>
+                        <button onClick={() => { const all = accounts.filter(a => pDepts.includes("Tất cả") || pDepts.includes(a.dept)).map(a => a.id); setFormData({ ...formData, pAssign: all }); }} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: `${C.green}18`, color: C.green, border: `1px solid ${C.green}33`, cursor: "pointer" }}>Chọn tất cả</button>
                         <button onClick={() => setFormData({ ...formData, pAssign: [] })} style={{ padding: "4px 10px", borderRadius: 5, fontSize: 10, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", border: `1px solid ${C.border}`, cursor: "pointer" }}>Bỏ chọn</button>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {accounts.filter(a => a.dept === pDept || pDept === "Tất cả").map(a => {
+                      {accounts.filter(a => pDepts.includes("Tất cả") || pDepts.includes(a.dept)).map(a => {
                         const on = pAssign.includes(a.id); return (
                           <button key={a.id} onClick={() => { const na = on ? pAssign.filter(x => x !== a.id) : [...pAssign, a.id]; setFormData({ ...formData, pAssign: na }); }} style={{ padding: "6px 12px", borderRadius: 6, fontSize: 10, background: on ? `${C.green}22` : "rgba(255,255,255,0.03)", color: on ? C.green : "rgba(255,255,255,0.3)", border: `1px solid ${on ? C.green + "44" : C.border}`, cursor: "pointer" }}>{on ? "✓ " : ""}{a.name}</button>
                         );
@@ -3608,6 +3682,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                 <input value={mod.title} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], title: e.target.value }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, flex: 1, padding: "6px 10px", fontSize: 12 }} placeholder="Tên module" />
                                 <button onClick={() => { const ns = [...pStages]; ns[si].modules = ns[si].modules.filter((_, i) => i !== mi); setFormData({ ...formData, pStages: ns }); }} style={{ fontSize: 12, color: C.red, background: "none", border: "none" }}>✕</button>
                               </div>
+                              {/* Link knowledge */}
+                              <div style={{ marginBottom: 4 }}><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>📖 Bài kiến thức (đọc trước khi thi)</label>
+                                <select value={mod.knowledgeId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], knowledgeId: e.target.value || "" }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
+                                  <option value="">— Không gắn bài —</option>{knowledge.map(k => <option key={k.id} value={k.id}>{k.title}</option>)}
+                                </select>
+                              </div>
                               {/* Link quiz */}
                               <div style={{ marginBottom: 4 }}><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Bài kiểm tra (mở khóa tuần tự)</label>
                                 <select value={mod.quizId || ""} onChange={e => { const ns = [...pStages]; ns[si].modules[mi] = { ...ns[si].modules[mi], quizId: e.target.value, quizTitle: (() => { const _q = quizzes.find(q => q.id === e.target.value); return _q ? _q.title : ""; }) }; setFormData({ ...formData, pStages: ns }); }} style={{ ...inp, padding: "5px 8px", fontSize: 11 }}>
@@ -3630,7 +3710,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                     if (!mod.title) return; setAiLoading(true); setAiStatus("AI đang gợi ý checklist...");
                                     try {
                                       await supabase.auth.getSession(); // Refresh JWT
-                                      const { data: rawCl, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDept}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] }, responseType: "text" });
+                                      const { data: rawCl, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDepts.join(", ")}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] }, responseType: "text" });
                                       if (fnErr) throw new Error(fnErr.message || "Edge function error");
                                       var clData; try { clData = typeof rawCl === "string" ? JSON.parse(rawCl) : rawCl; } catch (pe) { throw new Error("Response parse error: " + String(rawCl).slice(0, 200)); }
                                       if (clData && clData.error) throw new Error(clData.error.message || "API error");
@@ -3652,7 +3732,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={async () => {
                       if (!pTitle.trim() || pStages.length === 0) return;
-                      const pathData = { id: isEdit ? editPath.id : uid(), title: pTitle, dept: pDept, stages: pStages.map(s => ({ ...s, modules: (s.modules || []).filter(m => m.title || m.quizId).map(m => ({ ...m, checklist: (m.checklist || []).filter(Boolean) })) })), assignedTo: pAssign, createdAt: isEdit ? editPath.createdAt : new Date().toISOString() };
+                      const pathData = { id: isEdit ? editPath.id : uid(), title: pTitle, depts: pDepts, stages: pStages.map(s => ({ ...s, modules: (s.modules || []).filter(m => m.title || m.quizId || m.knowledgeId).map(m => ({ ...m, checklist: (m.checklist || []).filter(Boolean) })) })), assignedTo: pAssign, createdAt: isEdit ? editPath.createdAt : new Date().toISOString() };
                       let existing = paths; try { const fromDB = await DB.get("km-paths", []); if (Array.isArray(fromDB)) existing = fromDB; } catch (e) { }
                       const np = isEdit ? existing.map(p => p.id === pathData.id ? pathData : p) : [...existing, pathData];
                       setPaths(np); await DB.set("km-paths", np);
@@ -3690,41 +3770,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   </div>
                 ))}
             </div>
-            {/* Old notifications cleanup */}
-            <div style={card}>
-              <div style={{ fontSize: 13, color: C.white, fontWeight: 700, marginBottom: 8 }}>🗑️ DỌN DẸP THÔNG BÁO CŨ</div>
-              {(() => {
-                const cutoff = "2026-04-01";
-                const oldCount = notifications.filter(n => n.date < cutoff).length;
-                return <>
-                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>
-                    {oldCount > 0 ? `${oldCount} thông báo trước ngày 01/04/2026` : "Không có thông báo cũ nào trước ngày 01/04/2026"}
-                  </div>
-                  {oldCount > 0 && (
-                    formData._confirmDelNotif ? (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={async () => {
-                          const { error } = await supabase.from("notifications").delete().lt("created_at", cutoff);
-                          if (!error) {
-                            const kept = notifications.filter(n => n.date >= cutoff);
-                            setNotifications(kept);
-                            cacheSet("notifications", kept);
-                            setSaveStatus("saved");
-                            setTimeout(() => setSaveStatus(""), 2000);
-                          }
-                          setFormData({ ...formData, _confirmDelNotif: false });
-                        }} style={{ padding: "8px 16px", borderRadius: 8, background: C.red, color: C.white, fontSize: 12, fontWeight: 700, border: "none" }}>✅ Xác nhận xóa {oldCount} thông báo</button>
-                        <button onClick={() => setFormData({ ...formData, _confirmDelNotif: false })} style={btnO}>Hủy</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setFormData({ ...formData, _confirmDelNotif: true })} style={{ padding: "8px 16px", borderRadius: 8, background: C.red + "22", color: C.red, fontSize: 12, fontWeight: 700, border: `1px solid ${C.red}44` }}>
-                        Xóa {oldCount} thông báo cũ
-                      </button>
-                    )
-                  )}
-                </>;
-              })()}
-            </div>
+            {/* Old notifications cleanup hidden */}
           </div>
         )}
 
@@ -3839,7 +3885,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             <div style={{ ...card, marginTop: 8 }}>
               <div style={{ fontSize: 13, color: C.gold, fontWeight: 700, marginBottom: 10 }}>THÔNG TIN DỮ LIỆU HIỆN TẠI</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))", gap: 8 }}>
-                {[["Tài khoản", accounts.length], ["Kiến thức", knowledge.length], ["Đề thi", quizzes.length], ["Kết quả", results.length], ["Tuyên dương", recognitions.length], ["Thử thách", challenges.length], ["Lộ trình", paths.length], ["Thông báo", notifications.length]].map(([l, v], i) => (
+                {[["Tài khoản", accounts.length], ["Kiến thức", knowledge.length], ["Đề thi", quizzes.length], ["Kết quả", results.length], ["Tuyên dương", recognitions.length], ["Thử thách", challenges.length], ["Lộ trình", paths.length]].map(([l, v], i) => (
                   <div key={i} style={{ textAlign: "center", padding: 8 }}><div style={{ fontSize: 16, fontWeight: 800, color: C.goldL }}>{v}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{l}</div></div>
                 ))}
               </div>
@@ -4142,26 +4188,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 ))}
               </div>
             )}
-            {/* Notifications */}
-            {notifications.filter(n => n.empId === currentUser.id && !n.read).length > 0 && (
-              <div style={{ ...card, background: `${C.orange}08`, border: `1px solid ${C.orange}22` }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <div style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>🔔 THÔNG BÁO MỚI ({notifications.filter(n => n.empId === currentUser.id && !n.read).length})</div>
-                  <button onClick={() => markAllNotifsRead()} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "none", padding: "2px 6px" }}>Đã đọc tất cả</button>
-                </div>
-                {notifications.filter(n => n.empId === currentUser.id && !n.read).slice(-5).reverse().map(n => (
-                  <div key={n.id} onClick={() => {
-                    markNotifRead(n.id);
-                    if (n.msg.includes("Thử thách")) { setScreen("emp_challenges"); setSubScreen(null); }
-                    else if (n.msg.includes("tuyên dương")) { }
-                  }} style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", padding: "6px 8px", marginBottom: 2, borderRadius: 6, background: "rgba(255,255,255,0.03)", cursor: n.msg.includes("Thử thách") ? "pointer" : "default", display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ flexShrink: 0 }}>{n.msg.includes("Thử thách") ? "🎯" : n.msg.includes("tuyên dương") ? "🎖️" : "📢"}</span>
-                    <span style={{ flex: 1 }}>{n.msg}</span>
-                    {n.msg.includes("Thử thách") && <span style={{ fontSize: 10, color: C.gold }}>Xem →</span>}
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Notifications hidden */}
             {/* Actions */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 8 }}>
               {[
@@ -4171,7 +4198,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 { i: "🏆", t: "Xếp Hạng", d: "Toàn công ty", s: "emp_ranking" },
                 { i: "🎖️", t: "Huy Hiệu", d: `${getUserBadges(currentUser).length}/${BADGES.length}`, s: "emp_badges" },
                 { i: "🎯", t: "Thử Thách", d: `${challenges.filter(ch => challengeVisibleTo(ch, currentUser)).length} thử thách`, s: "emp_challenges" },
-                { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => { const assigned = (p.assignedTo || []).includes(currentUser.id); const hasProgress = !!(currentUser.pathProgress || {})[p.id]; const deptMatch = p.dept && p.dept === currentUser.dept; return assigned || hasProgress || deptMatch; }).length} lộ trình`, s: "emp_pathway" },
+                { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => { const assigned = (p.assignedTo || []).includes(currentUser.id); const hasProgress = !!(currentUser.pathProgress || {})[p.id]; const deptMatch = (p.depts || []).includes("Tất cả") || (p.depts || []).includes(currentUser.dept); return assigned || hasProgress || deptMatch; }).length} lộ trình`, s: "emp_pathway" },
                 { i: "📢", t: "Bảng Tin", d: `${bulletins.length} bài đăng`, s: "emp_bulletins" },
                 ...(currentUser.accRole === "director" ? [
                   { i: "📢", t: "Tạo Bảng Tin", d: "Đăng thông báo/chính sách", s: "dir_bulletins" },
@@ -4244,8 +4271,14 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {/* ═══ EMPLOYEE: KNOWLEDGE ═══ */}
         {role === "employee" && screen === "emp_knowledge" && !subScreen && currentUser && (
           <div style={{ animation: "fadeIn .4s" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>{"📚 Kiến Thức"}</h2><button onClick={function () { setScreen("emp_home") }} style={btnO}>{"← Dashboard"}</button></div>
-            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) }).map(function (k) {
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>{"📚 Kiến Thức"}</h2>{formData._returnFrom ? <button onClick={function () { setScreen(formData._returnFrom.screen); setSubScreen(formData._returnFrom.subScreen || null); setFormData(Object.assign({}, formData, { _returnFrom: null })); }} style={btnO}>{"← " + formData._returnFrom.label}</button> : <button onClick={function () { setScreen("emp_home") }} style={btnO}>{"← Dashboard"}</button>}</div>
+            {/* ── Search bar ── */}
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "rgba(255,255,255,0.3)", pointerEvents: "none" }}>🔍</span>
+              <input type="text" value={formData.empKnowledgeSearch || ""} onChange={function (e) { setFormData(Object.assign({}, formData, { empKnowledgeSearch: e.target.value })) }} placeholder="Tìm bài kiến thức..." style={{ ...inp, paddingLeft: 38, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, borderRadius: 12, fontSize: 13 }} />
+              {formData.empKnowledgeSearch && <button onClick={function () { setFormData(Object.assign({}, formData, { empKnowledgeSearch: "" })) }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer" }}>✕</button>}
+            </div>
+            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) && (!formData.empKnowledgeSearch || k.title.toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase()) || (k.content || "").toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase())) }).map(function (k) {
               var isRead = (currentUser.readLessons || []).includes(k.id);
               return (
                 <div key={k.id} style={{ ...card, cursor: "pointer", border: "1px solid " + (isRead ? C.green + "33" : C.border) }} onClick={function () {
@@ -4262,7 +4295,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
                     {(k.depts || ["Tất cả"]).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
                     {k.hasPdf && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.purple + "22", color: C.purple, fontWeight: 600 }}>{"📄 " + (k.pdfName || "PDF")}</span>}
-                    {k.videoUrl && tag("🎬 Video", C.red)}
+                    {(k.hasVideo || k.videoUrl) && tag(k.hasVideo ? "🎬 Video ⬆️" : "🎬 Video 🔗", C.red)}
                     {k.audioUrl && tag("🎧 Nghe", "#9b59b6")}
                     {k.docUrl && tag("🔗 Link", C.blue)}
                   </div>
@@ -4270,7 +4303,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                 </div>
               );
             })}
-            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) }).length === 0 && <Empty msg={"Chưa có bài nào."} />}
+            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) && (!formData.empKnowledgeSearch || k.title.toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase()) || (k.content || "").toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase())) }).length === 0 && <Empty msg={formData.empKnowledgeSearch ? "Không tìm thấy bài kiến thức nào phù hợp." : "Chưa có bài nào."} />}
           </div>
         )}
 
@@ -4284,7 +4317,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           const sIdx = formData.slideIdx || 0;
           const mAns = formData.miniQAns || {};
           const exitLearn = () => setFormData({ ...formData, learnTab: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {} });
-          const exitAll = () => { if (formData._returnAdmin) { var rid = formData._returnAdmin; setRole("admin"); setScreen("admin_lessons"); setSubScreen(rid); setFormData({ ...formData, learnTab: null, _returnAdmin: null }); } else { setSubScreen(null); setFormData({ ...formData, learnTab: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {}, loadedPdf: null }); } };
+          const exitAll = () => { if (formData._returnAdmin) { var rid = formData._returnAdmin; setRole("admin"); setScreen("admin_lessons"); setSubScreen(rid); setFormData({ ...formData, learnTab: null, _returnAdmin: null }); } else if (formData._returnFrom) { var rf = formData._returnFrom; setScreen(rf.screen); setSubScreen(rf.subScreen || null); setFormData({ ...formData, learnTab: null, _returnFrom: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {}, loadedPdf: null }); } else { setSubScreen(null); setFormData({ ...formData, learnTab: null, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {}, loadedPdf: null }); } };
 
           // ── FULLSCREEN LEARNING MODE ──
           if (tab && it) {
@@ -4292,13 +4325,13 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
             const fsHead = { padding: "6px 8px", display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid " + C.border, flexShrink: 0 };
             const fsBody = { flex: 1, overflow: "auto", padding: "16px", display: "flex", flexDirection: "column" };
             const fsNav = { padding: "12px 16px", display: "flex", gap: 8, justifyContent: "center", alignItems: "center", borderTop: `1px solid ${C.border}`, flexShrink: 0 };
-            const tabBtn = (id, icon, label) => <button key={id} onClick={() => setFormData({ ...formData, learnTab: id, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {} })} style={{ padding: "8px 12px", borderRadius: 8, fontSize: 11, whiteSpace: "nowrap", minHeight: 36, fontWeight: 700, background: tab === id ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: tab === id ? C.goldL : "rgba(255,255,255,0.3)", border: `1px solid ${tab === id ? C.gold + "44" : C.border}` }}>{icon} {label}</button>;
+            const tabBtn = (id, icon, label) => <button key={id} onClick={() => setFormData({ ...formData, learnTab: id, cardIdx: 0, cardFlip: false, slideIdx: 0, miniQAns: {} })} style={{ padding: "6px 10px", borderRadius: 8, fontSize: 10, whiteSpace: "nowrap", minHeight: 32, fontWeight: 700, flexShrink: 0, background: tab === id ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: tab === id ? C.goldL : "rgba(255,255,255,0.3)", border: `1px solid ${tab === id ? C.gold + "44" : C.border}` }}>{icon} {label}</button>;
 
             return (
               <div style={fs}>
                 {/* Fullscreen header */}
                 <div style={fsHead}>
-                  <div style={{ display: "flex", gap: 3, flex: 1, overflowX: "scroll", WebkitOverflowScrolling: "touch", paddingBottom: 2, msOverflowStyle: "none" }}>{tabBtn("docs", "📄", "Tài liệu")}{tabBtn("slides", "📊", "Slides")}{tabBtn("audio", "🔊", "Nghe")}{tabBtn("video", "🎬", "Video")}<div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)", margin: "0 2px", flexShrink: 0 }} />{tabBtn("cards", "🎴", "Cards")}{tabBtn("sheet", "📋", "Sheet")}{tabBtn("quiz", "✏️", "Quiz")}{tabBtn("info", "🖼️", "Ảnh")}{tabBtn("mind", "🧠", "Sơ đồ")}</div>
+                  <div className="nav-scroll" style={{ display: "flex", gap: 3, flex: 1, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2, scrollbarWidth: "none", msOverflowStyle: "none" }}>{tabBtn("docs", "📄", "Tài liệu")}{tabBtn("slides", "📊", "Slides")}{tabBtn("audio", "🔊", "Nghe")}{tabBtn("video", "🎬", "Video")}<div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)", margin: "0 2px", flexShrink: 0 }} />{tabBtn("cards", "🎴", "Cards")}{tabBtn("sheet", "📋", "Sheet")}{tabBtn("quiz", "✏️", "Quiz")}{tabBtn("info", "🖼️", "Ảnh")}{tabBtn("mind", "🧠", "Sơ đồ")}</div>
                   <button onClick={exitLearn} style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 18, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
                 </div>
 
@@ -4560,13 +4593,24 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
 
                 {/* ── VIDEO ── */}
                 {tab === "video" && (function () {
-                  var vUrl = k.videoUrl || "";
-                  var isYT = /youtu/.test(vUrl);
+                  // Priority: uploaded MP4 (hasVideo) > YouTube/external link (videoUrl)
+                  var uploadedUrl = "";
+                  if (k.hasVideo) {
+                    var sbUrl = import.meta.env.VITE_SUPABASE_URL;
+                    uploadedUrl = sbUrl + "/storage/v1/object/public/videos/knowledge/" + k.id + ".mp4";
+                  }
+                  var vUrl = uploadedUrl || k.videoUrl || "";
+                  var isYT = !uploadedUrl && /youtu/.test(vUrl);
                   var ytId = "";
                   if (isYT) { var m = vUrl.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/); if (m) ytId = m[1] }
                   var isDirect = !isYT && !!vUrl;
                   return (
                     <div style={{ ...fsBody, padding: 0, alignItems: "center" }}>
+                      {/* Uploaded MP4 badge */}
+                      {k.hasVideo && k.videoName && (
+                        <div style={{ padding: "6px 12px", fontSize: 10, color: C.green, textAlign: "center", background: C.green + "08", borderBottom: "1px solid " + C.green + "22" }}>{"✅ Video đã tải lên: " + k.videoName}</div>
+                      )}
+
                       {/* YouTube embed — works on hosting, blocked in artifact */}
                       {isYT && ytId && (
                         <div style={{ width: "100%", maxWidth: "min(1100px, 100%)", margin: "0 auto" }}>
@@ -4599,7 +4643,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                       {!vUrl && (
                         <div style={{ textAlign: "center", padding: 40, color: "rgba(255,255,255,0.25)" }}>
                           <div style={{ fontSize: 28, marginBottom: 6 }}>{"🎬"}</div>
-                          <div style={{ fontSize: 12 }}>{"Admin thêm link video trong Bài học"}</div>
+                          <div style={{ fontSize: 12 }}>{"Admin thêm link video hoặc tải MP4 trong Bài học"}</div>
                         </div>
                       )}
                     </div>
@@ -4676,7 +4720,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
           // ── NORMAL VIEW (chưa vào học) ──
           return (
             <div style={{ animation: "fadeIn .4s" }}>
-              <button onClick={exitAll} style={{ ...btnO, marginBottom: 14 }}>← Quay lại danh sách</button>
+              <button onClick={exitAll} style={{ ...btnO, marginBottom: 14 }}>{formData._returnFrom ? "← " + formData._returnFrom.label : formData._returnAdmin ? "← Quản lý bài học" : "← Quay lại danh sách"}</button>
 
               {/* Header */}
               <div style={{ background: `linear-gradient(135deg,${C.dark},#1a4a50)`, borderRadius: 16, padding: "24px 20px", marginBottom: 14, border: `1px solid ${C.gold}33` }}>
@@ -4816,6 +4860,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
         {role === "employee" && screen === "emp_quizzes" && (
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>✏️ Kiểm Tra</h2><button onClick={() => setScreen("emp_home")} style={btnO}>← Dashboard</button></div>
+            {/* ── Search bar ── */}
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "rgba(255,255,255,0.3)", pointerEvents: "none" }}>🔍</span>
+              <input type="text" value={formData.empQuizSearch || ""} onChange={(e) => setFormData({ ...formData, empQuizSearch: e.target.value })} placeholder="Tìm đề kiểm tra..." style={{ ...inp, paddingLeft: 38, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, borderRadius: 12, fontSize: 13 }} />
+              {formData.empQuizSearch && <button onClick={() => setFormData({ ...formData, empQuizSearch: "" })} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer" }}>✕</button>}
+            </div>
             {/* ── Difficulty filter & sort bar ── */}
             <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginRight: 2 }}>Độ khó:</span>
@@ -4833,11 +4883,12 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               const diffOrder = { easy: 1, medium: 2, hard: 3, advanced: 4 };
               const empDiffFilter = formData.empDiffFilter || "all";
               const empDiffSort = formData.empDiffSort || "none";
-              let filtered = quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept));
+              const empQuizSearch = (formData.empQuizSearch || "").toLowerCase();
+              let filtered = quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept) && (!empQuizSearch || q.title.toLowerCase().includes(empQuizSearch)));
               if (empDiffFilter !== "all") filtered = filtered.filter(q => (q.difficulty || "medium") === empDiffFilter);
               if (empDiffSort === "asc") filtered = [...filtered].sort((a, b) => (diffOrder[a.difficulty || "medium"] || 2) - (diffOrder[b.difficulty || "medium"] || 2));
               else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
-              return filtered.length === 0 ? <Empty msg={empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : filtered.map(q => {
+              return filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : filtered.map(q => {
               const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
               const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
               return (
@@ -5199,7 +5250,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
               const myPaths = paths.filter(p => {
                 const assigned = (p.assignedTo || []).includes(currentUser.id);
                 const hasProgress = !!(currentUser.pathProgress || {})[p.id];
-                const deptMatch = p.dept && p.dept === currentUser.dept;
+                const deptMatch = (p.depts || []).includes("Tất cả") || (p.depts || []).includes(currentUser.dept);
                 return assigned || hasProgress || deptMatch;
               });
               if (myPaths.length === 0) return <Empty msg="Chưa có lộ trình nào." />;
@@ -5285,6 +5336,19 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                 {isLocked && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", marginTop: 2 }}>Hoàn thành module trước để mở khóa</div>}
                                 {!isLocked && (
                                   <div style={{ marginTop: 8 }}>
+                                    {/* Knowledge */}
+                                    {mod.knowledgeId && (() => {
+                                      const kItem = knowledge.find(k => k.id === mod.knowledgeId);
+                                      const hasRead = (currentUser.readLessons || []).includes(mod.knowledgeId);
+                                      return (
+                                        <div style={{ padding: "8px 12px", borderRadius: 8, background: hasRead ? `${C.green}08` : `${C.blue}08`, border: `1px solid ${hasRead ? C.green + "33" : C.blue + "33"}`, marginBottom: 6 }}>
+                                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                            <div><div style={{ fontSize: 12, fontWeight: 600, color: hasRead ? C.green : C.blue }}>📖 {(kItem && kItem.title) || "Bài kiến thức"}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{hasRead ? "✅ Đã đọc" : "Đọc bài trước khi thi"}</div></div>
+                                            {!hasRead && kItem ? <button onClick={() => { setFormData({ ...formData, _returnFrom: { screen: "emp_pathway", subScreen: null, label: "Lộ trình" }, viewPathId: viewPath.id }); setScreen("emp_knowledge"); setSubScreen(mod.knowledgeId); }} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}44` }}>Đọc bài →</button> : hasRead ? <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>✅</span> : null}
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                     {/* Quiz */}
                                     {mod.quizId && (
                                       <div style={{ padding: "8px 12px", borderRadius: 8, background: quizPassed ? `${C.green}08` : "rgba(255,255,255,0.03)", border: `1px solid ${quizPassed ? C.green + "33" : C.border}`, marginBottom: 6 }}>
@@ -5515,11 +5579,7 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                         setChallenges(newCh);
                         const saved = await DB.set("km-challenges", newCh);
                         if (!saved) { setSaveStatus("error"); return; }
-                        let curNotifs = notifications;
-                        try { const nfDB = await DB.get("km-notifications", []); if (Array.isArray(nfDB) && nfDB.length >= curNotifs.length) curNotifs = nfDB; } catch (e) { }
-                        const newNotifs = [...curNotifs];
-                        targets.forEach(m => newNotifs.push({ id: uid(), empId: m.id, msg: "🎯 Thử thách từ " + currentUser.name + ": " + formData.mgrCh + " — Đạt ≥" + (formData.mgrChMin || 70) + "% bài " + ch.quizTitle + (ch.rewards.length > 0 ? " · 🎁 " + ch.rewards.length + " phần thưởng" : ""), type: "challenge", date: new Date().toISOString(), read: false }));
-                        setNotifications(newNotifs); await DB.set("km-notifications", newNotifs);
+                        // Notifications disabled
                         setSaveStatus("saved"); setFormData({});
                       }} style={{ ...btnG, opacity: (!(formData.mgrCh || "").trim() || !formData.mgrChQuiz) ? 0.4 : 1 }}>🎯 Gán</button>
                     </div>
@@ -5798,6 +5858,23 @@ select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !import
                                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 4 }}>Hoàn thành thử thách → bốc thăm ngẫu nhiên 1 phần thưởng!</div>
                               </div>
                             )}
+                            {/* Knowledge link */}
+                            {ch.knowledgeId && (() => {
+                              const kItem = knowledge.find(k => k.id === ch.knowledgeId);
+                              const hasRead = (currentUser.readLessons || []).includes(ch.knowledgeId);
+                              return (
+                                <div style={{ padding: "10px 14px", borderRadius: 10, background: hasRead ? `${C.green}08` : `${C.blue}08`, border: `1px solid ${hasRead ? C.green + "33" : C.blue + "33"}`, marginBottom: 8 }}>
+                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: hasRead ? C.green : C.blue }}>📖 {ch.knowledgeTitle || (kItem && kItem.title) || "Bài kiến thức"}</div>
+                                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{hasRead ? "✅ Đã đọc" : "Đọc bài kiến thức trước khi làm bài"}</div>
+                                    </div>
+                                    {!hasRead && kItem && <button onClick={() => { setFormData({ ...formData, _returnFrom: { screen: "emp_challenges", subScreen: null, label: "Thử thách" } }); setScreen("emp_knowledge"); setSubScreen(ch.knowledgeId); }} style={{ padding: "6px 14px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}44` }}>📖 Đọc bài →</button>}
+                                    {hasRead && <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>✅</span>}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                             {/* Action button */}
                             {linkedQuiz ? (
                               <button onClick={() => { setQuizPathContext(null); startQuiz(linkedQuiz); }} style={{ width: "100%", padding: "14px", borderRadius: 12, background: `linear-gradient(135deg,${C.gold},${C.goldL})`, color: C.dark, fontSize: 15, fontWeight: 800, border: "none" }}>📝 Làm kiểm tra ngay →</button>
