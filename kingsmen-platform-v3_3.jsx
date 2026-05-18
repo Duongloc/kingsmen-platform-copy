@@ -260,12 +260,12 @@ const DB = {
     try {
       switch (k) {
         case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at").order("created_at"); return data ? data.map(profileToCamel) : fb; }
-        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
+        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("id,title,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at"); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
-            // Admins fetch everything — RLS allows this
-            const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at");
+            // Admins fetch recent 200 results — RLS allows this
+            const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at", { ascending: false }).limit(200);
             return data ? data.map(resultToCamel) : fb;
           }
           // Non-admins: single query filtered to own rows (explicit filter + RLS double protection)
@@ -496,7 +496,7 @@ export default function App() {
   useEffect(() => { accountsRef.current = accounts; }, [accounts]);
 
   // ─── localStorage cache helpers (TTL-aware, cross-tab safe) ───
-  const CACHE_TTL = { accounts: 600000, results: 300000, notifications: 300000, challenges: 300000, knowledge: 600000, quizzes: 600000, paths: 600000, settings: 600000, recognitions: 600000, bulletins: 600000, logo: 600000 };
+  const CACHE_TTL = { accounts: 1800000, results: 1800000, notifications: 1800000, challenges: 1800000, knowledge: 1800000, quizzes: 1800000, paths: 1800000, settings: 1800000, recognitions: 1800000, bulletins: 1800000, logo: 1800000 };
   const cacheGet = (key) => { try { const raw = localStorage.getItem("kc_" + key); if (!raw) return null; const { ts, data } = JSON.parse(raw); const ttl = CACHE_TTL[key] ?? 30000; if (Date.now() - ts > ttl) { localStorage.removeItem("kc_" + key); return null; } return data; } catch (e) { } return null; };
   const cacheSet = (key, data) => { try { localStorage.setItem("kc_" + key, JSON.stringify({ ts: Date.now(), data })); } catch (e) { } };
   // Cross-tab cache invalidation: when another tab writes to cache, refresh volatile state
@@ -687,6 +687,22 @@ export default function App() {
   const markNotifRead = async (id) => { return; };
   const markAllNotifsRead = async () => { return; };
 
+  const loadMoreResults = async () => {
+    if (results.length === 0) return;
+    const oldestDate = results.reduce((min, r) => r.date < min ? r.date : min, results[0].date);
+    const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").lt("created_at", oldestDate).order("created_at", { ascending: false }).limit(200);
+    if (data && data.length > 0) {
+      const newResults = data.map(resultToCamel);
+      setResults(prev => {
+        const merged = [...prev, ...newResults];
+        cacheSet("results", merged);
+        return merged;
+      });
+    } else {
+      alert("Đã tải hết kết quả lịch sử.");
+    }
+  };
+
   // Logo upload handler
   const handleLogoUpload = (e) => {
     const file = e.target.files && e.target.files[0]; if (!file) return;
@@ -694,21 +710,8 @@ export default function App() {
     reader.onload = (ev) => { const dataUrl = ev.target.result; setCompanyLogo(dataUrl); DB.set("km-logo", dataUrl); };
     reader.readAsDataURL(file);
   };
-  // Avatar upload handler
-  const handleAvatarUpload = (e, userId) => {
-    const file = e.target.files && e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target.result;
-      // Optimistic local update
-      setAccounts(prev => { const u = prev.map(a => a.id === userId ? { ...a, avatar: dataUrl } : a); accountsRef.current = u; return u; });
-      if (currentUser && currentUser.id === userId) setCurrentUser(prev => ({ ...prev, avatar: dataUrl }));
-      // Single-row update — not full-array upsert
-      const { error: avErr } = await supabase.from("profiles").update({ avatar: dataUrl }).eq("id", userId);
-      if (avErr) console.error("avatar update error:", avErr.message);
-    };
-    reader.readAsDataURL(file);
-  };
+  // Upload functions disabled per request to save bandwidth
+
 
   // Streak check-in + XP decay
   const doCheckIn = async (user) => {
@@ -795,7 +798,7 @@ export default function App() {
     const needed = SCREEN_TABLES[screen];
     if (!role || !needed) return;
     const now = Date.now();
-    if (now - lastAutoReloadRef.current < 30000) return;
+    if (now - lastAutoReloadRef.current < 300000) return;
     lastAutoReloadRef.current = now;
     (async () => {
       try {
@@ -855,6 +858,25 @@ export default function App() {
       } catch (e) { console.error("Lazy load knowledge error:", e); }
     })();
   }, [subScreen, screen, knowledge]);
+
+  // Lazy-load full quiz questions when opened in admin editor
+  useEffect(() => {
+    if (!subScreen || screen !== "admin_quizzes" || subScreen === "add") return;
+    const qItem = quizzes.find(q => q.id === subScreen);
+    if (!qItem || (qItem.questions && qItem.questions.length > 0)) return;
+    (async () => {
+      try {
+        const { data } = await supabase.from("quizzes").select("questions").eq("id", qItem.id).single();
+        if (data && data.questions) {
+          setQuizzes(prev => {
+            const next = prev.map(q => q.id === qItem.id ? { ...q, questions: data.questions } : q);
+            cacheSet("quizzes", next);
+            return next;
+          });
+        }
+      } catch (e) { console.error("Lazy load quiz error:", e); }
+    })();
+  }, [subScreen, screen, quizzes]);
 
 
   // Timer
@@ -1071,7 +1093,19 @@ ${content}`);
   };
 
   // Quiz logic
-  const startQuiz = (quiz) => { const s = { ...quiz, questions: shuffle(quiz.questions) }; setActiveQuiz(s); setQIdx(0); setQAnswers({}); qAnswersRef.current = {}; finishingRef.current = false; setQSel(null); setQShowExp(false); setQTimer(quiz.timeLimit || quiz.questions.length * 90); setQActive(true); setEssayGrading(false); setEssayResults([]); setEssayDraft(""); setScreen("emp_quiz_play"); };
+  const startQuiz = async (quiz) => { 
+    let qs = quiz.questions;
+    if (!qs || qs.length === 0) {
+      setAiStatus("⏳ Đang tải đề thi...");
+      try {
+        const { data } = await supabase.from("quizzes").select("questions").eq("id", quiz.id).single();
+        if (data && data.questions) qs = data.questions;
+      } catch(e){}
+      setAiStatus("");
+    }
+    if (!qs || qs.length === 0) { alert("Không thể tải câu hỏi. Đề thi có thể trống."); return; }
+    const s = { ...quiz, questions: shuffle(qs) }; setActiveQuiz(s); setQIdx(0); setQAnswers({}); qAnswersRef.current = {}; finishingRef.current = false; setQSel(null); setQShowExp(false); setQTimer(quiz.timeLimit || s.questions.length * 90); setQActive(true); setEssayGrading(false); setEssayResults([]); setEssayDraft(""); setScreen("emp_quiz_play"); 
+  };
   const answerQ = (val) => { if (qShowExp) return; setQSel(val); setQShowExp(true); const q = activeQuiz.questions[qIdx]; const correct = val === Number(q.ans); const newA = { ...qAnswersRef.current, [qIdx]: { selected: val, correct } }; setQAnswers(newA); qAnswersRef.current = newA; };
   const nextQ = () => {
     const q = activeQuiz.questions[qIdx];
@@ -2181,11 +2215,11 @@ header{padding:6px 8px !important}
       {/* Header */}
       <header style={{ background: "linear-gradient(135deg," + C.tealD + "," + C.dark + ")", borderBottom: "2px solid " + C.gold, padding: "8px 12px", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, cursor: role === "admin" ? "pointer" : "default" }} onClick={() => { if (role === "admin" && logoInputRef.current) logoInputRef.current.click(); }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             {companyLogo ? (<img src={companyLogo} alt="Logo" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />) : (<div style={{ width: 32, height: 32, background: C.gold, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 900, fontSize: 14, color: C.dark, flexShrink: 0 }}>K</div>)}
             <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 800, fontSize: 14, color: C.white, letterSpacing: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>KINGSMEN</div><div style={{ fontSize: 11, color: C.goldL, letterSpacing: 2 }}>Training Platform v3</div></div>
-            {role === "admin" && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginLeft: 2, padding: "4px 7px", borderRadius: 4, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>🖼 Logo</div>}
-            <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
+            
+            
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {saveStatus && <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, background: saveStatus === "saved" ? (C.green + "22") : (C.red + "22"), color: saveStatus === "saved" ? C.green : C.red, animation: "fadeIn .3s" }}>{saveStatus === "saved" ? "Saved" : "Error"}</span>}
@@ -2201,11 +2235,10 @@ header{padding:6px 8px !important}
               </button>
             )}
             {currentUser && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", position: "relative", minWidth: 0 }} onClick={() => { if (avatarInputRef.current) avatarInputRef.current.click(); }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, position: "relative", minWidth: 0 }}>
                 {currentUser.avatar ? (<img src={currentUser.avatar} alt="av" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "2px solid " + C.gold + "55", flexShrink: 0 }} />) : (<span style={{ fontSize: 14, flexShrink: 0 }}>{gL(currentUser.xp || 0).icon}</span>)}
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 80 }}>{currentUser.name}</span>
                 {currentUser.streak > 0 && <span style={{ fontSize: 11, color: C.orange, flexShrink: 0 }}>{"🔥" + currentUser.streak}</span>}
-                <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleAvatarUpload(e, currentUser.id)} />
               </div>
             )}
             {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } ["accounts", "knowledge", "quizzes", "results", "recognitions", "challenges", "notifications", "paths", "settings", "bulletins", "logo"].forEach(k => localStorage.removeItem("kc_" + k)); try { sessionStorage.removeItem("km_screen"); } catch(e){} setAccounts([]); setKnowledge([]); setQuizzes([]); setResults([]); setRecognitions([]); setChallenges([]); setNotifications([]); setPaths([]); setSettings({}); setBulletins([]); setCompanyLogo(null); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
@@ -2546,15 +2579,6 @@ header{padding:6px 8px !important}
                               </div>
                             </div>
                           )}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{"🖼️ Ảnh"}</div>
-                          <label style={{ padding: "6px 12px", borderRadius: 6, background: C.gold + "10", color: C.gold, fontSize: 10, fontWeight: 700, border: "1px solid " + C.gold + "22", cursor: "pointer" }}>{"📎 Tải ảnh"}<input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={function (e) {
-                            var files = e.target.files; if (!files || !files.length) return;
-                            var newImgs = [].concat(k.images || []); var loaded = 0;
-                            for (var fi = 0; fi < files.length; fi++) { (function (file) { var reader = new FileReader(); reader.onload = function (ev) { newImgs.push(ev.target.result); loaded++; if (loaded === files.length) { upd({ images: newImgs }) } }; reader.readAsDataURL(file) })(files[fi]) }
-                          }} /></label>
-                          {k.images && k.images.length > 0 && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{k.images.length + " ảnh"}</span>}
                         </div>
                         {k.images && k.images.length > 0 && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(60px,1fr))", gap: 4, marginTop: 6 }}>
@@ -3771,6 +3795,9 @@ header{padding:6px 8px !important}
                 ))}
             </div>
             {/* Old notifications cleanup hidden */}
+            <div style={{ marginTop: 20, textAlign: "center" }}>
+              <button onClick={loadMoreResults} style={{ padding: "8px 16px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.white, fontSize: 12, cursor: "pointer" }}>⬇ Tải thêm lịch sử bài thi (200 kết quả)</button>
+            </div>
           </div>
         )}
 
@@ -5978,3 +6005,5 @@ function Leaderboard({ accounts, results, card, currentUserId, depts, levels }) 
     })}
   </React.Fragment>);
 }
+
+
