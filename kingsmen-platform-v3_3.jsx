@@ -260,22 +260,21 @@ const DB = {
     try {
       switch (k) {
         case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at").order("created_at"); return data ? data.map(profileToCamel) : fb; }
-        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
+        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at", { ascending: true }).limit(20); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
-            // Admins fetch recent 200 results — RLS allows this
-            const { data, error } = await supabase.from("results").select("*").order("created_at", { ascending: false }).limit(200);
+            // Admins fetch recent 2000 results (without the heavy 'answers' column) for fast analytics
+            const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at", { ascending: false }).limit(2000);
             if (error) console.error("Admin results fetch error:", error);
             return data ? data.map(resultToCamel) : fb;
           }
-          // Non-admins: single query filtered to own rows (explicit filter + RLS double protection)
-          // No second query needed — answers are included since we only fetch own rows
+          // Non-admins: fetch 20 most recent results (without heavy 'answers') for fast load
           if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
           if (!userId) return fb;
-          const { data, error } = await supabase.from("results").select("*").eq("emp_id", userId).order("created_at");
+          const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").eq("emp_id", userId).order("created_at", { ascending: false }).limit(20);
           if (error) console.error("Employee results fetch error:", error);
-          return data ? data.map(resultToCamel) : fb;
+          return data ? data.map(resultToCamel).sort((a, b) => new Date(a.date) - new Date(b.date)) : fb;
         }
         case "km-recognitions": { const { data } = await supabase.from("recognitions").select("*").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
         case "km-challenges": { const { data } = await supabase.from("challenges").select("*").order("created_at"); return data ? data.map(challengeToCamel) : fb; }
@@ -415,6 +414,7 @@ export default function App() {
   const [knowledge, setKnowledge] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [results, setResults] = useState([]);
+  const [totalResultsCount, setTotalResultsCount] = useState(0);
   const [recognitions, setRecognitions] = useState([]);
   const [challenges, setChallenges] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -629,6 +629,14 @@ export default function App() {
         });
       }
 
+      // Fetch true total results count for Admins
+      if (isAdmin) {
+        try {
+          const { count } = await supabase.from("results").select('*', { count: 'exact', head: true });
+          if (count !== null) setTotalResultsCount(count);
+        } catch (e) { }
+      }
+
       // Lowest priority
       if (!cacheGet("logo")) { try { const logoData = await DB.get("km-logo", null); if (logoData) { setCompanyLogo(logoData); cacheSet("logo", logoData); } } catch (e2) { } }
 
@@ -688,22 +696,6 @@ export default function App() {
   const addNotif = async (empId, msg, type = "info") => { return; };
   const markNotifRead = async (id) => { return; };
   const markAllNotifsRead = async () => { return; };
-
-  const loadMoreResults = async () => {
-    if (results.length === 0) return;
-    const oldestDate = results.reduce((min, r) => r.date < min ? r.date : min, results[0].date);
-    const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").lt("created_at", oldestDate).order("created_at", { ascending: false }).limit(200);
-    if (data && data.length > 0) {
-      const newResults = data.map(resultToCamel);
-      setResults(prev => {
-        const merged = [...prev, ...newResults];
-        cacheSet("results", merged);
-        return merged;
-      });
-    } else {
-      alert("Đã tải hết kết quả lịch sử.");
-    }
-  };
 
   // Logo upload handler
   const handleLogoUpload = (e) => {
@@ -880,6 +872,61 @@ export default function App() {
     })();
   }, [subScreen, screen, quizzes]);
 
+
+  // Server-side search for quizzes
+  useEffect(() => {
+    const term = formData.qSearch || formData.empQuizSearch;
+    if (!term || term.length < 2) return;
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await supabase.from("quizzes").select("*").ilike("title", `%${term}%`);
+        if (data && data.length > 0) {
+          const fetched = data.map(quizToCamel);
+          setQuizzes(prev => {
+            const map = new Map(prev.map(q => [q.id, q]));
+            fetched.forEach(q => map.set(q.id, q));
+            const next = Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            cacheSet("quizzes", next);
+            return next;
+          });
+        }
+      } catch (e) { console.error("Search quiz error:", e); }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [formData.qSearch, formData.empQuizSearch]);
+
+  const loadMoreQuizzesDB = async () => {
+    try {
+      const { data } = await supabase.from("quizzes").select("*").order("created_at", { ascending: true }).range(quizzes.length, quizzes.length + 19);
+      if (data && data.length > 0) {
+        const fetched = data.map(quizToCamel);
+        setQuizzes(prev => {
+          const map = new Map(prev.map(q => [q.id, q]));
+          fetched.forEach(q => map.set(q.id, q));
+          const next = Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          cacheSet("quizzes", next);
+          return next;
+        });
+      }
+    } catch (e) { console.error("Load more quiz error:", e); }
+  };
+
+  const loadMoreEmpResultsDB = async () => {
+    try {
+      if (!currentUser?.id) return;
+      const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").eq("emp_id", currentUser.id).order("created_at", { ascending: false }).range(results.length, results.length + 19);
+      if (data && data.length > 0) {
+        const fetched = data.map(resultToCamel);
+        setResults(prev => {
+          const map = new Map(prev.map(r => [r.id, r]));
+          fetched.forEach(r => map.set(r.id, r));
+          const next = Array.from(map.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
+          cacheSet("results", next);
+          return next;
+        });
+      }
+    } catch (e) { console.error("Load more emp results error:", e); }
+  };
 
   // Timer
   useEffect(() => { if (qActive && qTimer > 0) { qTimerRef.current = setInterval(() => setQTimer(t => t <= 1 ? (clearInterval(qTimerRef.current), 0) : t - 1), 1000); return () => clearInterval(qTimerRef.current); }; }, [qActive]);
@@ -2337,7 +2384,7 @@ header{padding:6px 8px !important}
           <div style={{ animation: "fadeIn .4s" }}>
             <h2 style={{ ...hd(24), marginBottom: 20 }}>🏠 Bảng Điều Khiển</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))", gap: 10, marginBottom: 16 }}>
-              {[{ l: "Nhân viên", v: accounts.length, i: "👥", c: C.blue }, { l: "Bài kiến thức", v: knowledge.length, i: "📚", c: C.green }, { l: "Đề kiểm tra", v: quizzes.length, i: "📝", c: C.purple }, { l: "Lượt thi", v: results.length, i: "📊", c: C.orange }].map((s, i) => (
+              {[{ l: "Nhân viên", v: accounts.length, i: "👥", c: C.blue }, { l: "Bài kiến thức", v: knowledge.length, i: "📚", c: C.green }, { l: "Đề kiểm tra", v: quizzes.length, i: "📝", c: C.purple }, { l: "Lượt thi", v: totalResultsCount || results.length, i: "📊", c: C.orange }].map((s, i) => (
                 <div key={i} style={{ background: `${s.c}0a`, borderRadius: 12, padding: "14px 12px", border: `1px solid ${s.c}22`, textAlign: "center" }}>
                   <div style={{ fontSize: 20, marginBottom: 3 }}>{s.i}</div><div style={{ fontSize: 20, fontWeight: 800, color: s.c, fontFamily: "'Be Vietnam Pro',sans-serif" }}>{s.v}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{s.l}</div>
                 </div>
@@ -2731,7 +2778,7 @@ header{padding:6px 8px !important}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <div>
                   <h2 style={hd(22)}>📝 Quản Lý Đề Kiểm Tra</h2>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{quizzes.length} đề · {results.length} lượt làm</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{quizzes.length} đề · {totalResultsCount || results.length} lượt làm</div>
                 </div>
                 <button onClick={() => setScreen("admin_home")} style={btnO}>← Quay lại</button>
               </div>
@@ -2806,7 +2853,7 @@ header{padding:6px 8px !important}
 
               {/* ── Quiz list ── */}
               {filteredQ.length === 0 && <Empty msg="Không tìm thấy đề nào." />}
-              {filteredQ.map(q => {
+              {filteredQ.slice(0, formData.adminQuizLimit || 20).map(q => {
                 const att = totalAttempts(q), pr = passRate(q), avg = avgScore(q), last = lastUsed(q);
                 const isExpanded = formData.expandQ === q.id;
                 const isEditing = formData.editPanel === q.id;
@@ -2973,6 +3020,11 @@ header{padding:6px 8px !important}
                   </div>
                 );
               })}
+              {filteredQ.length > (formData.adminQuizLimit || 20) && (
+                <div style={{ textAlign: "center", marginTop: 12 }}>
+                  <button onClick={() => { setFormData({ ...formData, adminQuizLimit: (formData.adminQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -3797,9 +3849,6 @@ header{padding:6px 8px !important}
                 ))}
             </div>
             {/* Old notifications cleanup hidden */}
-            <div style={{ marginTop: 20, textAlign: "center" }}>
-              <button onClick={loadMoreResults} style={{ padding: "8px 16px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`, color: C.white, fontSize: 12, cursor: "pointer" }}>⬇ Tải thêm lịch sử bài thi (200 kết quả)</button>
-            </div>
           </div>
         )}
 
@@ -3914,7 +3963,7 @@ header{padding:6px 8px !important}
             <div style={{ ...card, marginTop: 8 }}>
               <div style={{ fontSize: 13, color: C.gold, fontWeight: 700, marginBottom: 10 }}>THÔNG TIN DỮ LIỆU HIỆN TẠI</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))", gap: 8 }}>
-                {[["Tài khoản", accounts.length], ["Kiến thức", knowledge.length], ["Đề thi", quizzes.length], ["Kết quả", results.length], ["Tuyên dương", recognitions.length], ["Thử thách", challenges.length], ["Lộ trình", paths.length]].map(([l, v], i) => (
+                {[["Tài khoản", accounts.length], ["Kiến thức", knowledge.length], ["Đề thi", quizzes.length], ["Kết quả", totalResultsCount || results.length], ["Tuyên dương", recognitions.length], ["Thử thách", challenges.length], ["Lộ trình", paths.length]].map(([l, v], i) => (
                   <div key={i} style={{ textAlign: "center", padding: 8 }}><div style={{ fontSize: 16, fontWeight: 800, color: C.goldL }}>{v}</div><div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{l}</div></div>
                 ))}
               </div>
@@ -4917,20 +4966,30 @@ header{padding:6px 8px !important}
               if (empDiffFilter !== "all") filtered = filtered.filter(q => (q.difficulty || "medium") === empDiffFilter);
               if (empDiffSort === "asc") filtered = [...filtered].sort((a, b) => (diffOrder[a.difficulty || "medium"] || 2) - (diffOrder[b.difficulty || "medium"] || 2));
               else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
-              return filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : filtered.map(q => {
-              const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
-              const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
-              return (
-                <div key={q.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
-                    <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
-                    {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
-                  </div>
-                  <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
-                </div>
+              return filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : (
+                <React.Fragment>
+                  {filtered.slice(0, formData.empQuizLimit || 20).map(q => {
+                    const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
+                    const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
+                    return (
+                      <div key={q.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
+                          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
+                          {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
+                        </div>
+                        <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
+                      </div>
+                    );
+                  })}
+                  {filtered.length > (formData.empQuizLimit || 20) && (
+                    <div style={{ textAlign: "center", marginTop: 12 }}>
+                      <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                    </div>
+                  )}
+                </React.Fragment>
               );
-            }); })()}
+            })()}
 
           </div>
         )}
@@ -5238,6 +5297,11 @@ header{padding:6px 8px !important}
                   <span style={{ padding: "5px 10px", borderRadius: 5, fontSize: 10, fontWeight: 700, background: r.pct >= (settings.passScore || 70) ? `${C.green}18` : `${C.red}18`, color: r.pct >= (settings.passScore || 70) ? C.green : C.red }}>{r.pct >= (settings.passScore || 70) ? "ĐẠT" : "CHƯA ĐẠT"}</span>
                 </div>
               ))}
+            {results.filter(r => r.empId === currentUser.id).length >= 20 && (
+              <div style={{ textAlign: "center", marginTop: 16 }}>
+                <button onClick={loadMoreEmpResultsDB} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+              </div>
+            )}
           </div>
         )}
 
