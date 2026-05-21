@@ -265,14 +265,16 @@ const DB = {
         case "km-results": {
           if (isAdmin) {
             // Admins fetch recent 200 results — RLS allows this
-            const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at", { ascending: false }).limit(200);
+            const { data, error } = await supabase.from("results").select("*").order("created_at", { ascending: false }).limit(200);
+            if (error) console.error("Admin results fetch error:", error);
             return data ? data.map(resultToCamel) : fb;
           }
           // Non-admins: single query filtered to own rows (explicit filter + RLS double protection)
           // No second query needed — answers are included since we only fetch own rows
           if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
           if (!userId) return fb;
-          const { data } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").eq("emp_id", userId).order("created_at");
+          const { data, error } = await supabase.from("results").select("*").eq("emp_id", userId).order("created_at");
+          if (error) console.error("Employee results fetch error:", error);
           return data ? data.map(resultToCamel) : fb;
         }
         case "km-recognitions": { const { data } = await supabase.from("recognitions").select("*").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
