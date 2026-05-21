@@ -260,7 +260,7 @@ const DB = {
     try {
       switch (k) {
         case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at").order("created_at"); return data ? data.map(profileToCamel) : fb; }
-        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("id,title,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at"); return data ? data.map(quizToCamel) : fb; }
+        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at"); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
