@@ -92,13 +92,18 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
+        "anthropic-version": "2025-04-15",
         "x-api-key": apiKey,
       },
       body: JSON.stringify(safeBody),
     });
 
     const data = await anthropicRes.json();
+
+    // Log Anthropic errors to Supabase Edge Function logs for debugging
+    if (!anthropicRes.ok) {
+      console.error("Anthropic API error:", anthropicRes.status, JSON.stringify(data));
+    }
 
     return new Response(JSON.stringify(data), {
       status: anthropicRes.status,
