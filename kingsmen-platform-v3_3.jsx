@@ -232,14 +232,14 @@ const supabase = createClient(
 );
 
 // ─── Field mapping: DB (snake_case) ↔ App (camelCase) ───
-const profileToCamel = (r) => ({ id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, accRole: r.acc_role, xp: r.xp || 0, streak: r.streak || 0, status: r.status, lastCheckIn: r.last_check_in || null, lastXpGainDate: r.last_xp_gain_date || null, checkIns: r.check_ins || [], readLessons: r.read_lessons || [], pathProgress: r.path_progress || {}, avatar: r.avatar || null, team: r.team || "" });
-const profileToSnake = (a) => ({ id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, avatar: a.avatar || null, team: a.team || "" });
+const profileToCamel = (r) => { const obj = { id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, accRole: r.acc_role, xp: r.xp || 0, streak: r.streak || 0, status: r.status, lastCheckIn: r.last_check_in || null, lastXpGainDate: r.last_xp_gain_date || null, checkIns: r.check_ins || [], readLessons: r.read_lessons || [], pathProgress: r.path_progress || {}, team: r.team || "" }; if ('avatar' in r) obj.avatar = r.avatar || null; return obj; };
+const profileToSnake = (a) => { const obj = { id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, team: a.team || "" }; if ('avatar' in a) obj.avatar = a.avatar || null; return obj; };
 const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, hidden: r.hidden || false, createdAt: r.created_at });
 const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null, hidden: q.hidden || false }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
 const knowledgeToCamel = (r) => ({ id: r.id, title: r.title, content: r.content || "", depts: r.depts || ["Tất cả"], docUrl: r.doc_url || "", hasPdf: r.has_pdf || false, pdfName: r.pdf_name || "", interactive: r.interactive || null, videoUrl: r.video_url || "", audioUrl: r.audio_url || "", images: r.images || [], hasVideo: r.has_video || false, videoName: r.video_name || "", createdAt: r.created_at, _isPartial: !('content' in r) });
-const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, content: k.content || "", depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", interactive: k.interactive || null, video_url: k.videoUrl || "", audio_url: k.audioUrl || "", images: k.images || [], has_video: k.hasVideo || false, video_name: k.videoName || "" }; if (k.createdAt) base.created_at = k.createdAt; return base; };
-const resultToCamel = (r) => ({ id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, answers: r.answers || [], quizType: r.quiz_type });
-const resultToSnake = (r) => ({ id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, answers: r.answers || [], quiz_type: r.quizType || "mc" });
+const knowledgeToSnake = (k) => { const base = { id: k.id, title: k.title, depts: k.depts || ["Tất cả"], doc_url: k.docUrl || "", has_pdf: k.hasPdf || false, pdf_name: k.pdfName || "", video_url: k.videoUrl || "", audio_url: k.audioUrl || "", has_video: k.hasVideo || false, video_name: k.videoName || "" }; if (!k._isPartial) { base.content = k.content || ""; base.interactive = k.interactive || null; base.images = k.images || []; } if (k.createdAt) base.created_at = k.createdAt; return base; };
+const resultToCamel = (r) => { const obj = { id: r.id, empId: r.emp_id, quizId: r.quiz_id, quizTitle: r.quiz_title, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time: r.time_taken, date: r.created_at, quizType: r.quiz_type }; if ('answers' in r) obj.answers = r.answers || []; return obj; };
+const resultToSnake = (r) => { const obj = { id: r.id, emp_id: r.empId, quiz_id: r.quizId || null, quiz_title: r.quizTitle, score: r.score, total: r.total, pct: r.pct, passed: r.passed, time_taken: r.time, quiz_type: r.quizType || "mc" }; if ('answers' in r) obj.answers = r.answers || []; return obj; };
 const challengeToCamel = (r) => ({ id: r.id, title: r.title, quizId: r.quiz_id, quizTitle: r.quiz_title || "", knowledgeId: r.knowledge_id || null, knowledgeTitle: r.knowledge_title || "", minScore: r.min_score, deadline: r.deadline ? String(r.deadline).slice(0, 10) : null, assignTo: r.assign_to, assignDept: r.assign_dept, rewards: r.rewards || [], active: r.active, xpBonus: r.xp_bonus, xpReward: r.xp_bonus, createdAt: r.created_at, createdBy: r.created_by, createdByName: r.created_by_name || "", completedBy: r.completed_by || [], wonRewards: r.won_rewards || {}, delivered: r.delivered || {} });
 const challengeToSnake = (c) => ({ id: c.id, title: c.title, quiz_id: c.quizId || null, quiz_title: c.quizTitle || "", knowledge_id: c.knowledgeId || null, knowledge_title: c.knowledgeTitle || "", min_score: c.minScore || 70, deadline: c.deadline || null, assign_to: c.assignTo || "all", assign_dept: c.assignDept || null, rewards: c.rewards || [], active: c.active !== false, xp_bonus: c.xpBonus || c.xpReward || 50, created_by: c.createdBy || null, created_by_name: c.createdByName || "", completed_by: c.completedBy || [], won_rewards: c.wonRewards || {} });
 const notifToCamel = (r) => ({ id: r.id, empId: r.emp_id, msg: r.msg, type: r.type, date: r.created_at, read: r.read });
@@ -636,8 +636,8 @@ export default function App() {
   const updAccounts = (d) => { setAccounts(d); accountsRef.current = d; save("km-accounts", d); };
   const updKnowledgeNow = (d) => {
     setKnowledge(d);
-    var clean = d.map(function (item) { var c2 = Object.assign({}, item); delete c2.videoData; delete c2.audioData; delete c2.videoFileName; delete c2.videoFileSize; delete c2.audioFileName; delete c2.audioFileSize; return c2 });
-    save("km-knowledge", clean);
+    var clean = d.filter(function (item) { return !item._isPartial; }).map(function (item) { var c2 = Object.assign({}, item); delete c2.videoData; delete c2.audioData; delete c2.videoFileName; delete c2.videoFileSize; delete c2.audioFileName; delete c2.audioFileSize; return c2 });
+    if (clean.length > 0) save("km-knowledge", clean);
   };
   const updKnowledge = (d, changedId) => {
     setKnowledge(d);
@@ -646,13 +646,13 @@ export default function App() {
     knowledgeSaveTimerRef.current = setTimeout(async () => {
       if (changedId) {
         const item = d.find(k => k.id === changedId);
-        if (item) {
+        if (item && !item._isPartial) {
           var c2 = Object.assign({}, item); delete c2.videoData; delete c2.audioData; delete c2.videoFileName; delete c2.videoFileSize; delete c2.audioFileName; delete c2.audioFileSize;
           const row = knowledgeToSnake(c2);
           const { error } = await supabase.from("knowledge").upsert(row);
           if (error) { console.error("knowledge single upsert err:", error.message); setSaveStatus("error"); }
           else { setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000); }
-        }
+        } else if (item && item._isPartial) { console.warn("Skipping save for partial knowledge item:", changedId); }
       } else {
         var clean = d.map(function (item) { var c2 = Object.assign({}, item); delete c2.videoData; delete c2.audioData; delete c2.videoFileName; delete c2.videoFileSize; delete c2.audioFileName; delete c2.audioFileSize; return c2 });
         save("km-knowledge", clean);
