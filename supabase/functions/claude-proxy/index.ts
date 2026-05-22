@@ -73,7 +73,7 @@ serve(async (req) => {
     }
 
     // ── 4. Enforce model and token limits server-side — admins get higher cap ─
-    const ALLOWED_MODEL = "claude-sonnet-4-6";
+    const ALLOWED_MODEL = "claude-3-5-sonnet-20241022";
     const isAdminOrDirector = profile.emp_id === "admin" || profile.acc_role === "director";
     // Admins/directors: 6000 tokens (quiz gen, knowledge AI, analysis)
     // Regular employees: 2000 tokens (essay grading only)
@@ -92,7 +92,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "anthropic-version": "2025-04-15",
+        "anthropic-version": "2023-06-01",
         "x-api-key": apiKey,
       },
       body: JSON.stringify(safeBody),

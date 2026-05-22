@@ -408,7 +408,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [role, setRole] = useState(null);
   const [screen, setScreenRaw] = useState("login");
-  const setScreen = (s) => { setScreenRaw(s); if (s !== "login") { try { sessionStorage.setItem("km_screen", s); } catch(e){} } };
+  const setScreen = (s) => { setScreenRaw(s); if (s !== "login") { try { sessionStorage.setItem("km_screen", s); } catch (e) { } } };
   const [currentUser, setCurrentUser] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [knowledge, setKnowledge] = useState([]);
@@ -832,16 +832,16 @@ export default function App() {
     if (!subScreen || (screen !== "admin_lessons" && screen !== "emp_knowledge")) return;
     const kItem = knowledge.find(k => k.id === subScreen);
     if (!kItem || kItem.id === "add" || !kItem._isPartial) return;
-    
+
     (async () => {
       try {
         const { data } = await supabase.from("knowledge").select("content,interactive,images").eq("id", kItem.id).single();
         if (data) {
           setKnowledge(prev => {
-            const next = prev.map(k => k.id === kItem.id ? { 
-              ...k, 
-              content: data.content || "", 
-              interactive: data.interactive || null, 
+            const next = prev.map(k => k.id === kItem.id ? {
+              ...k,
+              content: data.content || "",
+              interactive: data.interactive || null,
               images: data.images || [],
               _isPartial: false
             } : k);
@@ -987,7 +987,7 @@ export default function App() {
     await supabase.auth.getSession();
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        var body = { model: "claude-sonnet-4-6", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] };
+        var body = { model: "claude-3-5-sonnet-20241022", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] };
         var { data: rawData, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body, responseType: "text" });
         if (fnErr) throw new Error(fnErr.message || "Edge function error");
         var data;
@@ -1118,7 +1118,7 @@ ${content}`);
         await supabase.auth.getSession(); // Refresh JWT
         const { data: rawPdf, error: fnErr } = await supabase.functions.invoke("claude-proxy", {
           body: {
-            model: "claude-sonnet-4-6", max_tokens: 6000,
+            model: "claude-3-5-sonnet-20241022", max_tokens: 6000,
             messages: [{
               role: "user", content: [
                 { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
@@ -1142,18 +1142,18 @@ ${content}`);
   };
 
   // Quiz logic
-  const startQuiz = async (quiz) => { 
+  const startQuiz = async (quiz) => {
     let qs = quiz.questions;
     if (!qs || qs.length === 0) {
       setAiStatus("⏳ Đang tải đề thi...");
       try {
         const { data } = await supabase.from("quizzes").select("questions").eq("id", quiz.id).single();
         if (data && data.questions) qs = data.questions;
-      } catch(e){}
+      } catch (e) { }
       setAiStatus("");
     }
     if (!qs || qs.length === 0) { alert("Không thể tải câu hỏi. Đề thi có thể trống."); return; }
-    const s = { ...quiz, questions: shuffle(qs) }; setActiveQuiz(s); setQIdx(0); setQAnswers({}); qAnswersRef.current = {}; finishingRef.current = false; setQSel(null); setQShowExp(false); setQTimer(quiz.timeLimit || s.questions.length * 90); setQActive(true); setEssayGrading(false); setEssayResults([]); setEssayDraft(""); setScreen("emp_quiz_play"); 
+    const s = { ...quiz, questions: shuffle(qs) }; setActiveQuiz(s); setQIdx(0); setQAnswers({}); qAnswersRef.current = {}; finishingRef.current = false; setQSel(null); setQShowExp(false); setQTimer(quiz.timeLimit || s.questions.length * 90); setQActive(true); setEssayGrading(false); setEssayResults([]); setEssayDraft(""); setScreen("emp_quiz_play");
   };
   const answerQ = (val) => { if (qShowExp) return; setQSel(val); setQShowExp(true); const q = activeQuiz.questions[qIdx]; const correct = val === Number(q.ans); const newA = { ...qAnswersRef.current, [qIdx]: { selected: val, correct } }; setQAnswers(newA); qAnswersRef.current = newA; };
   const nextQ = () => {
@@ -2267,8 +2267,8 @@ header{padding:6px 8px !important}
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
             {companyLogo ? (<img src={companyLogo} alt="Logo" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />) : (<div style={{ width: 32, height: 32, background: C.gold, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 900, fontSize: 14, color: C.dark, flexShrink: 0 }}>K</div>)}
             <div style={{ minWidth: 0 }}><div style={{ fontFamily: "'Be Vietnam Pro',sans-serif", fontWeight: 800, fontSize: 14, color: C.white, letterSpacing: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>KINGSMEN</div><div style={{ fontSize: 11, color: C.goldL, letterSpacing: 2 }}>Training Platform v3</div></div>
-            
-            
+
+
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {saveStatus && <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, background: saveStatus === "saved" ? (C.green + "22") : (C.red + "22"), color: saveStatus === "saved" ? C.green : C.red, animation: "fadeIn .3s" }}>{saveStatus === "saved" ? "Saved" : "Error"}</span>}
@@ -2290,7 +2290,7 @@ header{padding:6px 8px !important}
                 {currentUser.streak > 0 && <span style={{ fontSize: 11, color: C.orange, flexShrink: 0 }}>{"🔥" + currentUser.streak}</span>}
               </div>
             )}
-            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } ["accounts", "knowledge", "quizzes", "results", "recognitions", "challenges", "notifications", "paths", "settings", "bulletins", "logo"].forEach(k => localStorage.removeItem("kc_" + k)); try { sessionStorage.removeItem("km_screen"); } catch(e){} setAccounts([]); setKnowledge([]); setQuizzes([]); setResults([]); setRecognitions([]); setChallenges([]); setNotifications([]); setPaths([]); setSettings({}); setBulletins([]); setCompanyLogo(null); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
+            {role && <button onClick={async () => { try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { } ["accounts", "knowledge", "quizzes", "results", "recognitions", "challenges", "notifications", "paths", "settings", "bulletins", "logo"].forEach(k => localStorage.removeItem("kc_" + k)); try { sessionStorage.removeItem("km_screen"); } catch (e) { } setAccounts([]); setKnowledge([]); setQuizzes([]); setResults([]); setRecognitions([]); setChallenges([]); setNotifications([]); setPaths([]); setSettings({}); setBulletins([]); setCompanyLogo(null); setRole(null); setScreen("login"); setCurrentUser(null); setSubScreen(null); setFormData({}); }} style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", padding: "6px 12px", borderRadius: 6, fontSize: 11, border: "1px solid " + C.border }}>Logout</button>}
           </div>
         </div>
         {role === "employee" && currentUser && (
@@ -3788,7 +3788,7 @@ header{padding:6px 8px !important}
                                     if (!mod.title) return; setAiLoading(true); setAiStatus("AI đang gợi ý checklist...");
                                     try {
                                       await supabase.auth.getSession(); // Refresh JWT
-                                      const { data: rawCl, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDepts.join(", ")}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] }, responseType: "text" });
+                                      const { data: rawCl, error: fnErr } = await supabase.functions.invoke("claude-proxy", { body: { model: "claude-3-5-sonnet-20241022", max_tokens: 1000, messages: [{ role: "user", content: `Tạo checklist 5-8 việc cần làm cho module đào tạo "${mod.title}" phòng ban ${pDepts.join(", ")}. Trả về CHỈ JSON array: ["việc 1","việc 2",...]. Cụ thể, thực tế.` }] }, responseType: "text" });
                                       if (fnErr) throw new Error(fnErr.message || "Edge function error");
                                       var clData; try { clData = typeof rawCl === "string" ? JSON.parse(rawCl) : rawCl; } catch (pe) { throw new Error("Response parse error: " + String(rawCl).slice(0, 200)); }
                                       if (clData && clData.error) throw new Error(clData.error.message || "API error");
