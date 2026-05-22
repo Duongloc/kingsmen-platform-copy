@@ -3020,11 +3020,9 @@ header{padding:6px 8px !important}
                   </div>
                 );
               })}
-              {filteredQ.length > (formData.adminQuizLimit || 20) && (
-                <div style={{ textAlign: "center", marginTop: 12 }}>
-                  <button onClick={() => { setFormData({ ...formData, adminQuizLimit: (formData.adminQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
-                </div>
-              )}
+              <div style={{ textAlign: "center", marginTop: 12 }}>
+                <button onClick={() => { setFormData({ ...formData, adminQuizLimit: (formData.adminQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+              </div>
             </div>
           );
         })()}
@@ -4982,11 +4980,9 @@ header{padding:6px 8px !important}
                       </div>
                     );
                   })}
-                  {filtered.length > (formData.empQuizLimit || 20) && (
-                    <div style={{ textAlign: "center", marginTop: 12 }}>
-                      <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
-                    </div>
-                  )}
+                  <div style={{ textAlign: "center", marginTop: 12 }}>
+                    <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                  </div>
                 </React.Fragment>
               );
             })()}
