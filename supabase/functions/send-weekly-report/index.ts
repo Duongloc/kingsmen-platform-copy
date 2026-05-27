@@ -1,8 +1,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer";
 
+// ── HTML escape helper — prevents injection attacks in email body ──
+const escapeHtml = (str: string): string =>
+  String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+// Restrict CORS to your domain. Set ALLOWED_ORIGIN in Supabase Secrets.
+// Falls back to "*" if not configured (less secure — set this in production).
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -47,10 +60,31 @@ Deno.serve(async (req) => {
       
       const isAdmin = callerProfile.emp_id === "admin" || callerProfile.acc_role === "director";
       if (!isAdmin) throw new Error("Forbidden: Only admins can send reports manually");
+
+      // ── Rate limiting: enforce 1-hour cooldown between manual sends ──
+      const { data: rlSettings } = await supabaseAdmin.from("settings").select("config").eq("id", 1).single();
+      const lastSent = rlSettings?.config?.lastManualReportSentAt;
+      if (lastSent) {
+        const diffMs = Date.now() - new Date(lastSent).getTime();
+        if (diffMs < 60 * 60 * 1000) {
+          const minutesLeft = Math.ceil((60 * 60 * 1000 - diffMs) / 60000);
+          return new Response(
+            JSON.stringify({ error: `Report was sent recently. Please wait ${minutesLeft} more minute(s) before sending again.` }),
+            { status: 429, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+          );
+        }
+      }
     } else {
       // Automated -> Verify it is called securely (must use SERVICE_ROLE_KEY)
       const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-      if (token !== supabaseServiceKey) {
+      // Constant-time comparison to prevent timing attacks
+      const enc = new TextEncoder();
+      const tokenBytes = enc.encode(token);
+      const keyBytes = enc.encode(supabaseServiceKey);
+      let diff = tokenBytes.length ^ keyBytes.length;
+      const maxLen = Math.max(tokenBytes.length, keyBytes.length);
+      for (let i = 0; i < maxLen; i++) diff |= (tokenBytes[i] ?? 0) ^ (keyBytes[i] ?? 0);
+      if (diff !== 0) {
         return new Response(JSON.stringify({ error: "Unauthorized: Automated triggers must use the Service Role Key" }), { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       }
 
@@ -166,7 +200,8 @@ Deno.serve(async (req) => {
     let sentCount = 0;
 
     for (const profile of targetProfiles) {
-      if (!profile.real_email || !profile.real_email.includes("@")) continue;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!profile.real_email || !emailRegex.test(profile.real_email)) continue;
 
       // Weekly stats
       const userWeeklyResults = weeklyResults.filter((r) => r.emp_id === profile.id);
@@ -203,7 +238,7 @@ Deno.serve(async (req) => {
 
       const posComps = POS_COMPETENCIES[profile.dept] || [];
       const posCompHTML = posComps.length > 0
-        ? `<h3 style="color: #0e7356; font-size: 14px; margin: 20px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📌 Năng lực theo vị trí (${profile.dept})</h3>` +
+        ? `<h3 style="color: #0e7356; font-size: 14px; margin: 20px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📌 Năng lực theo vị trí (${escapeHtml(profile.dept)})</h3>` +
           posComps.map(c => renderBar(c.icon, c.name, (scores as any)[c.id] || 0)).join("")
         : "";
 
@@ -249,7 +284,7 @@ Deno.serve(async (req) => {
           </div>
 
           <div style="padding: 20px;">
-            <p style="margin-top: 0; font-size: 14px; color: #333;">Xin chào <b>${profile.name}</b>,</p>
+            <p style="margin-top: 0; font-size: 14px; color: #333;">Xin chào <b>${escapeHtml(profile.name)}</b>,</p>
             
             <!-- 4 Cards -->
             <div style="display: flex; gap: 10px; margin-bottom: 25px;">
@@ -309,14 +344,26 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Update rate-limit timestamp in settings when manually triggered
+    if (isManual && sentCount > 0) {
+      try {
+        const { data: currentCfg } = await supabaseAdmin.from("settings").select("config").eq("id", 1).single();
+        await supabaseAdmin.from("settings").update({
+          config: { ...(currentCfg?.config || {}), lastManualReportSentAt: new Date().toISOString() },
+        }).eq("id", 1);
+      } catch (updateErr) {
+        console.error("Failed to update lastManualReportSentAt:", updateErr);
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, sentCount }), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
 
   } catch (err) {
-    console.error("Error in send-weekly-report:", err.message);
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.error("Error in send-weekly-report:", err);
+    return new Response(JSON.stringify({ error: "Internal server error. Please contact your administrator." }), {
       status: 500,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
