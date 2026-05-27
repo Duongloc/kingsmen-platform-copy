@@ -35,8 +35,8 @@ print_warn() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 print_err()  { echo -e "${RED}❌ $1${NC}"; }
 
 # ── Check prerequisites ──
-command -v supabase >/dev/null 2>&1 || {
-  print_err "Supabase CLI not found. Install it with: npm install -g supabase"
+command -v npx >/dev/null 2>&1 || {
+  print_err "npx not found. Please install Node.js/npm."
   exit 1
 }
 
@@ -47,7 +47,7 @@ print_step "Checking Supabase authentication"
 # Use an access token instead.
 if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
   # Try 'supabase login' (works on local machine with browser)
-  if ! supabase projects list > /dev/null 2>&1; then
+  if ! npx supabase projects list > /dev/null 2>&1; then
     print_err "Not authenticated. On a VPS, set the access token:"
     echo ""
     echo "  1. Go to: https://supabase.com/dashboard/account/tokens"
@@ -55,12 +55,12 @@ if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
     echo "  3. Run:  export SUPABASE_ACCESS_TOKEN=sbp_your-token"
     echo "  4. Then re-run this script"
     echo ""
-    echo "  Or on a local machine with a browser: supabase login"
+    echo "  Or on a local machine with a browser: npx supabase login"
     exit 1
   fi
   print_ok "Supabase CLI authenticated (browser session)"
 else
-  if ! supabase projects list > /dev/null 2>&1; then
+  if ! npx supabase projects list > /dev/null 2>&1; then
     print_err "SUPABASE_ACCESS_TOKEN is set but invalid. Generate a new one at:"
     echo "  https://supabase.com/dashboard/account/tokens"
     exit 1
@@ -73,7 +73,7 @@ if [ ! -f ".supabase/project-ref" ] 2>/dev/null && [ ! -f "supabase/.temp/projec
   print_warn "Project not linked yet."
   read -p "Enter your Supabase project reference ID: " project_ref
   if [ -n "$project_ref" ]; then
-    supabase link --project-ref "$project_ref"
+    npx supabase link --project-ref "$project_ref"
     print_ok "Project linked: $project_ref"
   else
     print_err "Project ref is required. Find it in your Supabase Dashboard URL."
@@ -85,7 +85,7 @@ fi
 print_step "Step 1: Database Migration"
 echo "Running schema migration..."
 
-if supabase db push 2>&1; then
+if npx supabase db push 2>&1; then
   print_ok "Database migration applied successfully"
 else
   print_warn "Migration may have partially applied. Check the SQL Editor for errors."
@@ -100,7 +100,7 @@ FUNCTIONS=("claude-proxy" "create-user" "reset-password" "update-user" "send-wee
 
 for fn in "${FUNCTIONS[@]}"; do
   echo -n "Deploying $fn... "
-  if supabase functions deploy "$fn" --no-verify-jwt 2>&1; then
+  if npx supabase functions deploy "$fn" --no-verify-jwt 2>&1; then
     print_ok "$fn deployed"
   else
     print_err "Failed to deploy $fn"
@@ -124,7 +124,7 @@ read -p "Do you want to set the ANTHROPIC_API_KEY now? (y/n): " answer
 if [[ "$answer" =~ ^[Yy]$ ]]; then
   read -sp "Enter your Anthropic API key: " api_key
   echo ""
-  supabase secrets set ANTHROPIC_API_KEY="$api_key"
+  npx supabase secrets set ANTHROPIC_API_KEY="$api_key"
   print_ok "ANTHROPIC_API_KEY set"
 else
   print_warn "Skipped ANTHROPIC_API_KEY."
@@ -136,7 +136,7 @@ if [[ "$answer_gmail" =~ ^[Yy]$ ]]; then
   read -p "Enter your GMAIL_USER (email address): " gmail_user
   read -sp "Enter your GMAIL_APP_PASSWORD (16 characters): " gmail_pass
   echo ""
-  supabase secrets set GMAIL_USER="$gmail_user" GMAIL_APP_PASSWORD="$gmail_pass"
+  npx supabase secrets set GMAIL_USER="$gmail_user" GMAIL_APP_PASSWORD="$gmail_pass"
   print_ok "Gmail credentials set"
 else
   print_warn "Skipped Gmail credentials."
@@ -147,7 +147,7 @@ print_step "Deployment Complete"
 echo ""
 echo "  📦 Database:  Schema + RLS + RPC functions applied"
 echo "  ⚡ Functions: ${#FUNCTIONS[@]} edge functions deployed"
-echo "  🔑 Secrets:   Check with 'supabase secrets list'"
+echo "  🔑 Secrets:   Check with 'npx supabase secrets list'"
 echo ""
 echo "  Next steps:"
 echo "  1. Create the admin user via Supabase Dashboard → Authentication"
