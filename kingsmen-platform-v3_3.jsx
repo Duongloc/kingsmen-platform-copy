@@ -259,8 +259,13 @@ const DB = {
   async get(k, fb = null, isAdmin = false, userId = null) {
     try {
       switch (k) {
-        case "km-accounts": { const { data, error } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at,real_email,receive_weekly_report").order("created_at"); if (error) console.error("Accounts fetch error:", error); return data ? data.map(profileToCamel) : fb; }
-        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at", { ascending: true }).limit(20); return data ? data.map(quizToCamel) : fb; }
+        case "km-accounts": { 
+          const cols = isAdmin ? "id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at,real_email,receive_weekly_report" : "id,emp_id,name,dept,acc_role,xp,streak,status,team";
+          const { data, error } = await supabase.from("profiles").select(cols).order("created_at"); 
+          if (error) console.error("Accounts fetch error:", error); 
+          return data ? data.map(profileToCamel) : fb; 
+        }
+        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("id,title,questions,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at", { ascending: true }).limit(20); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
@@ -276,11 +281,11 @@ const DB = {
           if (error) console.error("Employee results fetch error:", error);
           return data ? data.map(resultToCamel).sort((a, b) => new Date(a.date) - new Date(b.date)) : fb;
         }
-        case "km-recognitions": { const { data } = await supabase.from("recognitions").select("*").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
-        case "km-challenges": { const { data } = await supabase.from("challenges").select("*").order("created_at"); return data ? data.map(challengeToCamel) : fb; }
-        case "km-notifications": { const { data } = await supabase.from("notifications").select("*").order("created_at"); return data ? data.map(notifToCamel) : fb; }
-        case "km-paths": { const { data } = await supabase.from("paths").select("*").order("created_at"); return data ? data.map(pathToCamel) : fb; }
-        case "km-bulletins": { const { data } = await supabase.from("bulletins").select("*").order("created_at", { ascending: false }); return data ? data.map(bulletinToCamel) : fb; }
+        case "km-recognitions": { const { data } = await supabase.from("recognitions").select("id,emp_id,emp_name,type,message,given_by,created_at").order("created_at"); return data ? data.map(recognitionToCamel) : fb; }
+        case "km-challenges": { const { data } = await supabase.from("challenges").select("id,title,quiz_id,quiz_title,knowledge_id,knowledge_title,min_score,deadline,assign_to,assign_dept,rewards,active,xp_bonus,created_at,created_by,created_by_name,completed_by,won_rewards,delivered").order("created_at"); return data ? data.map(challengeToCamel) : fb; }
+        case "km-notifications": { const { data } = await supabase.from("notifications").select("id,emp_id,msg,type,read,created_at").order("created_at"); return data ? data.map(notifToCamel) : fb; }
+        case "km-paths": { const { data } = await supabase.from("paths").select("id,title,dept,description,stages,assigned_to,created_at").order("created_at"); return data ? data.map(pathToCamel) : fb; }
+        case "km-bulletins": { const { data } = await supabase.from("bulletins").select("id,title,content,type,pinned,author,created_at").order("created_at", { ascending: false }); return data ? data.map(bulletinToCamel) : fb; }
         case "km-settings": { const { data } = await supabase.from("settings").select("config").eq("id", 1).single(); return data ? data.config : fb; }
         case "km-logo": { const { data } = await supabase.from("kingsmen_data").select("value").eq("id", "logo").single(); return data ? data.value : fb; }
         default: return fb;
@@ -542,7 +547,7 @@ export default function App() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session && session.user) {
           try {
-            const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+            const { data: profile } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,avatar").eq("id", session.user.id).single();
             if (profile && profile.status === "active") {
               const acc = profileToCamel(profile);
               const activeAcc = (Array.isArray(cached.accounts) && cached.accounts.find(x => x.id === acc.id)) || acc;
@@ -632,7 +637,7 @@ export default function App() {
       // Fetch true total results count for Admins
       if (isAdmin) {
         try {
-          const { count } = await supabase.from("results").select('*', { count: 'exact', head: true });
+          const { count } = await supabase.from("results").select('id', { count: 'exact', head: true });
           if (count !== null) setTotalResultsCount(count);
         } catch (e) { }
       }
@@ -879,7 +884,7 @@ export default function App() {
     if (!term || term.length < 2) return;
     const timer = setTimeout(async () => {
       try {
-        const { data } = await supabase.from("quizzes").select("*").ilike("title", `%${term}%`);
+        const { data } = await supabase.from("quizzes").select("id,title,questions,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").ilike("title", `%${term}%`);
         if (data && data.length > 0) {
           const fetched = data.map(quizToCamel);
           setQuizzes(prev => {
@@ -897,7 +902,7 @@ export default function App() {
 
   const loadMoreQuizzesDB = async () => {
     try {
-      const { data } = await supabase.from("quizzes").select("*").order("created_at", { ascending: true }).range(quizzes.length, quizzes.length + 19);
+      const { data } = await supabase.from("quizzes").select("id,title,questions,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at", { ascending: true }).range(quizzes.length, quizzes.length + 19);
       if (data && data.length > 0) {
         const fetched = data.map(quizToCamel);
         setQuizzes(prev => {
@@ -938,7 +943,7 @@ export default function App() {
     const email = `${loginId.trim().toLowerCase()}@kingsmen.internal`;
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: loginPw });
     if (error) { setLoginErr("Sai mã nhân viên hoặc mật khẩu"); return; }
-    const { data: profile, error: pErr } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+    const { data: profile, error: pErr } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,avatar").eq("id", data.user.id).single();
     if (pErr || !profile) { setLoginErr("Không tìm thấy hồ sơ nhân viên"); return; }
     if (profile.status === "inactive") { await supabase.auth.signOut(); setLoginErr("Tài khoản đã bị vô hiệu hóa. Liên hệ Admin."); return; }
     // Admin user (emp_id === "admin") or Director → admin panel

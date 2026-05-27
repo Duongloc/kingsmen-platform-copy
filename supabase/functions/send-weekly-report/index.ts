@@ -115,33 +115,67 @@ Deno.serve(async (req) => {
       const userQuizzes = userResults.length;
       const userAvgPct = userQuizzes > 0 ? Math.round(userResults.reduce((sum, r) => sum + r.pct, 0) / userQuizzes) : 0;
 
+      const today = new Date().toISOString().split('T')[0];
       const htmlBody = `
-        <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-          <h2 style="color: #2196f3; text-align: center; border-bottom: 2px solid #2196f3; padding-bottom: 10px;">Báo Cáo Năng Lực Tuần</h2>
-          <p>Xin chào <b>${profile.name}</b>,</p>
-          <p>Đây là báo cáo hoạt động đào tạo của bạn trong 7 ngày qua trên nền tảng Kingsmen.</p>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
           
-          <div style="background: #f9f9f9; padding: 15px; border-radius: 6px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #555;">📊 Thành tích cá nhân</h3>
-            <ul style="list-style: none; padding: 0;">
-              <li>Tài khoản: ${profile.dept} ${profile.team ? ` - ${profile.team}` : ""}</li>
-              <li>Số bài thi hoàn thành: <b>${userQuizzes}</b></li>
-              <li>Điểm trung bình: <b style="color: ${userAvgPct >= 70 ? 'green' : 'red'};">${userAvgPct}%</b></li>
-            </ul>
+          <!-- Header -->
+          <div style="background-color: #0e7356; color: #fff; padding: 20px;">
+            <h2 style="margin: 0; font-size: 18px; text-transform: uppercase;">📘 BÁO CÁO NĂNG LỰC — KINGSMEN</h2>
+            <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Báo cáo tuần • ${today}</p>
           </div>
 
-          <div style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #1565c0;">🌐 Tổng quan toàn công ty</h3>
-            <ul style="list-style: none; padding: 0;">
-              <li>Tổng số bài thi toàn công ty: <b>${totalCompanyQuizzes}</b></li>
-              <li>Điểm trung bình toàn công ty: <b>${companyAvgPct}%</b></li>
-            </ul>
-          </div>
+          <div style="padding: 20px;">
+            <p style="margin-top: 0; font-size: 14px; color: #333;">Xin chào <b>${profile.name}</b>,</p>
+            
+            <!-- 4 Cards -->
+            <div style="display: flex; gap: 10px; margin-bottom: 25px;">
+              <!-- Card 1 -->
+              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Bài thi<br/>đã làm</div>
+                <div style="font-size: 22px; font-weight: bold; color: #0e7356;">${userQuizzes}</div>
+              </div>
+              
+              <!-- Card 2 -->
+              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Điểm<br/>trung bình</div>
+                <div style="font-size: 22px; font-weight: bold; color: #0d6efd;">${userAvgPct}%</div>
+              </div>
 
-          <p style="font-size: 13px; color: #777; text-align: center; margin-top: 30px;">
-            Kingsmen Training Platform <br/>
-            <i>Email này được gửi tự động, vui lòng không phản hồi.</i>
-          </p>
+              <!-- Card 3 -->
+              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Số bài<br/>công ty</div>
+                <div style="font-size: 22px; font-weight: bold; color: #dc3545;">${totalCompanyQuizzes}</div>
+              </div>
+
+              <!-- Card 4 -->
+              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Điểm TB<br/>công ty</div>
+                <div style="font-size: 22px; font-weight: bold; color: #fd7e14;">${companyAvgPct}%</div>
+              </div>
+            </div>
+
+            <!-- Section 1 -->
+            <h3 style="color: #0e7356; font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🚨 Chi tiết cá nhân</h3>
+            <div style="background: #fdf5e6; border-left: 3px solid #f5b041; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 13px; color: #333;">
+              <b>Tài khoản:</b> ${profile.dept} ${profile.team ? ` - ${profile.team}` : ""}
+            </div>
+            <div style="background: ${userAvgPct >= 70 ? '#e8f6f0' : '#fdeded'}; border-left: 3px solid ${userAvgPct >= 70 ? '#0e7356' : '#e74c3c'}; padding: 10px; margin-bottom: 20px; border-radius: 4px; font-size: 13px; color: #333;">
+              <b>Đánh giá:</b> ${userAvgPct >= 70 ? "Đạt chuẩn yêu cầu tuần này" : "Cần cố gắng cải thiện điểm số"}
+            </div>
+
+            <!-- Section 2 -->
+            <h3 style="color: #0e7356; font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🌐 Nhận xét chung</h3>
+            <p style="font-size: 13px; color: #555; line-height: 1.5;">
+              Tuần qua, toàn công ty đã hoàn thành <b>${totalCompanyQuizzes}</b> bài thi với điểm số trung bình là <b>${companyAvgPct}%</b>. Hãy tiếp tục duy trì thói quen học tập để nâng cao kỹ năng!
+            </p>
+
+            <!-- Footer -->
+            <p style="font-size: 12px; color: #999; text-align: center; margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
+              Kingsmen Training Platform<br/>
+              <i>Email tự động, vui lòng không phản hồi.</i>
+            </p>
+          </div>
         </div>
       `;
 
