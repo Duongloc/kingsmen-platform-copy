@@ -259,7 +259,7 @@ const DB = {
   async get(k, fb = null, isAdmin = false, userId = null) {
     try {
       switch (k) {
-        case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at,real_email,receive_weekly_report").order("created_at"); return data ? data.map(profileToCamel) : fb; }
+        case "km-accounts": { const { data, error } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at,real_email,receive_weekly_report").order("created_at"); if (error) console.error("Accounts fetch error:", error); return data ? data.map(profileToCamel) : fb; }
         case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at", { ascending: true }).limit(20); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
