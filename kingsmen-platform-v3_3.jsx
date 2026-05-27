@@ -232,7 +232,7 @@ const supabase = createClient(
 );
 
 // ─── Field mapping: DB (snake_case) ↔ App (camelCase) ───
-const profileToCamel = (r) => { const obj = { id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, accRole: r.acc_role, xp: r.xp || 0, streak: r.streak || 0, status: r.status, lastCheckIn: r.last_check_in || null, lastXpGainDate: r.last_xp_gain_date || null, checkIns: r.check_ins || [], readLessons: r.read_lessons || [], pathProgress: r.path_progress || {}, team: r.team || "" }; if ('avatar' in r) obj.avatar = r.avatar || null; return obj; };
+const profileToCamel = (r) => { const obj = { id: r.id, empId: r.emp_id, name: r.name, dept: r.dept, accRole: r.acc_role, xp: r.xp || 0, streak: r.streak || 0, status: r.status, lastCheckIn: r.last_check_in || null, lastXpGainDate: r.last_xp_gain_date || null, checkIns: r.check_ins || [], readLessons: r.read_lessons || [], pathProgress: r.path_progress || {}, team: r.team || "", realEmail: r.real_email || "", receiveWeeklyReport: r.receive_weekly_report || false }; if ('avatar' in r) obj.avatar = r.avatar || null; return obj; };
 const profileToSnake = (a) => { const obj = { id: a.id, emp_id: a.empId, name: a.name, dept: a.dept, acc_role: a.accRole || "employee", xp: a.xp || 0, streak: a.streak || 0, status: a.status || "active", last_check_in: a.lastCheckIn || null, last_xp_gain_date: a.lastXpGainDate || null, check_ins: a.checkIns || [], read_lessons: a.readLessons || [], path_progress: a.pathProgress || {}, team: a.team || "" }; if ('avatar' in a) obj.avatar = a.avatar || null; return obj; };
 const quizToCamel = (r) => ({ id: r.id, title: r.title, questions: r.questions || [], timeLimit: r.time_limit, depts: r.depts || ["Tất cả"], aiGenerated: r.ai_generated, difficulty: r.difficulty, quizType: r.quiz_type, knowledgeId: r.knowledge_id, importedFrom: r.imported_from || null, hidden: r.hidden || false, createdAt: r.created_at });
 const quizToSnake = (q) => { const base = { id: q.id, title: q.title, questions: q.questions || [], time_limit: q.timeLimit, depts: q.depts || ["Tất cả"], ai_generated: q.aiGenerated || false, difficulty: q.difficulty || "medium", quiz_type: q.quizType || "mc", knowledge_id: q.knowledgeId || null, hidden: q.hidden || false }; if (q.importedFrom) base.imported_from = q.importedFrom; return base; };
@@ -259,7 +259,7 @@ const DB = {
   async get(k, fb = null, isAdmin = false, userId = null) {
     try {
       switch (k) {
-        case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at").order("created_at"); return data ? data.map(profileToCamel) : fb; }
+        case "km-accounts": { const { data } = await supabase.from("profiles").select("id,emp_id,name,dept,acc_role,xp,streak,status,last_check_in,last_xp_gain_date,check_ins,read_lessons,path_progress,team,created_at,real_email,receive_weekly_report").order("created_at"); return data ? data.map(profileToCamel) : fb; }
         case "km-quizzes": { const { data } = await supabase.from("quizzes").select("*").order("created_at", { ascending: true }).limit(20); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
@@ -3116,6 +3116,8 @@ header{padding:6px 8px !important}
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Cấp bậc</label><select value={formData.editRole || a.accRole} onChange={e => setFormData({ ...formData, editRole: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12 }}>{ROLES.map(r => <option key={r.id} value={r.id}>{r.icon} {r.name}</option>)}</select></div>
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Mật khẩu mới</label><input type="password" value={formData.editNewPw || ""} onChange={e => setFormData({ ...formData, editNewPw: e.target.value, editPwMsg: "" })} placeholder="Nhập mật khẩu mới (≥6 ký tự)" style={{ ...inp, padding: "5px 8px", fontSize: 12 }} /></div>
                           <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Xác nhận MK mới</label><input type="password" value={formData.editConfirmPw || ""} onChange={e => setFormData({ ...formData, editConfirmPw: e.target.value, editPwMsg: "" })} placeholder="Nhập lại mật khẩu mới" style={{ ...inp, padding: "5px 8px", fontSize: 12, borderColor: formData.editConfirmPw && formData.editConfirmPw !== formData.editNewPw ? C.red : undefined }} /></div>
+                          <div><label style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>Email thực (nhận báo cáo)</label><input type="email" value={formData.editRealEmail !== undefined ? formData.editRealEmail : (a.realEmail || "")} onChange={e => setFormData({ ...formData, editRealEmail: e.target.value })} placeholder="Email gửi báo cáo" style={{ ...inp, padding: "5px 8px", fontSize: 12 }} /></div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 14 }}><input type="checkbox" checked={formData.editReceiveWeeklyReport !== undefined ? formData.editReceiveWeeklyReport : (a.receiveWeeklyReport || false)} onChange={e => setFormData({ ...formData, editReceiveWeeklyReport: e.target.checked })} /><label style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", cursor: "pointer" }} onClick={() => setFormData({ ...formData, editReceiveWeeklyReport: !(formData.editReceiveWeeklyReport !== undefined ? formData.editReceiveWeeklyReport : (a.receiveWeeklyReport || false)) })}>Nhận báo cáo tự động hàng tuần</label></div>
                         </div>
                         {formData.editPwMsg && <div style={{ fontSize: 11, marginBottom: 6, color: formData.editPwMsg.startsWith("✓") ? C.green : C.red }}>{formData.editPwMsg}</div>}
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -3134,8 +3136,8 @@ header{padding:6px 8px !important}
                                 if (resData.error) throw new Error(resData.error);
                               } catch (err) { alert("Lỗi cập nhật mã NV: " + err.message); return; }
                             }
-                            const patch = { emp_id: newEmpId, name: formData.editName || a.name, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", acc_role: formData.editRole || a.accRole };
-                            const optimistic = accounts.map(x => x.id === a.id ? { ...x, empId: patch.emp_id, name: patch.name, dept: patch.dept, team: patch.team, accRole: patch.acc_role } : x);
+                            const patch = { emp_id: newEmpId, name: formData.editName || a.name, dept: formData.editDept || a.dept, team: (formData.editTeam || a.team) || "", acc_role: formData.editRole || a.accRole, real_email: formData.editRealEmail !== undefined ? formData.editRealEmail : a.realEmail, receive_weekly_report: formData.editReceiveWeeklyReport !== undefined ? formData.editReceiveWeeklyReport : a.receiveWeeklyReport };
+                            const optimistic = accounts.map(x => x.id === a.id ? { ...x, empId: patch.emp_id, name: patch.name, dept: patch.dept, team: patch.team, accRole: patch.acc_role, realEmail: patch.real_email, receiveWeeklyReport: patch.receive_weekly_report } : x);
                             setAccounts(optimistic); accountsRef.current = optimistic;
                             const { error: aeErr } = await supabase.from("profiles").update(patch).eq("id", a.id);
                             if (aeErr) { console.error("admin account update error:", aeErr.message); setSaveStatus("error"); return; }
@@ -3327,6 +3329,47 @@ header{padding:6px 8px !important}
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h2 style={hd(22)}>📊 Phân Tích Năng Lực</h2><button onClick={() => setScreen("admin_home")} style={btnO}>← Quay lại</button>
+            </div>
+
+            {/* Weekly Email Report */}
+            <div style={{ ...card, padding: 14, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between", background: "rgba(33, 150, 243, 0.05)", border: "1px solid rgba(33, 150, 243, 0.2)" }}>
+              <div>
+                <div style={{ fontSize: 13, color: "#2196f3", fontWeight: 700, marginBottom: 4 }}>📧 BÁO CÁO HÀNG TUẦN (GMAIL)</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Gửi báo cáo năng lực cho các nhân viên đã được chọn (trong tab Tài Khoản).</div>
+              </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input type="checkbox" checked={settings.autoWeeklyReportEnabled || false} onChange={async (e) => {
+                    const newSettings = { ...settings, autoWeeklyReportEnabled: e.target.checked };
+                    setSettings(newSettings);
+                    await DB.set("km-settings", newSettings);
+                    setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000);
+                  }} />
+                  <label style={{ fontSize: 12, color: C.white, cursor: "pointer" }} onClick={async () => {
+                    const newSettings = { ...settings, autoWeeklyReportEnabled: !(settings.autoWeeklyReportEnabled || false) };
+                    setSettings(newSettings);
+                    await DB.set("km-settings", newSettings);
+                    setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000);
+                  }}>Tự động gửi (Cron)</label>
+                </div>
+                <button onClick={async () => {
+                  if (!window.confirm("Gửi báo cáo hàng tuần ngay bây giờ cho các tài khoản được chọn?")) return;
+                  setFormData({ ...formData, _sendingReport: true });
+                  try {
+                    await supabase.auth.getSession();
+                    const { data: rawRes, error: fnErr } = await supabase.functions.invoke("send-weekly-report", { body: { manual: true }, responseType: "text" });
+                    if (fnErr) throw new Error(fnErr.message);
+                    let resData; try { resData = typeof rawRes === "string" ? JSON.parse(rawRes) : rawRes; } catch (e) { throw new Error("Response parse error"); }
+                    if (resData.error) throw new Error(resData.error);
+                    alert(`✅ Đã gửi báo cáo thành công!\nSố email đã gửi: ${resData.sentCount || 0}`);
+                  } catch (err) {
+                    alert("Lỗi khi gửi báo cáo: " + (err.message || "Không xác định"));
+                  }
+                  setFormData({ ...formData, _sendingReport: false });
+                }} disabled={!!formData._sendingReport} style={{ ...btnG, opacity: formData._sendingReport ? 0.6 : 1 }}>
+                  {formData._sendingReport ? "⏳ Đang gửi..." : "Gửi ngay bây giờ"}
+                </button>
+              </div>
             </div>
 
             {/* Filters: Dept + Team + Employee */}

@@ -96,7 +96,7 @@ fi
 # ── Step 2: Deploy Edge Functions ──
 print_step "Step 2: Edge Functions"
 
-FUNCTIONS=("claude-proxy" "create-user" "reset-password" "update-user")
+FUNCTIONS=("claude-proxy" "create-user" "reset-password" "update-user" "send-weekly-report")
 
 for fn in "${FUNCTIONS[@]}"; do
   echo -n "Deploying $fn... "
@@ -113,6 +113,8 @@ print_step "Step 3: Edge Function Secrets"
 echo "The following secrets are needed for edge functions:"
 echo ""
 echo "  ANTHROPIC_API_KEY    — Required by claude-proxy for AI features"
+echo "  GMAIL_USER           — Required by send-weekly-report (e.g. your email)"
+echo "  GMAIL_APP_PASSWORD   — Required by send-weekly-report (16-char app password)"
 echo ""
 echo "Note: SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY"
 echo "are automatically available in edge functions."
@@ -125,8 +127,19 @@ if [[ "$answer" =~ ^[Yy]$ ]]; then
   supabase secrets set ANTHROPIC_API_KEY="$api_key"
   print_ok "ANTHROPIC_API_KEY set"
 else
-  print_warn "Skipped. Set it later with:"
-  echo "  supabase secrets set ANTHROPIC_API_KEY=sk-ant-..."
+  print_warn "Skipped ANTHROPIC_API_KEY."
+fi
+
+echo ""
+read -p "Do you want to set the Gmail credentials for weekly reports now? (y/n): " answer_gmail
+if [[ "$answer_gmail" =~ ^[Yy]$ ]]; then
+  read -p "Enter your GMAIL_USER (email address): " gmail_user
+  read -sp "Enter your GMAIL_APP_PASSWORD (16 characters): " gmail_pass
+  echo ""
+  supabase secrets set GMAIL_USER="$gmail_user" GMAIL_APP_PASSWORD="$gmail_pass"
+  print_ok "Gmail credentials set"
+else
+  print_warn "Skipped Gmail credentials."
 fi
 
 # ── Summary ──
