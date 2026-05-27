@@ -48,7 +48,13 @@ Deno.serve(async (req) => {
       const isAdmin = callerProfile.emp_id === "admin" || callerProfile.acc_role === "director";
       if (!isAdmin) throw new Error("Forbidden: Only admins can send reports manually");
     } else {
-      // Automated -> Verify settings
+      // Automated -> Verify it is called securely (must use SERVICE_ROLE_KEY)
+      const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+      if (token !== supabaseServiceKey) {
+        return new Response(JSON.stringify({ error: "Unauthorized: Automated triggers must use the Service Role Key" }), { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+      }
+
+      // Verify settings
       const { data: settingsRow } = await supabaseAdmin.from("settings").select("config").eq("id", 1).single();
       if (!settingsRow?.config?.autoWeeklyReportEnabled) {
         return new Response(JSON.stringify({ success: true, message: "Automated reports disabled in settings" }), { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
