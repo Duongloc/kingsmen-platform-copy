@@ -274,10 +274,10 @@ const DB = {
             if (error) console.error("Admin results fetch error:", error);
             return data ? data.map(resultToCamel) : fb;
           }
-          // Non-admins: fetch 20 most recent results (without heavy 'answers') for fast load
+          // Non-admins: fetch ALL own results (without heavy 'answers') for accurate competency evaluation
           if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
           if (!userId) return fb;
-          const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").eq("emp_id", userId).order("created_at", { ascending: false }).limit(20);
+          const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").eq("emp_id", userId).order("created_at", { ascending: false });
           if (error) console.error("Employee results fetch error:", error);
           return data ? data.map(resultToCamel).sort((a, b) => new Date(a.date) - new Date(b.date)) : fb;
         }
