@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
 
       try {
         await transporter.sendMail({
-          from: \`"Kingsmen Training" <\${gmailUser}>\`,
+          from: `"Kingsmen Training" <${gmailUser}>`,
           to: profile.real_email,
           subject: "📊 Báo Cáo Năng Lực Tuần - Kingsmen",
           html: htmlBody,
