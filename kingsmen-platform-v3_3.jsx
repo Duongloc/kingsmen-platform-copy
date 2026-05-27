@@ -269,8 +269,8 @@ const DB = {
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
-            // Admins fetch recent 2000 results (without the heavy 'answers' column) for fast analytics
-            const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at", { ascending: false }).limit(2000);
+            // Admins fetch ALL results (without the heavy 'answers' column) for accurate analytics
+            const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at", { ascending: false });
             if (error) console.error("Admin results fetch error:", error);
             return data ? data.map(resultToCamel) : fb;
           }
