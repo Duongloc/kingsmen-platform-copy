@@ -76,15 +76,15 @@ Deno.serve(async (req) => {
       },
     });
 
-    // ── 3. Data Gathering ──
+    // ── 3. Fetch data ──
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const isoDate = sevenDaysAgo.toISOString();
 
-    // Get profiles that want the report
+    // Get profiles that want the report (include streak, read_lessons for competency calc)
     const { data: targetProfiles, error: pErr } = await supabaseAdmin
       .from("profiles")
-      .select("id, name, dept, team, real_email")
+      .select("id, name, dept, team, real_email, streak, read_lessons")
       .eq("status", "active")
       .eq("receive_weekly_report", true)
       .not("real_email", "is", null);
@@ -102,8 +102,65 @@ Deno.serve(async (req) => {
 
     if (rErr) throw new Error("Failed to fetch results: " + rErr.message);
 
+    // Get total knowledge count for competency calc
+    const { count: totalKnowledge } = await supabaseAdmin
+      .from("knowledge")
+      .select("id", { count: "exact", head: true });
+
     const totalCompanyQuizzes = weeklyResults.length;
     const companyAvgPct = totalCompanyQuizzes > 0 ? Math.round(weeklyResults.reduce((sum, r) => sum + r.pct, 0) / totalCompanyQuizzes) : 0;
+
+    // ── Competency definitions (mirrored from frontend) ──
+    const CORE_COMPETENCIES = [
+      { id: "thinking", name: "Tư duy & Xử lý thông tin", icon: "🧠" },
+      { id: "knowledge", name: "Hiểu công việc & Áp dụng kiến thức", icon: "📖" },
+      { id: "problem", name: "Giải quyết vấn đề & Ra quyết định", icon: "🎯" },
+      { id: "communication", name: "Giao tiếp & Phối hợp", icon: "🤝" },
+      { id: "discipline", name: "Trách nhiệm, Kỷ luật & Tuân thủ", icon: "📋" },
+      { id: "learning", name: "Học hỏi, Thích nghi & Cải tiến", icon: "🚀" },
+    ];
+    const POS_COMPETENCIES: Record<string, { id: string; name: string; icon: string }[]> = {
+      "Kinh doanh": [{ id: "sales", name: "Kỹ năng bán hàng & Tư vấn", icon: "💼" }, { id: "customer", name: "Chăm sóc khách hàng", icon: "🎧" }],
+      "Kỹ thuật": [{ id: "technical", name: "Chuyên môn kỹ thuật", icon: "🔧" }, { id: "quality", name: "Kiểm soát chất lượng", icon: "✅" }],
+      "Marketing": [{ id: "creative", name: "Tư duy sáng tạo", icon: "🎨" }, { id: "digital", name: "Marketing số", icon: "📱" }],
+      "Kho vận": [{ id: "logistics", name: "Quản lý kho & Logistics", icon: "📦" }, { id: "accuracy", name: "Độ chính xác", icon: "🎯" }],
+      "Quản lý": [{ id: "leadership", name: "Lãnh đạo & Quản lý", icon: "👔" }, { id: "strategy", name: "Tư duy chiến lược", icon: "♟️" }],
+      "CSKH": [{ id: "empathy", name: "Đồng cảm & Kiên nhẫn", icon: "💛" }, { id: "resolve", name: "Xử lý khiếu nại", icon: "🛡️" }],
+    };
+
+    const evalCompetency = (results: any[], streak: number, readCount: number, totalKn: number) => {
+      const total = results.length;
+      const avg = total > 0 ? results.reduce((s, r) => s + r.pct, 0) / total : 0;
+      const passRate = total > 0 ? results.filter(r => r.passed).length / total * 100 : 0;
+      const perfect = results.filter(r => r.pct === 100).length;
+      const recent = results.slice(-5);
+      const recentAvg = recent.length > 0 ? recent.reduce((s, r) => s + r.pct, 0) / recent.length : 0;
+      const readPct = totalKn > 0 ? readCount / totalKn * 100 : 0;
+      return {
+        thinking: Math.min(100, Math.round(avg * 0.6 + (perfect > 0 ? 20 : 0) + (recentAvg > avg ? 20 : 0))),
+        knowledge: Math.min(100, Math.round(readPct * 0.5 + avg * 0.3 + passRate * 0.2)),
+        problem: Math.min(100, Math.round(avg * 0.4 + passRate * 0.3 + (recentAvg > 70 ? 30 : recentAvg * 0.3))),
+        communication: Math.min(100, Math.round(passRate * 0.4 + (streak > 7 ? 30 : streak * 4) + (total > 5 ? 30 : total * 6))),
+        discipline: Math.min(100, Math.round((streak > 14 ? 40 : streak * 3) + passRate * 0.3 + (total > 3 ? 30 : total * 10))),
+        learning: Math.min(100, Math.round(readPct * 0.3 + (recentAvg - avg > 0 ? 30 : 10) + (streak > 7 ? 20 : streak * 3) + (total > 5 ? 20 : total * 4))),
+      };
+    };
+
+    const getLevel = (score: number) => {
+      if (score >= 85) return { label: "Xuất sắc", color: "#28a745" };
+      if (score >= 70) return { label: "Tốt", color: "#0d6efd" };
+      if (score >= 50) return { label: "Đạt", color: "#fd7e14" };
+      return { label: "Cần cải thiện", color: "#dc3545" };
+    };
+
+    const IMPROVEMENT_ACTIONS: Record<string, string> = {
+      thinking: "Làm thêm bài kiểm tra nâng cao, tập trung phân tích câu hỏi kỹ trước khi trả lời",
+      knowledge: "Đọc hết tài liệu kiến thức, ôn lại các bài chưa đạt",
+      problem: "Tập trung vào bài thi tình huống, phân tích kỹ từng phương án",
+      discipline: "Duy trì đăng nhập hàng ngày, hoàn thành bài kiểm tra đúng hạn",
+      learning: "Chủ động học bài mới, thi lại bài chưa đạt để cải thiện điểm",
+      communication: "Tiếp tục rèn luyện và thực hành thường xuyên",
+    };
 
     // ── 4. Generate & Send Emails ──
     let sentCount = 0;
@@ -111,9 +168,75 @@ Deno.serve(async (req) => {
     for (const profile of targetProfiles) {
       if (!profile.real_email || !profile.real_email.includes("@")) continue;
 
-      const userResults = weeklyResults.filter((r) => r.emp_id === profile.id);
-      const userQuizzes = userResults.length;
-      const userAvgPct = userQuizzes > 0 ? Math.round(userResults.reduce((sum, r) => sum + r.pct, 0) / userQuizzes) : 0;
+      // Weekly stats
+      const userWeeklyResults = weeklyResults.filter((r) => r.emp_id === profile.id);
+      const userQuizzes = userWeeklyResults.length;
+      const userAvgPct = userQuizzes > 0 ? Math.round(userWeeklyResults.reduce((sum, r) => sum + r.pct, 0) / userQuizzes) : 0;
+
+      // Fetch ALL results for this user (for competency evaluation)
+      const { data: allUserResults } = await supabaseAdmin
+        .from("results")
+        .select("pct, passed")
+        .eq("emp_id", profile.id)
+        .order("created_at", { ascending: true });
+
+      const userAllResults = allUserResults || [];
+      const streak = profile.streak || 0;
+      const readCount = (profile.read_lessons || []).length;
+      const scores = evalCompetency(userAllResults, streak, readCount, totalKnowledge || 0);
+
+      // Build competency bar HTML
+      const renderBar = (icon: string, name: string, score: number) => {
+        const lv = getLevel(score);
+        return `<div style="margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+            <span style="font-size: 13px; color: #333; font-weight: 600;">${icon} ${name}</span>
+            <span style="font-size: 12px; font-weight: 700; color: ${lv.color};">${score}% · ${lv.label}</span>
+          </div>
+          <div style="background: #e9ecef; border-radius: 6px; height: 8px; overflow: hidden;">
+            <div style="width: ${score}%; height: 100%; background: ${lv.color}; border-radius: 6px;"></div>
+          </div>
+        </div>`;
+      };
+
+      const coreCompHTML = CORE_COMPETENCIES.map(c => renderBar(c.icon, c.name, (scores as any)[c.id] || 0)).join("");
+
+      const posComps = POS_COMPETENCIES[profile.dept] || [];
+      const posCompHTML = posComps.length > 0
+        ? `<h3 style="color: #0e7356; font-size: 14px; margin: 20px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📌 Năng lực theo vị trí (${profile.dept})</h3>` +
+          posComps.map(c => renderBar(c.icon, c.name, (scores as any)[c.id] || 0)).join("")
+        : "";
+
+      // Build improvement suggestions
+      const allComps = [...CORE_COMPETENCIES, ...posComps];
+      const sortedScores = Object.entries(scores).sort((a, b) => (a[1] as number) - (b[1] as number));
+      const improvements = sortedScores
+        .filter(([, score]) => (score as number) < 70)
+        .slice(0, 3)
+        .map(([id, score]) => {
+          const comp = allComps.find(c => c.id === id);
+          const action = IMPROVEMENT_ACTIONS[id] || "Tiếp tục rèn luyện và thực hành thường xuyên";
+          const priority = (score as number) < 50 ? "Cao" : "Trung bình";
+          return { name: comp?.name || id, action, priority };
+        });
+
+      const improvementHTML = improvements.length > 0
+        ? `<div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 15px; margin-top: 20px;">
+            <h3 style="color: #e65100; font-size: 14px; margin: 0 0 10px 0;">💡 Đề xuất cải thiện</h3>
+            ${improvements.map(s => `
+              <div style="padding: 8px 0; border-bottom: 1px solid #fff3cd;">
+                <span style="display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff; background: ${s.priority === "Cao" ? "#dc3545" : "#fd7e14"}; margin-right: 8px;">${s.priority}</span>
+                <b style="font-size: 13px; color: #333;">${s.name}</b>
+                <div style="font-size: 12px; color: #666; margin-top: 3px; padding-left: 4px;">${s.action}</div>
+              </div>
+            `).join("")}
+          </div>`
+        : "";
+
+      // Compute overall avg score
+      const scoreValues = Object.values(scores) as number[];
+      const avgCompScore = scoreValues.length > 0 ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) : 0;
+      const avgLv = getLevel(avgCompScore);
 
       const today = new Date().toISOString().split('T')[0];
       const htmlBody = `
@@ -130,44 +253,38 @@ Deno.serve(async (req) => {
             
             <!-- 4 Cards -->
             <div style="display: flex; gap: 10px; margin-bottom: 25px;">
-              <!-- Card 1 -->
               <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Bài thi<br/>đã làm</div>
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Bài thi<br/>tuần này</div>
                 <div style="font-size: 22px; font-weight: bold; color: #0e7356;">${userQuizzes}</div>
               </div>
-              
-              <!-- Card 2 -->
               <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Điểm<br/>trung bình</div>
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Điểm TB<br/>tuần này</div>
                 <div style="font-size: 22px; font-weight: bold; color: #0d6efd;">${userAvgPct}%</div>
               </div>
-
-              <!-- Card 3 -->
               <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Số bài<br/>công ty</div>
-                <div style="font-size: 22px; font-weight: bold; color: #dc3545;">${totalCompanyQuizzes}</div>
+                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Năng lực<br/>tổng hợp</div>
+                <div style="font-size: 22px; font-weight: bold; color: ${avgLv.color};">${avgCompScore}%</div>
               </div>
-
-              <!-- Card 4 -->
               <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
                 <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Điểm TB<br/>công ty</div>
                 <div style="font-size: 22px; font-weight: bold; color: #fd7e14;">${companyAvgPct}%</div>
               </div>
             </div>
 
-            <!-- Section 1 -->
-            <h3 style="color: #0e7356; font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🚨 Chi tiết cá nhân</h3>
-            <div style="background: #fdf5e6; border-left: 3px solid #f5b041; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 13px; color: #333;">
-              <b>Tài khoản:</b> ${profile.dept} ${profile.team ? ` - ${profile.team}` : ""}
-            </div>
-            <div style="background: ${userAvgPct >= 70 ? '#e8f6f0' : '#fdeded'}; border-left: 3px solid ${userAvgPct >= 70 ? '#0e7356' : '#e74c3c'}; padding: 10px; margin-bottom: 20px; border-radius: 4px; font-size: 13px; color: #333;">
-              <b>Đánh giá:</b> ${userAvgPct >= 70 ? "Đạt chuẩn yêu cầu tuần này" : "Cần cố gắng cải thiện điểm số"}
-            </div>
+            <!-- Core Competencies -->
+            <h3 style="color: #0e7356; font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🧠 Năng lực cốt lõi (6 nhóm)</h3>
+            ${coreCompHTML}
 
-            <!-- Section 2 -->
-            <h3 style="color: #0e7356; font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🌐 Nhận xét chung</h3>
+            <!-- Position Competencies -->
+            ${posCompHTML}
+
+            <!-- Improvement Suggestions -->
+            ${improvementHTML}
+
+            <!-- Company Summary -->
+            <h3 style="color: #0e7356; font-size: 14px; margin: 20px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">🌐 Tổng quan công ty tuần qua</h3>
             <p style="font-size: 13px; color: #555; line-height: 1.5;">
-              Tuần qua, toàn công ty đã hoàn thành <b>${totalCompanyQuizzes}</b> bài thi với điểm số trung bình là <b>${companyAvgPct}%</b>. Hãy tiếp tục duy trì thói quen học tập để nâng cao kỹ năng!
+              Toàn công ty đã hoàn thành <b>${totalCompanyQuizzes}</b> bài thi với điểm số trung bình là <b>${companyAvgPct}%</b>. Hãy tiếp tục duy trì thói quen học tập để nâng cao kỹ năng!
             </p>
 
             <!-- Footer -->
