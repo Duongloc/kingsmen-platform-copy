@@ -225,25 +225,29 @@ Deno.serve(async (req) => {
       const readCount = (profile.read_lessons || []).length;
       const scores = evalCompetency(userAllResults, streak, readCount, totalKnowledge || 0);
 
-      // Build competency bar HTML
+      // Build competency bar HTML (table-based for email compatibility)
       const renderBar = (icon: string, name: string, score: number) => {
         const lv = getLevel(score);
-        return `<div style="margin-bottom: 10px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-            <span style="font-size: 13px; color: #333; font-weight: 600;">${icon} ${name}</span>
-            <span style="font-size: 12px; font-weight: 700; color: ${lv.color};">${score}% · ${lv.label}</span>
-          </div>
-          <div style="background: #e9ecef; border-radius: 6px; height: 8px; overflow: hidden;">
-            <div style="width: ${score}%; height: 100%; background: ${lv.color}; border-radius: 6px;"></div>
-          </div>
-        </div>`;
+        return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 14px;">
+          <tr>
+            <td style="font-size: 13px; color: #333; font-weight: 600; padding-bottom: 4px;">${icon} ${name}</td>
+            <td align="right" style="font-size: 12px; font-weight: 700; color: ${lv.color}; padding-bottom: 4px; white-space: nowrap;">${score}% · ${lv.label}</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding: 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #e9ecef; border-radius: 6px;">
+                <tr><td style="width: ${score}%; height: 8px; background: ${lv.color}; border-radius: 6px; font-size: 0; line-height: 0;">&nbsp;</td><td style="font-size: 0; line-height: 0;">&nbsp;</td></tr>
+              </table>
+            </td>
+          </tr>
+        </table>`;
       };
 
       const coreCompHTML = CORE_COMPETENCIES.map(c => renderBar(c.icon, c.name, (scores as any)[c.id] || 0)).join("");
 
       const posComps = POS_COMPETENCIES[profile.dept] || [];
       const posCompHTML = posComps.length > 0
-        ? `<h3 style="color: #0e7356; font-size: 14px; margin: 20px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📌 Năng lực theo vị trí (${escapeHtml(profile.dept)})</h3>` +
+        ? `<h3 style="color: #0e7356; font-size: 14px; margin: 24px 0 12px 0; border-bottom: 2px solid #e8f5e9; padding-bottom: 6px;">📌 Năng lực theo vị trí (${escapeHtml(profile.dept)})</h3>` +
           posComps.map(c => renderBar(c.icon, c.name, (scores as any)[c.id] || 0)).join("")
         : "";
 
@@ -261,16 +265,20 @@ Deno.serve(async (req) => {
         });
 
       const improvementHTML = improvements.length > 0
-        ? `<div style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 15px; margin-top: 20px;">
-            <h3 style="color: #e65100; font-size: 14px; margin: 0 0 10px 0;">💡 Đề xuất cải thiện</h3>
-            ${improvements.map(s => `
-              <div style="padding: 8px 0; border-bottom: 1px solid #fff3cd;">
-                <span style="display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; color: #fff; background: ${s.priority === "Cao" ? "#dc3545" : "#fd7e14"}; margin-right: 8px;">${s.priority}</span>
-                <b style="font-size: 13px; color: #333;">${s.name}</b>
-                <div style="font-size: 12px; color: #666; margin-top: 3px; padding-left: 4px;">${s.action}</div>
-              </div>
-            `).join("")}
-          </div>`
+        ? `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; margin-top: 20px;">
+            <tr><td style="padding: 16px;">
+              <h3 style="color: #e65100; font-size: 14px; margin: 0 0 12px 0;">💡 Đề xuất cải thiện</h3>
+              ${improvements.map(s => `
+                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-bottom: 1px solid #fff3cd; margin-bottom: 8px;">
+                  <tr><td style="padding: 6px 0 8px 0;">
+                    <span style="display: inline-block; font-size: 10px; padding: 3px 10px; border-radius: 4px; font-weight: 700; color: #fff; background: ${s.priority === "Cao" ? "#dc3545" : "#fd7e14"}; margin-right: 8px; vertical-align: middle;">${s.priority}</span>
+                    <b style="font-size: 13px; color: #333; vertical-align: middle;">${s.name}</b>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px; padding-left: 2px;">${s.action}</div>
+                  </td></tr>
+                </table>
+              `).join("")}
+            </td></tr>
+          </table>`
         : "";
 
       // Compute overall avg score
@@ -279,61 +287,75 @@ Deno.serve(async (req) => {
       const avgLv = getLevel(avgCompScore);
 
       const today = new Date().toISOString().split('T')[0];
+
+      // Helper for stat card (table cell)
+      const statCard = (label: string, value: string, color: string) =>
+        `<td width="25%" align="center" style="padding: 4px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border: 1px solid #e0e0e0; border-radius: 8px;">
+            <tr><td align="center" style="padding: 14px 6px 4px 6px; font-size: 11px; color: #888; line-height: 1.3;">${label}</td></tr>
+            <tr><td align="center" style="padding: 2px 6px 14px 6px; font-size: 22px; font-weight: bold; color: ${color};">${value}</td></tr>
+          </table>
+        </td>`;
+
       const htmlBody = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-          
-          <!-- Header -->
-          <div style="background-color: #0e7356; color: #fff; padding: 20px;">
-            <h2 style="margin: 0; font-size: 18px; text-transform: uppercase;">📘 BÁO CÁO NĂNG LỰC — KINGSMEN</h2>
-            <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Báo cáo tuần • ${today}</p>
-          </div>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
+          <tr><td>
+            <!-- Outer container -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #ffffff; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden;">
+              
+              <!-- Header -->
+              <tr>
+                <td style="background-color: #0e7356; padding: 20px 24px;">
+                  <h2 style="margin: 0; font-size: 17px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">📘 BÁO CÁO NĂNG LỰC — KINGSMEN</h2>
+                  <p style="margin: 6px 0 0 0; font-size: 13px; color: rgba(255,255,255,0.85);">Báo cáo tuần · ${today}</p>
+                </td>
+              </tr>
 
-          <div style="padding: 20px;">
-            <p style="margin-top: 0; font-size: 14px; color: #333;">Xin chào <b>${escapeHtml(profile.name)}</b>,</p>
-            
-            <!-- 4 Cards -->
-            <div style="display: flex; gap: 10px; margin-bottom: 25px;">
-              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Bài thi<br/>tuần này</div>
-                <div style="font-size: 22px; font-weight: bold; color: #0e7356;">${userQuizzes}</div>
-              </div>
-              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Điểm TB<br/>tuần này</div>
-                <div style="font-size: 22px; font-weight: bold; color: #0d6efd;">${userAvgPct}%</div>
-              </div>
-              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Năng lực<br/>tổng hợp</div>
-                <div style="font-size: 22px; font-weight: bold; color: ${avgLv.color};">${avgCompScore}%</div>
-              </div>
-              <div style="flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 8px; text-align: center;">
-                <div style="font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.3;">Điểm TB<br/>công ty</div>
-                <div style="font-size: 22px; font-weight: bold; color: #fd7e14;">${companyAvgPct}%</div>
-              </div>
-            </div>
+              <!-- Body -->
+              <tr>
+                <td style="padding: 24px;">
 
-            <!-- Core Competencies -->
-            <h3 style="color: #0e7356; font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🧠 Năng lực cốt lõi (6 nhóm)</h3>
-            ${coreCompHTML}
+                  <!-- Greeting -->
+                  <p style="margin: 0 0 20px 0; font-size: 14px; color: #333;">Xin chào <b>${escapeHtml(profile.name)}</b>,</p>
 
-            <!-- Position Competencies -->
-            ${posCompHTML}
+                  <!-- 4 Stat Cards -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
+                    <tr>
+                      ${statCard("Bài thi<br/>tuần này", String(userQuizzes), "#0e7356")}
+                      ${statCard("Điểm TB<br/>tuần này", userAvgPct + "%", "#0d6efd")}
+                      ${statCard("Năng lực<br/>tổng hợp", avgCompScore + "%", avgLv.color)}
+                      ${statCard("Điểm TB<br/>công ty", companyAvgPct + "%", "#fd7e14")}
+                    </tr>
+                  </table>
 
-            <!-- Improvement Suggestions -->
-            ${improvementHTML}
+                  <!-- Core Competencies Section -->
+                  <h3 style="color: #0e7356; font-size: 14px; margin: 0 0 14px 0; border-bottom: 2px solid #e8f5e9; padding-bottom: 6px;">🧠 Năng lực cốt lõi (6 nhóm)</h3>
+                  ${coreCompHTML}
 
-            <!-- Company Summary -->
-            <h3 style="color: #0e7356; font-size: 14px; margin: 20px 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">🌐 Tổng quan công ty tuần qua</h3>
-            <p style="font-size: 13px; color: #555; line-height: 1.5;">
-              Toàn công ty đã hoàn thành <b>${totalCompanyQuizzes}</b> bài thi với điểm số trung bình là <b>${companyAvgPct}%</b>. Hãy tiếp tục duy trì thói quen học tập để nâng cao kỹ năng!
-            </p>
+                  <!-- Position Competencies -->
+                  ${posCompHTML}
 
-            <!-- Footer -->
-            <p style="font-size: 12px; color: #999; text-align: center; margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
-              Kingsmen Training Platform<br/>
-              <i>Email tự động, vui lòng không phản hồi.</i>
-            </p>
-          </div>
-        </div>
+                  <!-- Improvement Suggestions -->
+                  ${improvementHTML}
+
+                  <!-- Company Summary -->
+                  <h3 style="color: #0e7356; font-size: 14px; margin: 24px 0 10px 0; border-bottom: 2px solid #e8f5e9; padding-bottom: 6px;">🌐 Tổng quan công ty tuần qua</h3>
+                  <p style="font-size: 13px; color: #555; line-height: 1.6; margin: 0;">
+                    Toàn công ty đã hoàn thành <b>${totalCompanyQuizzes}</b> bài thi với điểm số trung bình là <b>${companyAvgPct}%</b>. Hãy tiếp tục duy trì thói quen học tập để nâng cao kỹ năng!
+                  </p>
+
+                  <!-- Footer -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 28px; border-top: 1px solid #eee;">
+                    <tr><td align="center" style="padding-top: 16px;">
+                      <p style="font-size: 11px; color: #999; margin: 0;">Kingsmen Training Platform<br/><i>Email tự động, vui lòng không phản hồi.</i></p>
+                    </td></tr>
+                  </table>
+
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
       `;
 
       try {
