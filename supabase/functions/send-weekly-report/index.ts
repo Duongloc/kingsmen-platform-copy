@@ -120,10 +120,10 @@ Deno.serve(async (req) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const isoDate = sevenDaysAgo.toISOString();
 
-    // Get profiles that want the report (include streak, read_lessons for competency calc)
+    // Get profiles that want the report (include streak, read_lessons, xp, path_progress for competency calc)
     const { data: targetProfiles, error: pErr } = await supabaseAdmin
       .from("profiles")
-      .select("id, name, dept, team, real_email, streak, read_lessons")
+      .select("id, name, dept, team, real_email, streak, read_lessons, xp, path_progress")
       .eq("status", "active")
       .eq("receive_weekly_report", true)
       .not("real_email", "is", null);
@@ -140,6 +140,11 @@ Deno.serve(async (req) => {
       .gte("created_at", isoDate);
 
     if (rErr) throw new Error("Failed to fetch results: " + rErr.message);
+
+    // Get all paths for path progress tracking
+    const { data: allPaths } = await supabaseAdmin
+      .from("paths")
+      .select("id, title, dept, stages, assigned_to");
 
     // Get total knowledge count for competency calc
     const { count: totalKnowledge } = await supabaseAdmin
@@ -192,6 +197,29 @@ Deno.serve(async (req) => {
       return { label: "Cần cải thiện", color: "#dc3545" };
     };
 
+    const DEFAULT_LEVELS = [
+      { name: "Tập sự", min: 0, icon: "🌱", color: "#95a5a6" },
+      { name: "Nhân viên", min: 100, icon: "⭐", color: "#0d6efd" },
+      { name: "Chuyên viên", min: 300, icon: "💎", color: "#6f42c1" },
+      { name: "Chuyên gia", min: 600, icon: "🏅", color: "#c5993e" },
+      { name: "Master", min: 1000, icon: "🏆", color: "#e74c3c" }
+    ];
+    const getLevelObj = (xp: number) => { 
+      const x = Number(xp) || 0; 
+      for (let i = DEFAULT_LEVELS.length - 1; i >= 0; i--) 
+        if (x >= Number(DEFAULT_LEVELS[i].min)) return { ...DEFAULT_LEVELS[i], idx: i }; 
+      return { ...DEFAULT_LEVELS[0], idx: 0 }; 
+    };
+    const getNextLevelObj = (xp: number) => { 
+      const c = getLevelObj(xp); 
+      return c.idx >= DEFAULT_LEVELS.length - 1 ? null : DEFAULT_LEVELS[c.idx + 1]; 
+    };
+    const xpProgress = (xp: number) => {
+      const c = getLevelObj(xp);
+      const n = getNextLevelObj(xp);
+      return n ? (xp - c.min) / (n.min - c.min) : 1;
+    };
+
     const IMPROVEMENT_ACTIONS: Record<string, string> = {
       thinking: "Làm thêm bài kiểm tra nâng cao, tập trung phân tích câu hỏi kỹ trước khi trả lời",
       knowledge: "Đọc hết tài liệu kiến thức, ôn lại các bài chưa đạt",
@@ -216,7 +244,7 @@ Deno.serve(async (req) => {
       // Fetch ALL results for this user (for competency evaluation)
       const { data: allUserResults } = await supabaseAdmin
         .from("results")
-        .select("pct, passed")
+        .select("pct, passed, quiz_id")
         .eq("emp_id", profile.id)
         .order("created_at", { ascending: true });
 
@@ -224,6 +252,110 @@ Deno.serve(async (req) => {
       const streak = profile.streak || 0;
       const readCount = (profile.read_lessons || []).length;
       const scores = evalCompetency(userAllResults, streak, readCount, totalKnowledge || 0);
+
+      const xp = profile.xp || 0;
+      const currentLv = getLevelObj(xp);
+      const nextLv = getNextLevelObj(xp);
+      const readPct = totalKnowledge > 0 ? Math.round((readCount / totalKnowledge) * 100) : 0;
+
+      // Calculate path progress
+      const userPaths = (allPaths || []).filter((p: any) => {
+        const assigned = (p.assigned_to || []).includes(profile.id);
+        const hasProgress = !!(profile.path_progress || {})[p.id];
+        const deptMatch = p.dept === "Tất cả" || p.dept === profile.dept;
+        return assigned || hasProgress || deptMatch;
+      });
+
+      let totalPathModules = 0;
+      let completedPathModules = 0;
+
+      userPaths.forEach((p: any) => {
+        (p.stages || []).forEach((st: any) => {
+          (st.modules || []).forEach((mod: any) => {
+            totalPathModules++;
+            const prog = (profile.path_progress || {})[p.id] || {};
+            const checkDone = (mod.checklist || []).length === 0 || (mod.checklist || []).every((_: any, ci: number) => (prog.checks || {})[mod.id + "_" + ci]);
+            const quizFromResults = !mod.quizId || userAllResults.some((r: any) => r.quiz_id === mod.quizId && r.pct >= (mod.minScore || 70));
+            const quizFromProgress = !mod.quizId || ((prog.quizResults || {})[mod.quizId] && (prog.quizResults || {})[mod.quizId].passed && (prog.quizResults || {})[mod.quizId].pct >= (mod.minScore || 70));
+            const quizDone = quizFromResults || quizFromProgress;
+            if (checkDone && quizDone) completedPathModules++;
+          });
+        });
+      });
+      const pathPct = totalPathModules > 0 ? Math.round((completedPathModules / totalPathModules) * 100) : 0;
+
+      const personalProgressHTML = `
+        <h3 style="color: #0e7356; font-size: 14px; margin: 0 0 14px 0; border-bottom: 2px solid #e8f5e9; padding-bottom: 6px;">🏆 Tiến trình cá nhân</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 24px;">
+          <!-- Level & XP -->
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f1f3f4;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="34" style="font-size: 22px;">${currentLv.icon}</td>
+                  <td>
+                    <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 4px;">Cấp độ hiện tại: <span style="color: ${currentLv.color};">${currentLv.name}</span> (${xp} XP)</div>
+                    ${nextLv ? `
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #e9ecef; border-radius: 4px;">
+                        <tr><td style="width: ${xpProgress(xp) * 100}%; height: 6px; background: ${currentLv.color}; border-radius: 4px;"></td><td></td></tr>
+                      </table>
+                      <div style="font-size: 11px; color: #888; margin-top: 4px;">Cần thêm ${nextLv.min - xp} XP để đạt ${nextLv.name}</div>
+                    ` : '<div style="font-size: 11px; color: #888; margin-top: 4px;">Đã đạt cấp độ tối đa</div>'}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Streak -->
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f1f3f4;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="34" style="font-size: 22px;">🔥</td>
+                  <td>
+                    <div style="font-size: 13px; font-weight: bold; color: #333;">Chuỗi hoạt động liên tiếp</div>
+                    <div style="font-size: 12px; color: #ff5722; font-weight: bold; margin-top: 2px;">${streak} ngày</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Knowledge Base -->
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #f1f3f4;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="34" style="font-size: 22px;">📖</td>
+                  <td>
+                    <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 4px;">Đọc tài liệu kiến thức</div>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #e9ecef; border-radius: 4px;">
+                      <tr><td style="width: ${readPct}%; height: 6px; background: #17a2b8; border-radius: 4px;"></td><td></td></tr>
+                    </table>
+                    <div style="font-size: 11px; color: #888; margin-top: 4px;">Hoàn thành ${readCount}/${totalKnowledge} bài (${readPct}%)</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Path Progress -->
+          <tr>
+            <td style="padding: 10px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="34" style="font-size: 22px;">🛣️</td>
+                  <td>
+                    <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 4px;">Lộ trình đào tạo</div>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #e9ecef; border-radius: 4px;">
+                      <tr><td style="width: ${pathPct}%; height: 6px; background: #6f42c1; border-radius: 4px;"></td><td></td></tr>
+                    </table>
+                    <div style="font-size: 11px; color: #888; margin-top: 4px;">Hoàn thành ${completedPathModules}/${totalPathModules} yêu cầu (${pathPct}%)</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `;
 
       // Build competency bar HTML (table-based for email compatibility)
       const renderBar = (icon: string, name: string, score: number) => {
@@ -327,6 +459,9 @@ Deno.serve(async (req) => {
                       ${statCard("Điểm TB<br/>công ty", companyAvgPct + "%", "#fd7e14")}
                     </tr>
                   </table>
+
+                  <!-- Personal Progress Section -->
+                  ${personalProgressHTML}
 
                   <!-- Core Competencies Section -->
                   <h3 style="color: #0e7356; font-size: 14px; margin: 0 0 14px 0; border-bottom: 2px solid #e8f5e9; padding-bottom: 6px;">🧠 Năng lực cốt lõi (6 nhóm)</h3>
