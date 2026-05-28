@@ -14,13 +14,18 @@ const escapeHtml = (str: string): string =>
 // Falls back to "*" if not configured (less secure — set this in production).
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+const getCorsHeaders = (req: Request) => {
+  // Use the request's Origin header (strip trailing slash) to avoid CORS mismatch
+  const origin = (req.headers.get("Origin") || "").replace(/\/+$/, "");
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN === "*" ? (origin || "*") : ALLOWED_ORIGIN.replace(/\/+$/, ""),
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
 };
 
 Deno.serve(async (req) => {
+  const CORS_HEADERS = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
