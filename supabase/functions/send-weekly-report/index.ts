@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
     // Get profiles that want the report (include streak, read_lessons, xp, path_progress for competency calc)
     const { data: targetProfiles, error: pErr } = await supabaseAdmin
       .from("profiles")
-      .select("id, name, dept, team, real_email, streak, read_lessons, xp, path_progress")
+      .select("id, name, dept, team, real_email, streak, read_lessons, xp, path_progress, acc_role, emp_id")
       .eq("status", "active")
       .eq("receive_weekly_report", true)
       .not("real_email", "is", null);
@@ -151,6 +151,12 @@ Deno.serve(async (req) => {
     const { count: totalKnowledge } = await supabaseAdmin
       .from("knowledge")
       .select("id", { count: "exact", head: true });
+
+    // Fetch all active profiles (lightweight) for director dept-level stats
+    const { data: allActiveProfiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, name, dept, xp, streak")
+      .eq("status", "active");
 
     const totalCompanyQuizzes = weeklyResults.length;
     const companyAvgPct = totalCompanyQuizzes > 0 ? Math.round(weeklyResults.reduce((sum, r) => sum + r.pct, 0) / totalCompanyQuizzes) : 0;
@@ -443,6 +449,147 @@ Deno.serve(async (req) => {
           </table>
         </td>`;
 
+      // ── Director-specific department overview ──
+      const isDirector = profile.emp_id === "admin" || profile.acc_role === "director";
+      let directorSectionHTML = "";
+
+      if (isDirector) {
+        const deptMembers = (allActiveProfiles || []).filter((p: any) => p.dept === profile.dept && p.id !== profile.id);
+        const deptMemberIds = new Set(deptMembers.map((p: any) => p.id));
+        const deptWeeklyResults = weeklyResults.filter((r: any) => deptMemberIds.has(r.emp_id));
+
+        const deptActiveUserIds = new Set(deptWeeklyResults.map((r: any) => r.emp_id));
+        const deptTotalCount = deptMembers.length;
+        const deptActiveCount = deptActiveUserIds.size;
+        const deptParticipation = deptTotalCount > 0 ? Math.round((deptActiveCount / deptTotalCount) * 100) : 0;
+        const deptAvgPct = deptWeeklyResults.length > 0
+          ? Math.round(deptWeeklyResults.reduce((s: number, r: any) => s + r.pct, 0) / deptWeeklyResults.length)
+          : 0;
+        const deptTotalQuizzes = deptWeeklyResults.length;
+
+        // Aggregate per-user scores for top performers
+        const userScoreMap: Record<string, { name: string; total: number; count: number }> = {};
+        deptWeeklyResults.forEach((r: any) => {
+          if (!userScoreMap[r.emp_id]) {
+            const member = deptMembers.find((p: any) => p.id === r.emp_id);
+            userScoreMap[r.emp_id] = { name: member?.name || "?", total: 0, count: 0 };
+          }
+          userScoreMap[r.emp_id].total += r.pct;
+          userScoreMap[r.emp_id].count++;
+        });
+        const rankedUsers = Object.entries(userScoreMap)
+          .map(([id, u]) => ({ id, name: u.name, avg: Math.round(u.total / u.count), quizzes: u.count }))
+          .sort((a, b) => b.avg - a.avg);
+
+        const topPerformers = rankedUsers.slice(0, 3);
+        const lowPerformers = rankedUsers.filter(u => u.avg < 50).slice(0, 3);
+
+        // Inactive employees (no quizzes this week)
+        const inactiveMembers = deptMembers
+          .filter((p: any) => !deptActiveUserIds.has(p.id))
+          .slice(0, 5);
+
+        const medalIcons = ["🥇", "🥈", "🥉"];
+
+        const topPerformersHTML = topPerformers.length > 0
+          ? topPerformers.map((u, idx) =>
+            `<tr>
+              <td style="padding: 5px 0; font-size: 13px; color: #333; border-bottom: 1px solid #f1f3f4;">
+                ${medalIcons[idx] || "▪️"} ${escapeHtml(u.name)}
+              </td>
+              <td align="right" style="padding: 5px 0; font-size: 13px; font-weight: 700; color: #0e7356; border-bottom: 1px solid #f1f3f4;">
+                ${u.avg}% <span style="font-weight: 400; color: #888; font-size: 11px;">(${u.quizzes} bài)</span>
+              </td>
+            </tr>`
+          ).join("")
+          : `<tr><td style="padding: 5px 0; font-size: 12px; color: #999;">Không có dữ liệu tuần này</td></tr>`;
+
+        const inactiveHTML = inactiveMembers.length > 0
+          ? inactiveMembers.map((p: any) =>
+            `<tr>
+              <td style="padding: 4px 0; font-size: 12px; color: #666; border-bottom: 1px solid #f9f9f9;">
+                ⚠️ ${escapeHtml(p.name)}
+              </td>
+              <td align="right" style="padding: 4px 0; font-size: 11px; color: #999; border-bottom: 1px solid #f9f9f9;">
+                Streak: ${p.streak || 0} ngày · ${p.xp || 0} XP
+              </td>
+            </tr>`
+          ).join("")
+          : "";
+
+        const lowPerformersHTML = lowPerformers.length > 0
+          ? `<div style="margin-top: 12px;">
+              <div style="font-size: 12px; font-weight: 600; color: #dc3545; margin-bottom: 6px;">📉 Điểm thấp (dưới 50%)</div>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                ${lowPerformers.map(u =>
+                  `<tr>
+                    <td style="padding: 4px 0; font-size: 12px; color: #666; border-bottom: 1px solid #f9f9f9;">
+                      ${escapeHtml(u.name)}
+                    </td>
+                    <td align="right" style="padding: 4px 0; font-size: 12px; font-weight: 700; color: #dc3545; border-bottom: 1px solid #f9f9f9;">
+                      ${u.avg}%
+                    </td>
+                  </tr>`
+                ).join("")}
+              </table>
+            </div>`
+          : "";
+
+        const comparisonColor = deptAvgPct >= companyAvgPct ? "#28a745" : "#dc3545";
+        const comparisonArrow = deptAvgPct >= companyAvgPct ? "▲" : "▼";
+        const comparisonDiff = Math.abs(deptAvgPct - companyAvgPct);
+
+        directorSectionHTML = `
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f0f7ff; border: 1px solid #b8d4f0; border-radius: 8px; margin-top: 20px;">
+            <tr><td style="padding: 18px;">
+              <h3 style="color: #1a56db; font-size: 14px; margin: 0 0 14px 0; border-bottom: 2px solid #d0e3f7; padding-bottom: 6px;">👔 Phòng ban của bạn — ${escapeHtml(profile.dept)}</h3>
+
+              <!-- Dept stat cards -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 14px;">
+                <tr>
+                  <td width="33%" align="center" style="padding: 4px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
+                      <tr><td align="center" style="padding: 10px 4px 2px 4px; font-size: 10px; color: #888;">Tham gia</td></tr>
+                      <tr><td align="center" style="padding: 2px 4px 10px 4px; font-size: 18px; font-weight: bold; color: #1a56db;">${deptActiveCount}/${deptTotalCount} <span style="font-size: 11px; font-weight: 400; color: #888;">(${deptParticipation}%)</span></td></tr>
+                    </table>
+                  </td>
+                  <td width="33%" align="center" style="padding: 4px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
+                      <tr><td align="center" style="padding: 10px 4px 2px 4px; font-size: 10px; color: #888;">Bài thi</td></tr>
+                      <tr><td align="center" style="padding: 2px 4px 10px 4px; font-size: 18px; font-weight: bold; color: #0e7356;">${deptTotalQuizzes}</td></tr>
+                    </table>
+                  </td>
+                  <td width="33%" align="center" style="padding: 4px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;">
+                      <tr><td align="center" style="padding: 10px 4px 2px 4px; font-size: 10px; color: #888;">Điểm TB</td></tr>
+                      <tr><td align="center" style="padding: 2px 4px 10px 4px; font-size: 18px; font-weight: bold; color: ${comparisonColor};">${deptAvgPct}% <span style="font-size: 11px;">${comparisonArrow}${comparisonDiff}%</span></td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Top performers -->
+              <div style="font-size: 12px; font-weight: 600; color: #1a56db; margin-bottom: 6px;">🏅 Top nhân viên xuất sắc</div>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 8px;">
+                ${topPerformersHTML}
+              </table>
+
+              ${lowPerformersHTML}
+
+              <!-- Inactive employees -->
+              ${inactiveMembers.length > 0 ? `
+                <div style="margin-top: 12px;">
+                  <div style="font-size: 12px; font-weight: 600; color: #e65100; margin-bottom: 6px;">🔕 Chưa hoạt động tuần này (${inactiveMembers.length}${deptTotalCount - deptActiveCount > 5 ? `/${deptTotalCount - deptActiveCount}` : ""} người)</div>
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    ${inactiveHTML}
+                  </table>
+                </div>
+              ` : ""}
+            </td></tr>
+          </table>
+        `;
+      }
+
       const htmlBody = `
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
           <tr><td>
@@ -492,6 +639,8 @@ Deno.serve(async (req) => {
                   <p style="font-size: 13px; color: #555; line-height: 1.6; margin: 0;">
                     Toàn công ty đã hoàn thành <b>${totalCompanyQuizzes}</b> bài thi với điểm số trung bình là <b>${companyAvgPct}%</b>. Hãy tiếp tục duy trì thói quen học tập để nâng cao kỹ năng!
                   </p>
+
+                  ${directorSectionHTML}
 
                   <!-- Footer -->
                   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 28px; border-top: 1px solid #eee;">
