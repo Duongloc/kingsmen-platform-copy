@@ -500,7 +500,21 @@ export default function App() {
   const [showMotivation, setShowMotivation] = useState(null); // null | quote object
   const logoInputRef = useRef(null);
   const avatarInputRef = useRef(null);
+  // Nav scroll fade indicators
+  const handleNavScroll = (el) => {
+    if (!el) return;
+    const w = el.closest('.nav-wrapper');
+    if (!w) return;
+    w.classList.toggle('fade-left', el.scrollLeft > 8);
+    w.classList.toggle('fade-right', el.scrollLeft < el.scrollWidth - el.clientWidth - 8);
+  };
   useEffect(() => { accountsRef.current = accounts; }, [accounts]);
+  useEffect(() => {
+    const check = () => { const el = document.querySelector('.nav-scroll'); if (el) handleNavScroll(el); };
+    window.addEventListener('resize', check);
+    const t = setTimeout(check, 150);
+    return () => { window.removeEventListener('resize', check); clearTimeout(t); };
+  }, [role, screen]);
 
   // ─── localStorage cache helpers (TTL-aware, cross-tab safe) ───
   const CACHE_TTL = { accounts: 1800000, results: 1800000, notifications: 1800000, challenges: 1800000, knowledge: 1800000, quizzes: 1800000, paths: 1800000, settings: 1800000, recognitions: 1800000, bulletins: 1800000, logo: 1800000 };
@@ -1974,28 +1988,32 @@ button{cursor:pointer;border:none;transition:all .15s}button:hover{filter:bright
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:${C.teal}55;border-radius:3px}
 select{appearance:none;background-color:#0f2d3a !important;color:#FFFFFF !important}select option{background-color:#1A3A4A !important;color:#FFFFFF !important}input[type="date"]{color-scheme:dark}
 .nav-scroll::-webkit-scrollbar{display:none}
+.nav-scroll{scroll-behavior:smooth}
+/* Nav fade indicators */
+.nav-wrapper{position:relative}
+.nav-wrapper::before,.nav-wrapper::after{content:'';position:absolute;top:0;bottom:0;width:40px;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s ease}
+.nav-wrapper::before{left:0;background:linear-gradient(to right,#12303e 0%,rgba(18,48,62,0) 100%)}
+.nav-wrapper::after{right:0;background:linear-gradient(to left,#12303e 0%,rgba(18,48,62,0) 100%)}
+.nav-wrapper.fade-left::before{opacity:1}
+.nav-wrapper.fade-right::after{opacity:1}
 /* ── MOBILE RESPONSIVE ── */
-@media(max-width:480px){
+@media(max-width:600px){
 body{font-size:13px;overflow-x:hidden !important}
 html{overflow-x:hidden !important}
-/* Header wrapping */
 header{padding:6px 10px !important}
 header>div{flex-wrap:wrap !important;gap:6px !important}
-/* Nav tabs: compact for mobile */
-.nav-scroll{-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scroll-behavior:smooth}
-.nav-scroll>button{padding:8px 10px !important;font-size:10px !important;min-height:40px !important}
-/* Inputs: larger touch targets on mobile */
-input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="date"],input[type="search"],textarea,select{min-height:42px !important;font-size:14px !important}
-/* Video player sizing */
+.nav-scroll{-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.nav-scroll>button{padding:8px 8px !important;font-size:10px !important;min-height:40px !important}
+.nav-wrapper::before,.nav-wrapper::after{width:28px}
+input[type="text"],input[type="password"],input[type="email"],input[type="number"],input[type="date"],input[type="search"],textarea,select{min-height:44px !important;font-size:15px !important}
 video{max-height:60vh !important;width:100% !important}
-/* Tables: allow horizontal scroll */
 table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
-/* Modals: full-width on mobile */
 .km-modal{max-width:95vw !important;width:95vw !important}
 }
 @media(max-width:360px){
 header{padding:6px 8px !important}
-.nav-scroll>button{padding:6px 8px !important;font-size:9px !important}
+.nav-scroll>button{padding:6px 6px !important;font-size:9px !important}
+.nav-wrapper::before,.nav-wrapper::after{width:20px}
 }`}</style>
       <div ref={topRef} />
 
@@ -2299,35 +2317,39 @@ header{padding:6px 8px !important}
           </div>
         </div>
         {role === "employee" && currentUser && (
-          <div className="nav-scroll" style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {[
-              { i: "🏠", t: "HOME", s: "emp_home" },
-              { i: "📖", t: "HỌC", s: "emp_knowledge" },
-              { i: "✏️", t: "THI", s: "emp_quizzes" },
-              { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
-              { i: "🏆", t: "HẠNG", s: "emp_ranking" },
-              { i: "🎯", t: "THÁCH", s: "emp_challenges" },
-              { i: "📋", t: "LỘ TRÌNH", s: "emp_pathway" },
-              { i: "🧠", t: "NLỰC", s: "emp_competency" },
-              { i: "📢", t: "TIN", s: "emp_bulletins" },
-            ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44 }}>{m.i + " " + m.t}</button> })}
+          <div className="nav-wrapper">
+            <div className="nav-scroll" onScroll={(e) => handleNavScroll(e.currentTarget)} ref={(el) => { if (el) requestAnimationFrame(() => handleNavScroll(el)); }} style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+              {[
+                { i: "🏠", t: "HOME", s: "emp_home" },
+                { i: "📖", t: "HỌC", s: "emp_knowledge" },
+                { i: "✏️", t: "THI", s: "emp_quizzes" },
+                { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
+                { i: "🏆", t: "HẠNG", s: "emp_ranking" },
+                { i: "🎯", t: "THÁCH", s: "emp_challenges" },
+                { i: "📋", t: "LỘ TRÌNH", s: "emp_pathway" },
+                { i: "🧠", t: "NLỰC", s: "emp_competency" },
+                { i: "📢", t: "TIN", s: "emp_bulletins" },
+              ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: screen === m.s ? "rgba(255,255,255,0.06)" : "none", borderRadius: screen === m.s ? 6 : 0, border: "none", borderBottom: screen === m.s ? "3px solid " + C.gold : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44, transition: "all .2s" }}>{m.i + " " + m.t}</button> })}
+            </div>
           </div>
         )}
         {role === "admin" && (
-          <div className="nav-scroll" style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {[
-              { i: "🏠", t: "HOME", s: "admin_home" },
-              { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
-              { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
-              { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
-              { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
-              { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
-              { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
-              { i: "📈", t: "HOẠT ĐỘNG", s: "admin_activity" },
-              { i: "👥", t: "TÀI KHOẢN", s: "admin_accounts" },
-              { i: "⚙️", t: "CÀI ĐẶT", s: "admin_settings" },
-              { i: "💾", t: "SAO LƯU", s: "admin_backup" },
-            ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: "none", border: "none", borderBottom: screen === m.s ? "3px solid " + C.teal : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44 }}>{m.i + " " + m.t}</button> })}
+          <div className="nav-wrapper">
+            <div className="nav-scroll" onScroll={(e) => handleNavScroll(e.currentTarget)} ref={(el) => { if (el) requestAnimationFrame(() => handleNavScroll(el)); }} style={{ display: "flex", gap: 2, background: "rgba(0,0,0,0.15)", padding: "4px 6px", borderTop: "1px solid rgba(255,255,255,0.06)", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+              {[
+                { i: "🏠", t: "HOME", s: "admin_home" },
+                { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
+                { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
+                { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
+                { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
+                { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
+                { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
+                { i: "📈", t: "HOẠT ĐỘNG", s: "admin_activity" },
+                { i: "👥", t: "TÀI KHOẢN", s: "admin_accounts" },
+                { i: "⚙️", t: "CÀI ĐẶT", s: "admin_settings" },
+                { i: "💾", t: "SAO LƯU", s: "admin_backup" },
+              ].map(function (m) { return <button key={m.s} onClick={function () { setScreen(m.s); setSubScreen(null) }} style={{ padding: "10px 12px", fontSize: 11, fontWeight: screen === m.s ? 800 : 600, color: screen === m.s ? "#fff" : "rgba(255,255,255,0.5)", background: screen === m.s ? "rgba(255,255,255,0.06)" : "none", borderRadius: screen === m.s ? 6 : 0, border: "none", borderBottom: screen === m.s ? "3px solid " + C.teal : "3px solid transparent", whiteSpace: "nowrap", cursor: "pointer", flexShrink: 0, minHeight: 44, transition: "all .2s" }}>{m.i + " " + m.t}</button> })}
+            </div>
           </div>
         )}
       </header>
