@@ -52,6 +52,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Missing authorization header" }), { status: 401, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }
 
+    const { data: globalSettings } = await supabaseAdmin.from("settings").select("config").eq("id", 1).single();
+    const appConfig = globalSettings?.config || {};
+
     if (isManual) {
       // Manually triggered from the dashboard -> Must be an admin
       const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
@@ -67,8 +70,7 @@ Deno.serve(async (req) => {
       if (!isAdmin) throw new Error("Forbidden: Only admins can send reports manually");
 
       // ── Rate limiting: enforce 1-hour cooldown between manual sends ──
-      const { data: rlSettings } = await supabaseAdmin.from("settings").select("config").eq("id", 1).single();
-      const lastSent = rlSettings?.config?.lastManualReportSentAt;
+      const lastSent = appConfig.lastManualReportSentAt;
       if (lastSent) {
         const diffMs = Date.now() - new Date(lastSent).getTime();
         if (diffMs < 60 * 60 * 1000) {
@@ -94,8 +96,7 @@ Deno.serve(async (req) => {
       }
 
       // Verify settings
-      const { data: settingsRow } = await supabaseAdmin.from("settings").select("config").eq("id", 1).single();
-      if (!settingsRow?.config?.autoWeeklyReportEnabled) {
+      if (!appConfig.autoWeeklyReportEnabled) {
         return new Response(JSON.stringify({ success: true, message: "Automated reports disabled in settings" }), { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       }
     }
@@ -204,20 +205,29 @@ Deno.serve(async (req) => {
       { name: "Chuyên gia", min: 600, icon: "🏅", color: "#c5993e" },
       { name: "Master", min: 1000, icon: "🏆", color: "#e74c3c" }
     ];
+    const activeLevels = (appConfig.levels || DEFAULT_LEVELS)
+      .map((lv: any, i: number) => ({
+        ...DEFAULT_LEVELS[i],
+        ...lv,
+        min: Number(lv.min) || 0,
+        color: lv.color || (DEFAULT_LEVELS[i] && DEFAULT_LEVELS[i].color) || "#c5993e",
+      }))
+      .sort((a: any, b: any) => a.min - b.min);
+
     const getLevelObj = (xp: number) => { 
       const x = Number(xp) || 0; 
-      for (let i = DEFAULT_LEVELS.length - 1; i >= 0; i--) 
-        if (x >= Number(DEFAULT_LEVELS[i].min)) return { ...DEFAULT_LEVELS[i], idx: i }; 
-      return { ...DEFAULT_LEVELS[0], idx: 0 }; 
+      for (let i = activeLevels.length - 1; i >= 0; i--) 
+        if (x >= Number(activeLevels[i].min)) return { ...activeLevels[i], idx: i }; 
+      return { ...activeLevels[0], idx: 0 }; 
     };
     const getNextLevelObj = (xp: number) => { 
       const c = getLevelObj(xp); 
-      return c.idx >= DEFAULT_LEVELS.length - 1 ? null : DEFAULT_LEVELS[c.idx + 1]; 
+      return c.idx >= activeLevels.length - 1 ? null : activeLevels[c.idx + 1]; 
     };
     const xpProgress = (xp: number) => {
       const c = getLevelObj(xp);
       const n = getNextLevelObj(xp);
-      return n ? (xp - c.min) / (n.min - c.min) : 1;
+      return n ? Math.max(0, xp - c.min) / (n.min - c.min) : 1;
     };
 
     const IMPROVEMENT_ACTIONS: Record<string, string> = {
@@ -232,9 +242,13 @@ Deno.serve(async (req) => {
     // ── 4. Generate & Send Emails ──
     let sentCount = 0;
 
-    for (const profile of targetProfiles) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!profile.real_email || !emailRegex.test(profile.real_email)) continue;
+    const validProfiles = targetProfiles.filter((p: any) => p.real_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.real_email));
+
+    // Process in batches of 10 to speed up sequential bottlenecks while keeping SMTP safe
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < validProfiles.length; i += BATCH_SIZE) {
+      const batch = validProfiles.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(async (profile: any) => {
 
       // Weekly stats
       const userWeeklyResults = weeklyResults.filter((r) => r.emp_id === profile.id);
@@ -504,6 +518,7 @@ Deno.serve(async (req) => {
       } catch (sendErr) {
         console.error("Failed to send email to", profile.real_email, sendErr);
       }
+      }));
     }
 
     // Update rate-limit timestamp in settings when manually triggered
