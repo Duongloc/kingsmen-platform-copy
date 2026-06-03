@@ -265,7 +265,7 @@ const DB = {
           if (error) console.error("Accounts fetch error:", error); 
           return data ? data.map(profileToCamel) : fb; 
         }
-        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("id,title,questions,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at", { ascending: true }).limit(20); return data ? data.map(quizToCamel) : fb; }
+        case "km-quizzes": { const { data } = await supabase.from("quizzes").select("id,title,questions,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at", { ascending: false }).limit(200); return data ? data.map(quizToCamel) : fb; }
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
@@ -2784,6 +2784,7 @@ header{padding:6px 8px !important}
         {/* ═══ ADMIN: QUIZZES ═══ */}
         {role === "admin" && screen === "admin_quizzes" && (() => {
           const qFilter = formData.qFilter || "all";
+          const qDeptFilter = formData.qDeptFilter || "all";
           const qSearch = (formData.qSearch || "").toLowerCase();
           const diffColor = { easy: C.green, medium: C.gold, hard: C.orange, advanced: C.red };
           const diffLabel = { easy: "🟢 Dễ", medium: "🟡 TB", hard: "🟠 Khó", advanced: "🔴 NC" };
@@ -2792,6 +2793,7 @@ header{padding:6px 8px !important}
             if (qFilter === "mixed" && q.quizType !== "mixed") return false;
             if (qFilter === "ai" && !q.aiGenerated) return false;
             if (qFilter === "import" && q.aiGenerated) return false;
+            if (qDeptFilter !== "all" && !(q.depts || ["Tất cả"]).includes(qDeptFilter)) return false;
             if (qSearch && !q.title.toLowerCase().includes(qSearch)) return false;
             return true;
           });
@@ -2870,6 +2872,13 @@ header{padding:6px 8px !important}
               {/* ── Search + Filter bar ── */}
               <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <input value={formData.qSearch || ""} onChange={e => setFormData({ ...formData, qSearch: e.target.value })} placeholder="🔍 Tìm đề theo tên..." style={{ ...inp, width: "auto", flex: 1, minWidth: 160, padding: "8px 12px", fontSize: 12 }} />
+                
+                <select value={formData.qDeptFilter || "all"} onChange={e => setFormData({ ...formData, qDeptFilter: e.target.value })} style={{ ...inp, padding: "8px", fontSize: 11, width: "auto" }}>
+                  <option value="all">Tất cả phòng ban</option>
+                  <option value="Tất cả">Chung (Tất cả)</option>
+                  {DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+
                 <div style={{ display: "flex", gap: 4 }}>
                   {[{ v: "all", l: "Tất cả" }, { v: "mc", l: "TN" }, { v: "mixed", l: "Kết hợp" }, { v: "ai", l: "🤖 AI" }, { v: "import", l: "📥 Import" }].map(f => (
                     <button key={f.v} onClick={() => setFormData({ ...formData, qFilter: f.v })} style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: qFilter === f.v ? 700 : 500, background: qFilter === f.v ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: qFilter === f.v ? C.teal : "rgba(255,255,255,0.4)", border: `1px solid ${qFilter === f.v ? C.teal + "44" : C.border}` }}>{f.l}</button>
@@ -2888,11 +2897,11 @@ header{padding:6px 8px !important}
                 return (
                   <div key={q.id} style={{ ...card, padding: 0, overflow: "hidden", marginBottom: 10, opacity: q.hidden ? 0.55 : 1 }}>
                     {/* Main row */}
-                    <div style={{ padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <div style={{ padding: "14px 16px", display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
                       {/* Left: diff color bar */}
                       <div style={{ width: 4, borderRadius: 2, background: q.hidden ? C.red : dc, alignSelf: "stretch", flexShrink: 0 }} />
                       {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: "1 1 180px", minWidth: 0 }}>
                         {/* Title row */}
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
                           {formData.editQId === q.id ? (
@@ -2923,8 +2932,8 @@ header{padding:6px 8px !important}
                         </div>
                       </div>
                       {/* Actions */}
-                      <div style={{ display: "flex", gap: 5, flexShrink: 0, flexDirection: "column", alignItems: "flex-end" }}>
-                        <div style={{ display: "flex", gap: 4 }}>
+                      <div style={{ display: "flex", gap: 5, flexShrink: 0, flexDirection: "column", alignItems: "flex-end", marginLeft: "auto" }}>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
                           <button onClick={() => setFormData({ ...formData, editPanel: isEditing ? null : q.id, _editDepts: isEditing ? undefined : [...(q.depts || ["Tất cả"])], _editHidden: isEditing ? undefined : !!q.hidden })} style={{ padding: "5px 8px", borderRadius: 6, background: isEditing ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: isEditing ? C.teal : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: isEditing ? 700 : 500, border: `1px solid ${isEditing ? C.teal + "44" : C.border}` }} title="Sửa phòng ban / Ẩn hiện">⚙️ Sửa</button>
                           <button onClick={() => setFormData({ ...formData, expandQ: isExpanded ? null : q.id })} style={{ padding: "5px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)", fontSize: 11, border: `1px solid ${C.border}` }} title="Xem câu hỏi">{isExpanded ? "▲ Ẩn" : "▼ Xem"}</button>
                           <button onClick={() => exportQuizCSV(q)} style={{ padding: "5px 8px", borderRadius: 6, background: `${C.blue}22`, color: C.blue, fontSize: 11, fontWeight: 600, border: "none" }} title="Xuất CSV">📥</button>
