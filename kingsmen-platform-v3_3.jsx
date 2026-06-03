@@ -4003,8 +4003,46 @@ header{padding:6px 8px !important}
                 <div style={{ fontSize: 40, marginBottom: 10 }}>📥</div>
                 <div style={{ color: C.white, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Khôi Phục</div>
                 <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 14 }}>Tải lên file backup JSON để khôi phục</div>
-                <label style={{ ...btnG, display: "inline-block", cursor: "pointer" }} onClick={() => setImportStatus(null)}>⬆️ Chọn file backup (.json hoặc .txt)<input type="file" accept=".json,.txt" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) { setImportStatus(null); importBackup(e.target.files[0]); e.target.value = ""; } }} />
+                <label style={{ ...btnG, display: "inline-block", cursor: "pointer" }} onClick={() => setImportStatus(null)}>⬆️ Chọn file backup (.json hoặc .txt)<input type="file" accept=".json,.txt" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) { setImportStatus(null); setRestoreConfirm({ file: e.target.files[0], password: "", error: "", loading: false }); e.target.value = ""; } }} />
                 </label>
+                {restoreConfirm && (
+                  <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999, background: "rgba(10,45,58,0.95)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "fadeIn .3s" }} onClick={() => setRestoreConfirm(null)}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "rgba(20,55,70,0.95)", border: `1px solid ${C.red}66`, borderRadius: 16, padding: 30, maxWidth: 450, width: "100%", textAlign: "center", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+                      <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
+                      <div style={{ fontSize: 18, color: C.red, fontWeight: 800, marginBottom: 12 }}>CẢNH BÁO NGUY HIỂM</div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, marginBottom: 24, textAlign: "left" }}>
+                        Hành động khôi phục này sẽ <b>GHI ĐÈ TRỰC TIẾP</b> lên toàn bộ cơ sở dữ liệu Supabase hiện tại. Những dữ liệu mới hơn bản backup sẽ bị <b>MẤT VĨNH VIỄN</b>.<br /><br />
+                        File đã chọn: <span style={{ color: C.goldL }}>{restoreConfirm.file.name}</span>
+                      </div>
+                      <div style={{ textAlign: "left", marginBottom: 20 }}>
+                        <label style={{ ...lbl, color: C.red }}>Nhập mật khẩu Admin để xác nhận</label>
+                        <input type="password" value={restoreConfirm.password} onChange={e => setRestoreConfirm({ ...restoreConfirm, password: e.target.value, error: "" })} placeholder="Mật khẩu của bạn" style={{ ...inp, borderColor: restoreConfirm.error ? C.red : "rgba(12,123,111,0.3)" }} />
+                        {restoreConfirm.error && <div style={{ color: C.red, fontSize: 12, marginTop: 6 }}>{restoreConfirm.error}</div>}
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button onClick={async () => {
+                          if (!restoreConfirm.password) return setRestoreConfirm({ ...restoreConfirm, error: "Vui lòng nhập mật khẩu" });
+                          setRestoreConfirm({ ...restoreConfirm, loading: true, error: "" });
+                          try {
+                            const email = (currentUser?.empId || currentUser?.emp_id || "admin").toLowerCase() + "@kingsmen.internal";
+                            const { error: verifyErr } = await supabase.auth.signInWithPassword({ email, password: restoreConfirm.password });
+                            if (verifyErr) {
+                              setRestoreConfirm({ ...restoreConfirm, error: "Mật khẩu không chính xác", loading: false });
+                              return;
+                            }
+                            importBackup(restoreConfirm.file);
+                            setRestoreConfirm(null);
+                          } catch (err) {
+                            setRestoreConfirm({ ...restoreConfirm, error: "Lỗi xác thực: " + err.message, loading: false });
+                          }
+                        }} style={{ flex: 1, padding: "12px", borderRadius: 10, background: restoreConfirm.loading ? "rgba(255,255,255,0.1)" : C.red, color: C.white, fontSize: 14, fontWeight: 700 }}>
+                          {restoreConfirm.loading ? "⏳ Đang xử lý..." : "🚨 Xác nhận Khôi phục"}
+                        </button>
+                        <button onClick={() => setRestoreConfirm(null)} style={{ flex: 1, padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`, color: "rgba(255,255,255,0.7)", fontSize: 14, fontWeight: 600 }}>Hủy</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {importStatus && (
                   <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: importStatus.ok === null ? `${C.gold}08` : importStatus.ok ? `${C.green}10` : `${C.red}10`, border: `1px solid ${importStatus.ok === null ? C.gold : importStatus.ok ? C.green : C.red}33`, fontSize: 12, color: importStatus.ok === null ? C.goldL : importStatus.ok ? C.green : "#e74c3c", lineHeight: 1.9, whiteSpace: "pre-line", textAlign: "left" }}>
                     {importStatus.msg}
