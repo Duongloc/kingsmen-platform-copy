@@ -2889,7 +2889,13 @@ header{padding:6px 8px !important}
 
               {/* ── Quiz list ── */}
               {filteredQ.length === 0 && <Empty msg="Không tìm thấy đề nào." />}
-              {filteredQ.slice(0, formData.adminQuizLimit || 20).map(q => {
+              {(() => {
+                const isFiltering = !!(qSearch || (qDeptFilter && qDeptFilter !== "all") || (qFilter && qFilter !== "all"));
+                const displayLimit = isFiltering ? filteredQ.length : (formData.adminQuizLimit || 20);
+                const displayedQ = filteredQ.slice(0, displayLimit);
+                return (
+                  <React.Fragment>
+                    {displayedQ.map(q => {
                 const att = totalAttempts(q), pr = passRate(q), avg = avgScore(q), last = lastUsed(q);
                 const isExpanded = formData.expandQ === q.id;
                 const isEditing = formData.editPanel === q.id;
@@ -3056,13 +3062,17 @@ header{padding:6px 8px !important}
                   </div>
                 );
               })}
-              <div style={{ textAlign: "center", marginTop: 12 }}>
-                <button onClick={() => { setFormData({ ...formData, adminQuizLimit: (formData.adminQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
-              </div>
-            </div>
+              {!((!!(qSearch || (qDeptFilter && qDeptFilter !== "all") || (qFilter && qFilter !== "all")))) && quizzes.length >= (formData.adminQuizLimit || 20) && (
+                <div style={{ textAlign: "center", marginTop: 12 }}>
+                  <button onClick={() => { setFormData({ ...formData, adminQuizLimit: (formData.adminQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                </div>
+              )}
+            </React.Fragment>
           );
         })()}
-
+      </div>
+    );
+  })()}
         {/* ═══ ADMIN: ACCOUNTS ═══ */}
         {role === "admin" && screen === "admin_accounts" && (
           <div style={{ animation: "fadeIn .4s" }}>
