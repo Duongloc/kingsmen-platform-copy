@@ -904,7 +904,7 @@ export default function App() {
           setQuizzes(prev => {
             const map = new Map(prev.map(q => [q.id, q]));
             fetched.forEach(q => map.set(q.id, q));
-            const next = Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            const next = Array.from(map.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             cacheSet("quizzes", next);
             return next;
           });
@@ -916,13 +916,13 @@ export default function App() {
 
   const loadMoreQuizzesDB = async () => {
     try {
-      const { data } = await supabase.from("quizzes").select("id,title,questions,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at", { ascending: true }).range(quizzes.length, quizzes.length + 19);
+      const { data } = await supabase.from("quizzes").select("id,title,questions,time_limit,depts,ai_generated,difficulty,quiz_type,knowledge_id,imported_from,hidden,created_at").order("created_at", { ascending: false }).range(quizzes.length, quizzes.length + 19);
       if (data && data.length > 0) {
         const fetched = data.map(quizToCamel);
         setQuizzes(prev => {
           const map = new Map(prev.map(q => [q.id, q]));
           fetched.forEach(q => map.set(q.id, q));
-          const next = Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          const next = Array.from(map.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
           cacheSet("quizzes", next);
           return next;
         });
@@ -2880,8 +2880,8 @@ header{padding:6px 8px !important}
                 </select>
 
                 <div style={{ display: "flex", gap: 4 }}>
-                  {[{ v: "all", l: "Tất cả" }, { v: "mc", l: "TN" }, { v: "mixed", l: "Kết hợp" }, { v: "ai", l: "🤖 AI" }, { v: "import", l: "📥 Import" }].map(f => (
-                    <button key={f.v} onClick={() => setFormData({ ...formData, qFilter: f.v })} style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: qFilter === f.v ? 700 : 500, background: qFilter === f.v ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: qFilter === f.v ? C.teal : "rgba(255,255,255,0.4)", border: `1px solid ${qFilter === f.v ? C.teal + "44" : C.border}` }}>{f.l}</button>
+                  {[{ v: "mc", l: "TN" }, { v: "mixed", l: "Kết hợp" }, { v: "ai", l: "🤖 AI" }, { v: "import", l: "📥 Import" }].map(f => (
+                    <button key={f.v} onClick={() => setFormData({ ...formData, qFilter: qFilter === f.v ? "all" : f.v })} style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: qFilter === f.v ? 700 : 500, background: qFilter === f.v ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: qFilter === f.v ? C.teal : "rgba(255,255,255,0.4)", border: `1px solid ${qFilter === f.v ? C.teal + "44" : C.border}` }}>{f.l}</button>
                   ))}
                 </div>
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{filteredQ.length}/{quizzes.length} đề</span>
@@ -5091,9 +5091,13 @@ header{padding:6px 8px !important}
               if (empDiffFilter !== "all") filtered = filtered.filter(q => (q.difficulty || "medium") === empDiffFilter);
               if (empDiffSort === "asc") filtered = [...filtered].sort((a, b) => (diffOrder[a.difficulty || "medium"] || 2) - (diffOrder[b.difficulty || "medium"] || 2));
               else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
+              const isEmpFiltering = !!(empQuizSearch || empDiffFilter !== "all" || empDiffSort !== "none");
+              const empDisplayLimit = isEmpFiltering ? filtered.length : (formData.empQuizLimit || 20);
+              const displayedEmpQ = filtered.slice(0, empDisplayLimit);
+              
               return filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : (
                 <React.Fragment>
-                  {filtered.slice(0, formData.empQuizLimit || 20).map(q => {
+                  {displayedEmpQ.map(q => {
                     const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
                     const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
                     return (
@@ -5107,9 +5111,11 @@ header{padding:6px 8px !important}
                       </div>
                     );
                   })}
-                  <div style={{ textAlign: "center", marginTop: 12 }}>
-                    <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
-                  </div>
+                  {!isEmpFiltering && quizzes.length >= (formData.empQuizLimit || 20) && (
+                    <div style={{ textAlign: "center", marginTop: 12 }}>
+                      <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                    </div>
+                  )}
                 </React.Fragment>
               );
             })()}
