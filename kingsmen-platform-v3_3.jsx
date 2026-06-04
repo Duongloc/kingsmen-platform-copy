@@ -2874,8 +2874,8 @@ header{padding:6px 8px !important}
                 <input value={formData.qSearch || ""} onChange={e => setFormData({ ...formData, qSearch: e.target.value })} placeholder="🔍 Tìm đề theo tên..." style={{ ...inp, width: "auto", flex: 1, minWidth: 160, padding: "8px 12px", fontSize: 12 }} />
                 
                 <select value={formData.qDeptFilter || "all"} onChange={e => setFormData({ ...formData, qDeptFilter: e.target.value })} style={{ ...inp, padding: "8px", fontSize: 11, width: "auto" }}>
-                  <option value="all">Tất cả phòng ban</option>
-                  <option value="Tất cả">Chung (Tất cả)</option>
+                  <option value="all">— Lọc theo phòng ban —</option>
+                  <option value="Tất cả">Đề chung (Mọi phòng ban)</option>
                   {DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
 
