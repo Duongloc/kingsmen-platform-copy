@@ -269,10 +269,21 @@ const DB = {
         case "km-knowledge": { const { data } = await supabase.from("knowledge").select("id,title,depts,doc_url,has_pdf,pdf_name,video_url,audio_url,has_video,video_name,created_at").order("created_at"); return data ? data.map(knowledgeToCamel) : fb; }
         case "km-results": {
           if (isAdmin) {
-            // Admins fetch ALL results (without the heavy 'answers' column) for accurate analytics
-            const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at", { ascending: false });
-            if (error) console.error("Admin results fetch error:", error);
-            return data ? data.map(resultToCamel) : fb;
+            let allData = [];
+            let fetchError = null;
+            let offset = 0;
+            const limit = 1000;
+            while (true) {
+              const { data, error } = await supabase.from("results").select("id,emp_id,quiz_id,quiz_title,score,total,pct,passed,time_taken,quiz_type,created_at").order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+              if (error) { fetchError = error; break; }
+              if (data && data.length > 0) {
+                allData = allData.concat(data);
+                offset += limit;
+                if (data.length < limit) break; // Reached the end
+              } else { break; }
+            }
+            if (fetchError) console.error("Admin results fetch error:", fetchError);
+            return allData.length > 0 ? allData.map(resultToCamel) : fb;
           }
           // Non-admins: fetch ALL own results (without heavy 'answers') for accurate competency evaluation
           if (!userId) { const { data: ud } = await supabase.auth.getUser(); userId = ud?.user?.id; }
