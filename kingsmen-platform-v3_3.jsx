@@ -503,6 +503,7 @@ export default function App() {
   const [bkCopied, setBkCopied] = useState(false);
   const [importStatus, setImportStatus] = useState(null); // null | {ok, msg}
   const [importPreview, setImportPreview] = useState(null); // null | {quiz, fileName}
+  const [restoreConfirm, setRestoreConfirm] = useState(null);
   // Import JSON lesson state
   const [importLessonId, setImportLessonId] = useState(null);
   const [importLessonJson, setImportLessonJson] = useState("");
