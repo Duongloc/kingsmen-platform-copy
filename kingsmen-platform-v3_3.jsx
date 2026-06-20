@@ -5075,58 +5075,84 @@ header{padding:6px 8px !important}
         {role === "employee" && screen === "emp_quizzes" && (
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}><h2 style={hd(22)}>✏️ Kiểm Tra</h2><button onClick={() => setScreen("emp_home")} style={btnO}>← Dashboard</button></div>
-            {/* ── Search bar ── */}
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "rgba(255,255,255,0.3)", pointerEvents: "none" }}>🔍</span>
-              <input type="text" value={formData.empQuizSearch || ""} onChange={(e) => setFormData({ ...formData, empQuizSearch: e.target.value })} placeholder="Tìm đề kiểm tra..." style={{ ...inp, paddingLeft: 38, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, borderRadius: 12, fontSize: 13 }} />
-              {formData.empQuizSearch && <button onClick={() => setFormData({ ...formData, empQuizSearch: "" })} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer" }}>✕</button>}
-            </div>
-            {/* ── Difficulty filter & sort bar ── */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginRight: 2 }}>Độ khó:</span>
-              {[{ v: "all", l: "Tất cả" }, { v: "easy", l: "🟢 Dễ" }, { v: "medium", l: "🟡 TB" }, { v: "hard", l: "🟠 Khó" }, { v: "advanced", l: "🔴 NC" }].map(f => (
-                <button key={f.v} onClick={() => setFormData({ ...formData, empDiffFilter: f.v })} style={{ padding: "5px 10px", borderRadius: 6, fontSize: 11, fontWeight: (formData.empDiffFilter || "all") === f.v ? 700 : 500, background: (formData.empDiffFilter || "all") === f.v ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: (formData.empDiffFilter || "all") === f.v ? C.teal : "rgba(255,255,255,0.4)", border: `1px solid ${(formData.empDiffFilter || "all") === f.v ? C.teal + "44" : C.border}`, cursor: "pointer", transition: "all .2s" }}>{f.l}</button>
-              ))}
-              <div style={{ marginLeft: "auto", display: "flex", gap: 4, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Sắp xếp:</span>
-                {[{ v: "none", l: "Mặc định" }, { v: "asc", l: "Dễ → Khó" }, { v: "desc", l: "Khó → Dễ" }].map(s => (
-                  <button key={s.v} onClick={() => setFormData({ ...formData, empDiffSort: s.v })} style={{ padding: "5px 10px", borderRadius: 6, fontSize: 11, fontWeight: (formData.empDiffSort || "none") === s.v ? 700 : 500, background: (formData.empDiffSort || "none") === s.v ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: (formData.empDiffSort || "none") === s.v ? C.goldL : "rgba(255,255,255,0.4)", border: `1px solid ${(formData.empDiffSort || "none") === s.v ? C.gold + "44" : C.border}`, cursor: "pointer", transition: "all .2s" }}>{s.l}</button>
-                ))}
-              </div>
-            </div>
             {(() => {
               const diffOrder = { easy: 1, medium: 2, hard: 3, advanced: 4 };
               const empDiffFilter = formData.empDiffFilter || "all";
+              const empQFilter = formData.empQFilter || "all";
               const empDiffSort = formData.empDiffSort || "none";
               const empQuizSearch = (formData.empQuizSearch || "").toLowerCase();
-              let filtered = quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept) && (!empQuizSearch || q.title.toLowerCase().includes(empQuizSearch)));
-              if (empDiffFilter !== "all") filtered = filtered.filter(q => (q.difficulty || "medium") === empDiffFilter);
+              
+              let visibleQuizzes = quizzes.filter(q => !q.hidden && visibleToDept(q, (currentUser || {}).dept));
+              let filtered = visibleQuizzes.filter(q => {
+                if (empQuizSearch && !q.title.toLowerCase().includes(empQuizSearch)) return false;
+                if (empDiffFilter !== "all" && (q.difficulty || "medium") !== empDiffFilter) return false;
+                if (empQFilter === "mc" && q.quizType !== "mc") return false;
+                if (empQFilter === "mixed" && q.quizType !== "mixed") return false;
+                if (empQFilter === "ai" && !q.aiGenerated) return false;
+                if (empQFilter === "import" && q.aiGenerated) return false;
+                return true;
+              });
+              
               if (empDiffSort === "asc") filtered = [...filtered].sort((a, b) => (diffOrder[a.difficulty || "medium"] || 2) - (diffOrder[b.difficulty || "medium"] || 2));
               else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
-              const isEmpFiltering = !!(empQuizSearch || empDiffFilter !== "all" || empDiffSort !== "none");
+              
+              const isEmpFiltering = !!(empQuizSearch || empDiffFilter !== "all" || empQFilter !== "all" || empDiffSort !== "none");
               const empDisplayLimit = isEmpFiltering ? filtered.length : (formData.empQuizLimit || 20);
               const displayedEmpQ = filtered.slice(0, empDisplayLimit);
               
-              return filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" ? "Không có đề nào ở độ khó này." : "Chưa có đề cho phòng ban của bạn."} /> : (
+              return (
                 <React.Fragment>
-                  {displayedEmpQ.map(q => {
-                    const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
-                    const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
-                    return (
-                      <div key={q.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
-                          <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
-                          {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
-                        </div>
-                        <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
-                      </div>
-                    );
-                  })}
-                  {!isEmpFiltering && quizzes.length >= (formData.empQuizLimit || 20) && (
-                    <div style={{ textAlign: "center", marginTop: 12 }}>
-                      <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                  {/* ── Search + Filter bar ── */}
+                  <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <input value={formData.empQuizSearch || ""} onChange={e => setFormData({ ...formData, empQuizSearch: e.target.value })} placeholder="🔍 Tìm đề theo tên..." style={{ ...inp, width: "auto", flex: 1, minWidth: 160, padding: "8px 12px", fontSize: 12 }} />
+                    
+                    <select value={formData.empDiffFilter || "all"} onChange={e => setFormData({ ...formData, empDiffFilter: e.target.value })} style={{ ...inp, padding: "8px", fontSize: 11, width: "auto" }}>
+                      <option value="all">— Mọi độ khó —</option>
+                      <option value="easy">🟢 Dễ</option>
+                      <option value="medium">🟡 Trung bình</option>
+                      <option value="hard">🟠 Khó</option>
+                      <option value="advanced">🔴 Nâng cao</option>
+                    </select>
+
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {[{ v: "mc", l: "TN" }, { v: "mixed", l: "Kết hợp" }, { v: "ai", l: "🤖 AI" }, { v: "import", l: "📥 Import" }].map(f => (
+                        <button key={f.v} onClick={() => setFormData({ ...formData, empQFilter: empQFilter === f.v ? "all" : f.v })} style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: empQFilter === f.v ? 700 : 500, background: empQFilter === f.v ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: empQFilter === f.v ? C.teal : "rgba(255,255,255,0.4)", border: `1px solid ${empQFilter === f.v ? C.teal + "44" : C.border}` }}>{f.l}</button>
+                      ))}
                     </div>
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{filtered.length}/{visibleQuizzes.length} đề</span>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: 4, alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Sắp xếp:</span>
+                      {[{ v: "none", l: "Mặc định" }, { v: "asc", l: "Dễ → Khó" }, { v: "desc", l: "Khó → Dễ" }].map(s => (
+                        <button key={s.v} onClick={() => setFormData({ ...formData, empDiffSort: s.v })} style={{ padding: "5px 10px", borderRadius: 6, fontSize: 11, fontWeight: (formData.empDiffSort || "none") === s.v ? 700 : 500, background: (formData.empDiffSort || "none") === s.v ? `${C.gold}22` : "rgba(255,255,255,0.04)", color: (formData.empDiffSort || "none") === s.v ? C.goldL : "rgba(255,255,255,0.4)", border: `1px solid ${(formData.empDiffSort || "none") === s.v ? C.gold + "44" : C.border}`, cursor: "pointer", transition: "all .2s" }}>{s.l}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" || empQFilter !== "all" ? "Không có đề nào phù hợp với bộ lọc." : "Chưa có đề cho phòng ban của bạn."} /> : (
+                    <React.Fragment>
+                      {displayedEmpQ.map(q => {
+                        const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
+                        const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
+                        return (
+                          <div key={q.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
+                              <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
+                              {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
+                            </div>
+                            <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
+                          </div>
+                        );
+                      })}
+                      {!isEmpFiltering && visibleQuizzes.length >= (formData.empQuizLimit || 20) && (
+                        <div style={{ textAlign: "center", marginTop: 12 }}>
+                          <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                        </div>
+                      )}
+                    </React.Fragment>
                   )}
                 </React.Fragment>
               );
