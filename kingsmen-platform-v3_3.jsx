@@ -155,7 +155,31 @@ const getLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const x = Num
 const getNextLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L); return c.idx >= L.length - 1 ? null : L[c.idx + 1] };
 const xpProgress = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L), n = getNextLevel(xp, L); return n ? (xp - c.min) / (n.min - c.min) : 1 };
 const visibleToDept = (item, dept) => { const d = item.depts || ["Tất cả"]; return d.includes("Tất cả") || d.includes(dept) };
-const getBaseName = (title) => (title || "").replace(/(?:\s*-?\s*(?:Level\s*)?\d{1,3})?\s*(?:-\s*(?:TB|Dễ|Khó|NC|Nâng cao|Trung bình|D|T|K|Level\s*\d{1,3}))?\s*$/i, '').trim() || "Khác";
+const getBaseName = (title) => {
+  if (!title) return "Khác";
+  let base = title.trim();
+  // 1. Strip leading numbered prefix: 'Đề 01 ...', 'Đề 06 ...'
+  base = base.replace(/^(?:Đề|Bài|Test|Quiz)\s*\d+\s*[-:]?\s*/i, '');
+  // 2. Iteratively strip trailing difficulty / level suffixes
+  let changed = true;
+  while (changed) {
+    const prev = base;
+    base = base.replace(
+      /\s*[-:\s]?\s*(?:Level\s*\d{1,3}|Basic|Normal|Easy|Medium|Hard\s*Level|Advanced\s*Level|Hard|Advanced|TB|Dễ|Khó|NC|Nâng cao|Trung bình)\s*$/i,
+      ''
+    ).trim();
+    changed = base !== prev;
+  }
+  // 3. Strip a trailing bare number only for all-caps style names (e.g. 'ĐỀ HỆ TƯ TƯỞNG 03')
+  //    Avoids wrongly stripping product codes like 'Colormatch 02'
+  const isAllCaps = base === base.toUpperCase() && /[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐƠƯ]/.test(base);
+  if (isAllCaps) {
+    base = base.replace(/\s+\d{1,3}\s*$/, '').trim();
+  }
+  // 4. Clean trailing dashes/colons
+  base = base.replace(/\s*[-:]+\s*$/, '').trim();
+  return base || title.trim() || "Khác";
+};
 const challengeVisibleTo = (ch, user) => {
   if (ch.active === false) return false;
   if (!ch.assignTo || ch.assignTo === "all") return true;
