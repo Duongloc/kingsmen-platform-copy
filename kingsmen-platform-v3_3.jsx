@@ -155,6 +155,7 @@ const getLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const x = Num
 const getNextLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L); return c.idx >= L.length - 1 ? null : L[c.idx + 1] };
 const xpProgress = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L), n = getNextLevel(xp, L); return n ? (xp - c.min) / (n.min - c.min) : 1 };
 const visibleToDept = (item, dept) => { const d = item.depts || ["Tất cả"]; return d.includes("Tất cả") || d.includes(dept) };
+const getBaseName = (title) => (title || "").replace(/(?:\s*-?\s*\d{1,3})?\s*(?:-\s*(?:TB|Dễ|Khó|NC|Nâng cao|Trung bình|D|T|K))?\s*$/i, '').trim() || "Khác";
 const challengeVisibleTo = (ch, user) => {
   if (ch.active === false) return false;
   if (!ch.assignTo || ch.assignTo === "all") return true;
@@ -2899,15 +2900,32 @@ header{padding:6px 8px !important}
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{filteredQ.length}/{quizzes.length} đề</span>
               </div>
 
-              {/* ── Quiz list ── */}
+              {/* ── Quiz list / Grid ── */}
               {filteredQ.length === 0 && <Empty msg="Không tìm thấy đề nào." />}
               {(() => {
                 const isFiltering = !!(qSearch || (qDeptFilter && qDeptFilter !== "all") || (qFilter && qFilter !== "all"));
-                const displayLimit = isFiltering ? filteredQ.length : (formData.adminQuizLimit || 20);
-                const displayedQ = filteredQ.slice(0, displayLimit);
-                return (
-                  <React.Fragment>
-                    {displayedQ.map(q => {
+                
+                // Grouping logic
+                const groupsMap = {};
+                filteredQ.forEach(q => {
+                  const base = getBaseName(q.title);
+                  if (!groupsMap[base]) groupsMap[base] = [];
+                  groupsMap[base].push(q);
+                });
+                const groups = Object.keys(groupsMap).sort().map(k => ({ baseName: k, quizzes: groupsMap[k] }));
+
+                if (formData.adminQuizGroup) {
+                  const activeGroup = groups.find(g => g.baseName === formData.adminQuizGroup);
+                  if (!activeGroup) {
+                    return <div style={{ textAlign: "center", padding: 20 }}><button onClick={() => setFormData({ ...formData, adminQuizGroup: null })} style={btnO}>← Quay lại danh sách nhóm</button></div>;
+                  }
+                  return (
+                    <div style={{ animation: "fadeIn .3s" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+                        <h3 style={{ ...hd(18), color: C.teal, margin: 0 }}>📁 {activeGroup.baseName} <span style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontWeight: 400 }}>({activeGroup.quizzes.length} đề)</span></h3>
+                        <button onClick={() => setFormData({ ...formData, adminQuizGroup: null })} style={{ ...btnO, fontSize: 12 }}>← Quay lại nhóm</button>
+                      </div>
+                      {activeGroup.quizzes.map(q => {
                 const att = totalAttempts(q), pr = passRate(q), avg = avgScore(q), last = lastUsed(q);
                 const isExpanded = formData.expandQ === q.id;
                 const isEditing = formData.editPanel === q.id;
@@ -3074,14 +3092,67 @@ header{padding:6px 8px !important}
                   </div>
                 );
               })}
-              {!((!!(qSearch || (qDeptFilter && qDeptFilter !== "all") || (qFilter && qFilter !== "all")))) && quizzes.length >= (formData.adminQuizLimit || 20) && (
-                <div style={{ textAlign: "center", marginTop: 12 }}>
-                  <button onClick={() => { setFormData({ ...formData, adminQuizLimit: (formData.adminQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
-                </div>
-              )}
-            </React.Fragment>
-          );
-        })()}
+                    </div>
+                  );
+                }
+
+                // Render grid of groups
+                const folders = groups.filter(g => g.quizzes.length > 1);
+                const singles = groups.filter(g => g.quizzes.length === 1).map(g => g.quizzes[0]);
+
+                const displayLimit = isFiltering ? groups.length : (formData.adminQuizLimit || 20);
+                const displayedFolders = folders.slice(0, displayLimit);
+                const displayedSingles = singles.slice(0, displayLimit);
+
+                return (
+                  <React.Fragment>
+                    {displayedFolders.length > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: displayedSingles.length > 0 ? 16 : 0 }}>
+                        {displayedFolders.map(g => {
+                          const totalQs = g.quizzes.length;
+                          const totalAtt = g.quizzes.reduce((s, q) => s + totalAttempts(q), 0);
+                          return (
+                            <div key={g.baseName} onClick={() => setFormData({ ...formData, adminQuizGroup: g.baseName })} style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8, border: "1px solid rgba(255,255,255,0.08)", transition: "transform 0.2s", ":hover": { transform: "translateY(-2px)" } }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                <span style={{ fontSize: 24, flexShrink: 0 }}>📁</span>
+                                <div>
+                                  <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{g.baseName}</div>
+                                  <div style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>{totalQs} đề thi</div>
+                                </div>
+                              </div>
+                              {totalAtt > 0 && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: "auto", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>📊 Tổng {totalAtt} lượt thi</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {displayedSingles.length > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                        {displayedSingles.map(q => {
+                          const att = totalAttempts(q);
+                          return (
+                            <div key={q.id} onClick={() => setFormData({ ...formData, adminQuizGroup: getBaseName(q.title) })} style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8, border: "1px solid rgba(255,255,255,0.08)", transition: "transform 0.2s", ":hover": { transform: "translateY(-2px)" } }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                <span style={{ fontSize: 24, flexShrink: 0 }}>📝</span>
+                                <div>
+                                  <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{q.title}</div>
+                                  <div style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>Bài kiểm tra độc lập</div>
+                                </div>
+                              </div>
+                              {att > 0 && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: "auto", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>📊 Tổng {att} lượt thi</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!isFiltering && groups.length >= (formData.adminQuizLimit || 20) && (
+                      <div style={{ textAlign: "center", marginTop: 16 }}>
+                        <button onClick={() => { setFormData({ ...formData, adminQuizLimit: (formData.adminQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })()}
       </div>
     );
   })()}
@@ -5097,8 +5168,6 @@ header{padding:6px 8px !important}
               else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
               
               const isEmpFiltering = !!(empQuizSearch || empDiffFilter !== "all" || empQFilter !== "all" || empDiffSort !== "none");
-              const empDisplayLimit = isEmpFiltering ? filtered.length : (formData.empQuizLimit || 20);
-              const displayedEmpQ = filtered.slice(0, empDisplayLimit);
               
               return (
                 <React.Fragment>
@@ -5131,29 +5200,103 @@ header{padding:6px 8px !important}
                     </div>
                   </div>
 
-                  {filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" || empQFilter !== "all" ? "Không có đề nào phù hợp với bộ lọc." : "Chưa có đề cho phòng ban của bạn."} /> : (
-                    <React.Fragment>
-                      {displayedEmpQ.map(q => {
-                        const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
-                        const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
-                        return (
-                          <div key={q.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
-                              <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
-                              {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
-                            </div>
-                            <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
+                  {filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" || empQFilter !== "all" ? "Không có đề nào phù hợp với bộ lọc." : "Chưa có đề cho phòng ban của bạn."} /> : (() => {
+                    const groupsMap = {};
+                    filtered.forEach(q => {
+                      const base = getBaseName(q.title);
+                      if (!groupsMap[base]) groupsMap[base] = [];
+                      groupsMap[base].push(q);
+                    });
+                    const groups = Object.keys(groupsMap).sort().map(k => ({ baseName: k, quizzes: groupsMap[k] }));
+
+                    if (formData.empQuizGroup) {
+                      const activeGroup = groups.find(g => g.baseName === formData.empQuizGroup);
+                      if (!activeGroup) {
+                        return <div style={{ textAlign: "center", padding: 20 }}><button onClick={() => setFormData({ ...formData, empQuizGroup: null })} style={btnO}>← Quay lại danh sách nhóm</button></div>;
+                      }
+                      return (
+                        <div style={{ animation: "fadeIn .3s" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+                            <h3 style={{ ...hd(18), color: C.teal, margin: 0 }}>📁 {activeGroup.baseName}</h3>
+                            <button onClick={() => setFormData({ ...formData, empQuizGroup: null })} style={{ ...btnO, fontSize: 12 }}>← Quay lại nhóm</button>
                           </div>
-                        );
-                      })}
-                      {!isEmpFiltering && visibleQuizzes.length >= (formData.empQuizLimit || 20) && (
-                        <div style={{ textAlign: "center", marginTop: 12 }}>
-                          <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                          {activeGroup.quizzes.map(q => {
+                            const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
+                            const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
+                            return (
+                              <div key={q.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
+                                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
+                                  {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
+                                </div>
+                                <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
+                              </div>
+                            );
+                          })}
                         </div>
-                      )}
-                    </React.Fragment>
-                  )}
+                      );
+                    }
+
+                    const folders = groups.filter(g => g.quizzes.length > 1);
+                    const singles = groups.filter(g => g.quizzes.length === 1).map(g => g.quizzes[0]);
+
+                    const empDisplayLimit = isEmpFiltering ? groups.length : (formData.empQuizLimit || 20);
+                    const displayedFolders = folders.slice(0, empDisplayLimit);
+                    const displayedSingles = singles.slice(0, empDisplayLimit);
+
+                    return (
+                      <React.Fragment>
+                        {displayedFolders.length > 0 && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: displayedSingles.length > 0 ? 16 : 0 }}>
+                            {displayedFolders.map(g => {
+                              const passedQs = g.quizzes.filter(q => results.some(r => r.empId === currentUser.id && r.quizId === q.id && r.passed)).length;
+                              return (
+                                <div key={g.baseName} onClick={() => setFormData({ ...formData, empQuizGroup: g.baseName })} style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8, border: "1px solid rgba(255,255,255,0.08)", transition: "transform 0.2s", ":hover": { transform: "translateY(-2px)" } }}>
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                    <span style={{ fontSize: 24, flexShrink: 0 }}>📁</span>
+                                    <div>
+                                      <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{g.baseName}</div>
+                                      <div style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>{g.quizzes.length} đề thi</div>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 11, color: passedQs === g.quizzes.length ? C.green : "rgba(255,255,255,0.3)", marginTop: "auto", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                                    {passedQs === g.quizzes.length ? "✓ Đã qua toàn bộ" : `Đã qua ${passedQs}/${g.quizzes.length} đề`}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {displayedSingles.length > 0 && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                            {displayedSingles.map(q => {
+                              const passed = results.some(r => r.empId === currentUser.id && r.quizId === q.id && r.passed);
+                              return (
+                                <div key={q.id} onClick={() => setFormData({ ...formData, empQuizGroup: getBaseName(q.title) })} style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8, border: "1px solid rgba(255,255,255,0.08)", transition: "transform 0.2s", ":hover": { transform: "translateY(-2px)" } }}>
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                    <span style={{ fontSize: 24, flexShrink: 0 }}>📝</span>
+                                    <div>
+                                      <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{q.title}</div>
+                                      <div style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>Bài kiểm tra độc lập</div>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 11, color: passed ? C.green : "rgba(255,255,255,0.3)", marginTop: "auto", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                                    {passed ? "✓ Đã hoàn thành" : "Chưa hoàn thành"}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!isEmpFiltering && groups.length >= (formData.empQuizLimit || 20) && (
+                          <div style={{ textAlign: "center", marginTop: 12 }}>
+                            <button onClick={() => { setFormData({ ...formData, empQuizLimit: (formData.empQuizLimit || 20) + 20 }); loadMoreQuizzesDB(); }} style={{ ...btnO, padding: "8px 24px", fontSize: 13 }}>Hiển thị thêm...</button>
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })()}
                 </React.Fragment>
               );
             })()}
