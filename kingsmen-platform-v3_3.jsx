@@ -155,7 +155,7 @@ const getLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const x = Num
 const getNextLevel = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L); return c.idx >= L.length - 1 ? null : L[c.idx + 1] };
 const xpProgress = (xp, lvls) => { const L = lvls || DEFAULT_LEVELS; const c = getLevel(xp, L), n = getNextLevel(xp, L); return n ? (xp - c.min) / (n.min - c.min) : 1 };
 const visibleToDept = (item, dept) => { const d = item.depts || ["Tất cả"]; return d.includes("Tất cả") || d.includes(dept) };
-const getBaseName = (title) => (title || "").replace(/(?:\s*-?\s*\d{1,3})?\s*(?:-\s*(?:TB|Dễ|Khó|NC|Nâng cao|Trung bình|D|T|K))?\s*$/i, '').trim() || "Khác";
+const getBaseName = (title) => (title || "").replace(/(?:\s*-?\s*(?:Level\s*)?\d{1,3})?\s*(?:-\s*(?:TB|Dễ|Khó|NC|Nâng cao|Trung bình|D|T|K|Level\s*\d{1,3}))?\s*$/i, '').trim() || "Khác";
 const challengeVisibleTo = (ch, user) => {
   if (ch.active === false) return false;
   if (!ch.assignTo || ch.assignTo === "all") return true;
@@ -2925,7 +2925,13 @@ header{padding:6px 8px !important}
                         <h3 style={{ ...hd(18), color: C.teal, margin: 0 }}>📁 {activeGroup.baseName} <span style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", fontWeight: 400 }}>({activeGroup.quizzes.length} đề)</span></h3>
                         <button onClick={() => setFormData({ ...formData, adminQuizGroup: null })} style={{ ...btnO, fontSize: 12 }}>← Quay lại nhóm</button>
                       </div>
-                      {activeGroup.quizzes.map(q => {
+                      {activeGroup.quizzes.sort((a, b) => {
+                        const dO = { easy: 1, medium: 2, hard: 3, advanced: 4 };
+                        const dA = dO[a.difficulty || "medium"] || 2;
+                        const dB = dO[b.difficulty || "medium"] || 2;
+                        if (dA !== dB) return dA - dB;
+                        return a.title.localeCompare(b.title);
+                      }).map(q => {
                 const att = totalAttempts(q), pr = passRate(q), avg = avgScore(q), last = lastUsed(q);
                 const isExpanded = formData.expandQ === q.id;
                 const isEditing = formData.editPanel === q.id;
@@ -5220,7 +5226,13 @@ header{padding:6px 8px !important}
                             <h3 style={{ ...hd(18), color: C.teal, margin: 0 }}>📁 {activeGroup.baseName}</h3>
                             <button onClick={() => setFormData({ ...formData, empQuizGroup: null })} style={{ ...btnO, fontSize: 12 }}>← Quay lại nhóm</button>
                           </div>
-                          {activeGroup.quizzes.map(q => {
+                          {activeGroup.quizzes.sort((a, b) => {
+                            const dO = { easy: 1, medium: 2, hard: 3, advanced: 4 };
+                            const dA = dO[a.difficulty || "medium"] || 2;
+                            const dB = dO[b.difficulty || "medium"] || 2;
+                            if (dA !== dB) return dA - dB;
+                            return a.title.localeCompare(b.title);
+                          }).map(q => {
                             const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
                             const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
                             return (
