@@ -158,8 +158,8 @@ const visibleToDept = (item, dept) => { const d = item.depts || ["Tất cả"]; 
 const getBaseName = (title) => {
   if (!title) return "Khác";
   let base = title.trim();
-  // 1. Strip leading numbered prefix: 'Đề 01 ...', 'Đề 06 ...'
-  base = base.replace(/^(?:Đề|Bài|Test|Quiz)\s*\d+\s*[-:]?\s*/i, '');
+  // 1. Strip leading prefix: 'Đề 01 ...', 'Đề ...', 'Test 06 ...'
+  base = base.replace(/^(?:Đề|Bài|Test|Quiz)\s*(?:\d+\s*)?[-:]?\s*/i, '');
   // 2. Iteratively strip trailing difficulty / level suffixes
   let changed = true;
   while (changed) {
@@ -170,12 +170,9 @@ const getBaseName = (title) => {
     ).trim();
     changed = base !== prev;
   }
-  // 3. Strip a trailing bare number only for all-caps style names (e.g. 'ĐỀ HỆ TƯ TƯỞNG 03')
-  //    Avoids wrongly stripping product codes like 'Colormatch 02'
-  const isAllCaps = base === base.toUpperCase() && /[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐƠƯ]/.test(base);
-  if (isAllCaps) {
-    base = base.replace(/\s+\d{1,3}\s*$/, '').trim();
-  }
+  // 3. Strip trailing numbers (e.g. '01', '02') so variations of the same test group together
+  base = base.replace(/\s+\d{1,3}\s*$/, '').trim();
+  
   // 4. Clean trailing dashes/colons
   base = base.replace(/\s*[-:]+\s*$/, '').trim();
   return base || title.trim() || "Khác";
