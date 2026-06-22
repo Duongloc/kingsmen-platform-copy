@@ -2928,12 +2928,16 @@ header{padding:6px 8px !important}
                 
                 // Grouping logic
                 const groupsMap = {};
+                const groupsList = [];
                 filteredQ.forEach(q => {
                   const base = getBaseName(q.title);
-                  if (!groupsMap[base]) groupsMap[base] = [];
+                  if (!groupsMap[base]) {
+                    groupsMap[base] = [];
+                    groupsList.push(base);
+                  }
                   groupsMap[base].push(q);
                 });
-                const groups = Object.keys(groupsMap).sort().map(k => ({ baseName: k, quizzes: groupsMap[k] }));
+                const groups = groupsList.map(k => ({ baseName: k, quizzes: groupsMap[k] }));
 
                 if (formData.adminQuizGroup) {
                   const activeGroup = groups.find(g => g.baseName === formData.adminQuizGroup);
@@ -5229,12 +5233,16 @@ header{padding:6px 8px !important}
 
                   {filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" || empQFilter !== "all" ? "Không có đề nào phù hợp với bộ lọc." : "Chưa có đề cho phòng ban của bạn."} /> : (() => {
                     const groupsMap = {};
+                    const groupsList = [];
                     filtered.forEach(q => {
                       const base = getBaseName(q.title);
-                      if (!groupsMap[base]) groupsMap[base] = [];
+                      if (!groupsMap[base]) {
+                        groupsMap[base] = [];
+                        groupsList.push(base);
+                      }
                       groupsMap[base].push(q);
                     });
-                    const groups = Object.keys(groupsMap).sort().map(k => ({ baseName: k, quizzes: groupsMap[k] }));
+                    const groups = groupsList.map(k => ({ baseName: k, quizzes: groupsMap[k] }));
 
                     if (formData.empQuizGroup) {
                       const activeGroup = groups.find(g => g.baseName === formData.empQuizGroup);
