@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@supabase/supabase-js";
 
@@ -2520,33 +2520,40 @@ header{padding:6px 8px !important}
                   </div>
                 </div>
                 {aiStatus && <div style={{ textAlign: "center", color: C.goldL, fontSize: 12, marginBottom: 8 }}>{aiStatus}</div>}
-                {knowledge.map(function (k) {
-                  var hasL = !!k.interactive;
-                  var sl = hasL && k.interactive.slides ? k.interactive.slides.length : 0;
-                  var fc = hasL && k.interactive.flashcards ? k.interactive.flashcards.length : 0;
-                  return (
-                    <div key={k.id} onClick={function () { setSubScreen(k.id) }} style={{ ...card, cursor: "pointer", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderLeft: "3px solid " + (hasL ? C.teal : C.orange) }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: C.white, marginBottom: 4 }}>{k.title}</div>
-                        <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: k.hasPdf && k.pdfName ? 4 : 0 }}>
-                          {(k.depts || []).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
-                          {hasL && tag(sl + "S " + fc + "F", C.teal)}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {knowledge.map(function (k) {
+                    var hasL = !!k.interactive;
+                    var sl = hasL && k.interactive.slides ? k.interactive.slides.length : 0;
+                    var fc = hasL && k.interactive.flashcards ? k.interactive.flashcards.length : 0;
+                    return (
+                      <div key={k.id} onClick={function () { setSubScreen(k.id) }} style={{ ...card, cursor: "pointer", padding: "16px", display: "flex", flexDirection: "column", gap: 10, borderLeft: "3px solid " + (hasL ? C.teal : C.orange), transition: "transform 0.18s, box-shadow 0.18s" }}
+                        onMouseEnter={function(e){ e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.4)"; }}
+                        onMouseLeave={function(e){ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=""; }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <span style={{ fontSize: 24, flexShrink: 0 }}>{hasL ? "🎓" : "📄"}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: C.white, lineHeight: 1.4, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{k.title}</div>
+                            <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                              {(k.depts || []).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {hasL && tag(sl + " slides · " + fc + " cards", C.teal)}
+                          {k.hasPdf && tag("📄 PDF", C.purple)}
                           {!!(k.docUrl) && tag("🔗 Link", C.blue)}
                           {(k.hasVideo || k.videoUrl) && tag(k.hasVideo ? "🎬 Video ⬆️" : "🎬 Video 🔗", C.red)}
                           {!!(k.audioUrl) && tag("🎧 Audio", "#9b59b6")}
                           {k.images && k.images.length > 0 && tag(k.images.length + " 🖼️", C.gold)}
                         </div>
-                        {k.hasPdf && (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 4, background: C.purple + "18", border: "1px solid " + C.purple + "33" }}>
-                            <span style={{ fontSize: 12 }}>{"📄"}</span>
-                            <span style={{ fontSize: 12, color: C.purple, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 240 }}>{k.pdfName || "PDF đính kèm"}</span>
-                          </div>
-                        )}
+                        <div style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid " + C.border, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: hasL ? C.teal : "rgba(255,255,255,0.2)" }}>{hasL ? "✓ Có nội dung học" : "— Chưa có interactive"}</span>
+                          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.25)" }}>→</span>
+                        </div>
                       </div>
-                      <span style={{ fontSize: 16, color: "rgba(255,255,255,0.2)", flexShrink: 0, marginLeft: 8 }}>{"→"}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
                 {knowledge.length === 0 && <Empty msg={"Bấm + Thêm để tạo bài đầu tiên."} />}
               </div>
             )}
@@ -4594,32 +4601,48 @@ header{padding:6px 8px !important}
               <input type="text" value={formData.empKnowledgeSearch || ""} onChange={function (e) { setFormData(Object.assign({}, formData, { empKnowledgeSearch: e.target.value })) }} placeholder="Tìm bài kiến thức..." style={{ ...inp, paddingLeft: 38, background: "rgba(255,255,255,0.04)", border: "1px solid " + C.border, borderRadius: 12, fontSize: 13 }} />
               {formData.empKnowledgeSearch && <button onClick={function () { setFormData(Object.assign({}, formData, { empKnowledgeSearch: "" })) }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer" }}>✕</button>}
             </div>
-            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) && (!formData.empKnowledgeSearch || k.title.toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase()) || (k.content || "").toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase())) }).map(function (k) {
-              var isRead = (currentUser.readLessons || []).includes(k.id);
+            {(() => {
+              const empKList = knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) && (!formData.empKnowledgeSearch || k.title.toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase()) || (k.content || "").toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase())) });
+              if (empKList.length === 0) return <Empty msg={formData.empKnowledgeSearch ? "Không tìm thấy bài kiến thức nào phù hợp." : "Chưa có bài nào."} />;
               return (
-                <div key={k.id} style={{ ...card, cursor: "pointer", border: "1px solid " + (isRead ? C.green + "33" : C.border) }} onClick={function () {
-                  if (!isRead) { var u = Object.assign({}, currentUser, { readLessons: [].concat(currentUser.readLessons || [], [k.id]) }); setCurrentUser(u); var na = accountsRef.current.map(function (a) { return a.id === u.id ? u : a }); setAccounts(na); accountsRef.current = na; save("km-accounts", na); }
-                  setSubScreen(k.id); setFormData(Object.assign({}, formData, { learnTab: null }));
-                }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-                    <span style={{ color: C.white, fontWeight: 700, fontSize: 14, flex: 1 }}>{k.title}</span>
-                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      {isRead && tag("✓ Đã đọc", C.green)}
-                      {k.interactive && tag("🎴 Tương tác", C.teal)}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-                    {(k.depts || ["Tất cả"]).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
-                    {k.hasPdf && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.purple + "22", color: C.purple, fontWeight: 600 }}>{"📄 " + (k.pdfName || "PDF")}</span>}
-                    {(k.hasVideo || k.videoUrl) && tag(k.hasVideo ? "🎬 Video ⬆️" : "🎬 Video 🔗", C.red)}
-                    {k.audioUrl && tag("🎧 Nghe", "#9b59b6")}
-                    {k.docUrl && tag("🔗 Link", C.blue)}
-                  </div>
-                  <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>{(k.content || "").slice(0, 100) || "Chưa có nội dung"}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {empKList.map(function (k) {
+                    var isRead = (currentUser.readLessons || []).includes(k.id);
+                    return (
+                      <div key={k.id} style={{ ...card, cursor: "pointer", padding: "16px", display: "flex", flexDirection: "column", gap: 10, border: "1px solid " + (isRead ? C.green + "44" : C.border), borderLeft: "3px solid " + (isRead ? C.green : C.teal), transition: "transform 0.18s, box-shadow 0.18s" }}
+                        onMouseEnter={function(e){ e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.4)"; }}
+                        onMouseLeave={function(e){ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=""; }}
+                        onClick={function () {
+                          if (!isRead) { var u = Object.assign({}, currentUser, { readLessons: [].concat(currentUser.readLessons || [], [k.id]) }); setCurrentUser(u); var na = accountsRef.current.map(function (a) { return a.id === u.id ? u : a }); setAccounts(na); accountsRef.current = na; save("km-accounts", na); }
+                          setSubScreen(k.id); setFormData(Object.assign({}, formData, { learnTab: null }));
+                        }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <span style={{ fontSize: 24, flexShrink: 0 }}>{isRead ? "✅" : k.interactive ? "🎓" : "📗"}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{k.title}</div>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {isRead && tag("✓ Đã đọc", C.green)}
+                              {k.interactive && tag("🎴 Tương tác", C.teal)}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {(k.depts || ["Tất cả"]).map(function (d) { return <span key={d}>{tag(d, d === "Tất cả" ? C.green : C.blue)}</span> })}
+                          {k.hasPdf && tag("📄 PDF", C.purple)}
+                          {(k.hasVideo || k.videoUrl) && tag(k.hasVideo ? "🎬 Video ⬆️" : "🎬 Video 🔗", C.red)}
+                          {k.audioUrl && tag("🎧 Nghe", "#9b59b6")}
+                          {k.docUrl && tag("🔗 Link", C.blue)}
+                        </div>
+                        <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{(k.content || "").slice(0, 120) || "Chưa có nội dung"}</div>
+                        <div style={{ marginTop: "auto", paddingTop: 10, borderTop: "1px solid " + C.border, fontSize: 11, color: isRead ? C.green : "rgba(255,255,255,0.2)" }}>
+                          {isRead ? "✓ Đã hoàn thành" : "Chưa đọc →"}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
-            })}
-            {knowledge.filter(function (k) { return visibleToDept(k, currentUser.dept) && (!formData.empKnowledgeSearch || k.title.toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase()) || (k.content || "").toLowerCase().includes(formData.empKnowledgeSearch.toLowerCase())) }).length === 0 && <Empty msg={formData.empKnowledgeSearch ? "Không tìm thấy bài kiến thức nào phù hợp." : "Chưa có bài nào."} />}
+            })()}
           </div>
         )}
 
@@ -5198,13 +5221,13 @@ header{padding:6px 8px !important}
               else if (empDiffSort === "desc") filtered = [...filtered].sort((a, b) => (diffOrder[b.difficulty || "medium"] || 2) - (diffOrder[a.difficulty || "medium"] || 2));
               
               const isEmpFiltering = !!(empQuizSearch || empDiffFilter !== "all" || empQFilter !== "all" || empDiffSort !== "none");
-              
+              const empQuizViewMode = formData.empQuizViewMode || "grid";
+
               return (
                 <React.Fragment>
                   {/* ── Search + Filter bar ── */}
                   <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
                     <input value={formData.empQuizSearch || ""} onChange={e => setFormData({ ...formData, empQuizSearch: e.target.value })} placeholder="🔍 Tìm đề theo tên..." style={{ ...inp, width: "auto", flex: 1, minWidth: 160, padding: "8px 12px", fontSize: 12 }} />
-                    
                     <select value={formData.empDiffFilter || "all"} onChange={e => setFormData({ ...formData, empDiffFilter: e.target.value })} style={{ ...inp, padding: "8px", fontSize: 11, width: "auto" }}>
                       <option value="all">— Mọi độ khó —</option>
                       <option value="easy">🟢 Dễ</option>
@@ -5212,13 +5235,18 @@ header{padding:6px 8px !important}
                       <option value="hard">🟠 Khó</option>
                       <option value="advanced">🔴 Nâng cao</option>
                     </select>
-
                     <div style={{ display: "flex", gap: 4 }}>
                       {[{ v: "mc", l: "TN" }, { v: "mixed", l: "Kết hợp" }, { v: "ai", l: "🤖 AI" }, { v: "import", l: "📥 Import" }].map(f => (
                         <button key={f.v} onClick={() => setFormData({ ...formData, empQFilter: empQFilter === f.v ? "all" : f.v })} style={{ padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: empQFilter === f.v ? 700 : 500, background: empQFilter === f.v ? `${C.teal}22` : "rgba(255,255,255,0.04)", color: empQFilter === f.v ? C.teal : "rgba(255,255,255,0.4)", border: `1px solid ${empQFilter === f.v ? C.teal + "44" : C.border}` }}>{f.l}</button>
                       ))}
                     </div>
                     <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{filtered.length}/{visibleQuizzes.length} đề</span>
+                    {/* ── Grid / List toggle ── */}
+                    <div style={{ display: "flex", gap: 2, padding: 3, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}` }}>
+                      {[{ v: "grid", icon: "⊞" }, { v: "list", icon: "≡" }].map(m => (
+                        <button key={m.v} onClick={() => setFormData({ ...formData, empQuizViewMode: m.v })} style={{ width: 30, height: 28, borderRadius: 6, fontSize: 16, fontWeight: 700, background: empQuizViewMode === m.v ? `${C.teal}30` : "transparent", color: empQuizViewMode === m.v ? C.teal : "rgba(255,255,255,0.3)", border: `1px solid ${empQuizViewMode === m.v ? C.teal + "55" : "transparent"}`, cursor: "pointer", transition: "all .18s", lineHeight: 1 }}>{m.icon}</button>
+                      ))}
+                    </div>
                   </div>
 
                   <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -5260,13 +5288,21 @@ header{padding:6px 8px !important}
                             const myR = results.filter(r => r.empId === currentUser.id && r.quizId === q.id); const last = myR.length > 0 ? myR[myR.length - 1] : null;
                             const canTake = !last || daysSince(last.date) >= settings.quizFreq || !last.passed;
                             return (
-                              <div key={q.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>{q.title}</div>
-                                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 2 }}>{q.questions.length} câu · {q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "medium" ? "🟡 TB" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}{q.quizType === "mixed" && <span style={{ marginLeft: 5, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}{last && <React.Fragment> · Lần gần nhất: <b style={{ color: last.passed ? C.green : C.red }}>{last.pct}%</b></React.Fragment>}</div>
-                                  {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
+                              <div key={q.id} style={{ display: "flex", alignItems: "stretch", marginBottom: 10, borderRadius: 12, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+                                <div style={{ width: 5, flexShrink: 0, background: q.difficulty === "easy" ? C.green : q.difficulty === "hard" ? C.orange : q.difficulty === "advanced" ? C.red : C.gold }} />
+                                <div style={{ ...card, flex: 1, display: "flex", alignItems: "center", gap: 14, borderRadius: "0 12px 12px 0", margin: 0 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ color: C.white, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{q.title}</div>
+                                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 5, background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>{q.questions.length} câu</span>
+                                      <span style={{ fontSize: 11, fontWeight: 700, color: q.difficulty === "easy" ? C.green : q.difficulty === "hard" ? C.orange : q.difficulty === "advanced" ? C.red : C.gold }}>{q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}</span>
+                                      {q.quizType === "mixed" && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>📝 Kết hợp</span>}
+                                      {last && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 5, background: last.passed ? `${C.green}18` : `${C.red}18`, color: last.passed ? C.green : C.red, fontWeight: 700 }}>{last.pct}%</span>}
+                                    </div>
+                                    {!canTake && <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, marginTop: 4 }}>⏳ Làm lại sau {(settings.quizFreq ?? 7) - daysSince(last.date)} ngày</div>}
+                                  </div>
+                                  <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13, flexShrink: 0 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
                                 </div>
-                                <button onClick={() => { setQuizPathContext(null); canTake && startQuiz(q); }} disabled={!canTake} style={{ ...btnG, opacity: canTake ? 1 : 0.3, padding: "10px 18px", fontSize: 13 }}>{last ? "Làm lại" : "Bắt đầu"}</button>
                               </div>
                             );
                           })}
@@ -5284,19 +5320,38 @@ header{padding:6px 8px !important}
                     return (
                       <React.Fragment>
                         {displayedFolders.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: displayedSingles.length > 0 ? 16 : 0 }}>
+                          <div style={{ display: empQuizViewMode === "list" ? "flex" : "grid", flexDirection: empQuizViewMode === "list" ? "column" : undefined, gridTemplateColumns: empQuizViewMode === "list" ? undefined : "repeat(auto-fill, minmax(280px, 1fr))", gap: 10, marginBottom: displayedSingles.length > 0 ? 16 : 0 }}>
                             {displayedFolders.map(g => {
                               const passedQs = g.quizzes.filter(q => results.some(r => r.empId === currentUser.id && r.quizId === q.id && r.passed)).length;
+                              const passRatio = g.quizzes.length > 0 ? passedQs / g.quizzes.length : 0;
+                              const diffCounts = { easy: 0, medium: 0, hard: 0, advanced: 0 };
+                              g.quizzes.forEach(q => { diffCounts[q.difficulty || "medium"] = (diffCounts[q.difficulty || "medium"] || 0) + 1; });
                               return (
-                                <div key={g.baseName} onClick={() => setFormData({ ...formData, empQuizGroup: g.baseName })} style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8, border: "1px solid rgba(255,255,255,0.08)", transition: "transform 0.2s", ":hover": { transform: "translateY(-2px)" } }}>
-                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                <div key={g.baseName} onClick={() => setFormData({ ...formData, empQuizGroup: g.baseName })}
+                                  onMouseEnter={function(e){ e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.4)"; }}
+                                  onMouseLeave={function(e){ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=""; }}
+                                  style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: empQuizViewMode === "list" ? "row" : "column", alignItems: empQuizViewMode === "list" ? "center" : undefined, gap: 10, border: "1px solid rgba(255,255,255,0.08)", transition: "transform 0.18s, box-shadow 0.18s" }}>
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flex: 1 }}>
                                     <span style={{ fontSize: 24, flexShrink: 0 }}>📁</span>
-                                    <div>
-                                      <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{g.baseName}</div>
-                                      <div style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>{g.quizzes.length} đề thi</div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: empQuizViewMode === "list" ? "nowrap" : "normal" }}>{g.baseName}</div>
+                                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                                        <span style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>{g.quizzes.length} đề thi</span>
+                                        {diffCounts.easy > 0 && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: `${C.green}18`, color: C.green }}>🟢×{diffCounts.easy}</span>}
+                                        {diffCounts.medium > 0 && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: `${C.gold}18`, color: C.goldL }}>🟡×{diffCounts.medium}</span>}
+                                        {diffCounts.hard > 0 && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: `${C.orange}18`, color: C.orange }}>🟠×{diffCounts.hard}</span>}
+                                        {diffCounts.advanced > 0 && <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 4, background: `${C.red}18`, color: C.red }}>🔴×{diffCounts.advanced}</span>}
+                                      </div>
                                     </div>
                                   </div>
-                                  <div style={{ fontSize: 11, color: passedQs === g.quizzes.length ? C.green : "rgba(255,255,255,0.3)", marginTop: "auto", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                                  {empQuizViewMode !== "list" && (
+                                    <div style={{ marginTop: "auto" }}>
+                                      <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden", marginBottom: 5 }}>
+                                        <div style={{ height: "100%", width: `${passRatio * 100}%`, background: passedQs === g.quizzes.length ? C.green : C.teal, borderRadius: 2, transition: "width .5s" }} />
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: 11, color: passedQs === g.quizzes.length ? C.green : "rgba(255,255,255,0.3)", paddingTop: empQuizViewMode === "list" ? 0 : 6, borderTop: empQuizViewMode === "list" ? "none" : `1px solid ${C.border}`, flexShrink: 0 }}>
                                     {passedQs === g.quizzes.length ? "✓ Đã qua toàn bộ" : `Đã qua ${passedQs}/${g.quizzes.length} đề`}
                                   </div>
                                 </div>
@@ -5305,19 +5360,26 @@ header{padding:6px 8px !important}
                           </div>
                         )}
                         {displayedSingles.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                          <div style={{ display: empQuizViewMode === "list" ? "flex" : "grid", flexDirection: empQuizViewMode === "list" ? "column" : undefined, gridTemplateColumns: empQuizViewMode === "list" ? undefined : "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
                             {displayedSingles.map(q => {
                               const passed = results.some(r => r.empId === currentUser.id && r.quizId === q.id && r.passed);
+                              const diffColor = q.difficulty === "easy" ? C.green : q.difficulty === "hard" ? C.orange : q.difficulty === "advanced" ? C.red : C.gold;
                               return (
-                                <div key={q.id} onClick={() => setFormData({ ...formData, empQuizGroup: getBaseName(q.title) })} style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8, border: "1px solid rgba(255,255,255,0.08)", transition: "transform 0.2s", ":hover": { transform: "translateY(-2px)" } }}>
-                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                <div key={q.id} onClick={() => setFormData({ ...formData, empQuizGroup: getBaseName(q.title) })}
+                                  onMouseEnter={function(e){ e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.4)"; }}
+                                  onMouseLeave={function(e){ e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow=""; }}
+                                  style={{ ...card, padding: "16px", cursor: "pointer", display: "flex", flexDirection: empQuizViewMode === "list" ? "row" : "column", alignItems: empQuizViewMode === "list" ? "center" : undefined, gap: 10, border: "1px solid rgba(255,255,255,0.08)", borderLeft: `3px solid ${diffColor}`, transition: "transform 0.18s, box-shadow 0.18s" }}>
+                                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flex: 1 }}>
                                     <span style={{ fontSize: 24, flexShrink: 0 }}>📝</span>
-                                    <div>
-                                      <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4 }}>{q.title}</div>
-                                      <div style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>Bài kiểm tra độc lập</div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ color: C.white, fontWeight: 700, fontSize: 14, lineHeight: 1.4, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: empQuizViewMode === "list" ? "nowrap" : "normal" }}>{q.title}</div>
+                                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                                        <span style={{ fontSize: 11, color: diffColor, fontWeight: 700 }}>{q.difficulty === "easy" ? "🟢 Dễ" : q.difficulty === "hard" ? "🟠 Khó" : q.difficulty === "advanced" ? "🔴 NC" : "🟡 TB"}</span>
+                                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{q.questions ? q.questions.length + " câu" : ""}</span>
+                                      </div>
                                     </div>
                                   </div>
-                                  <div style={{ fontSize: 11, color: passed ? C.green : "rgba(255,255,255,0.3)", marginTop: "auto", paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                                  <div style={{ fontSize: 11, color: passed ? C.green : "rgba(255,255,255,0.3)", paddingTop: empQuizViewMode === "list" ? 0 : 8, borderTop: empQuizViewMode === "list" ? "none" : `1px solid ${C.border}`, flexShrink: 0 }}>
                                     {passed ? "✓ Đã hoàn thành" : "Chưa hoàn thành"}
                                   </div>
                                 </div>
@@ -5332,20 +5394,6 @@ header{padding:6px 8px !important}
                         )}
                       </React.Fragment>
                     );
-                  })()}
-                </React.Fragment>
-              );
-            })()}
-
-          </div>
-        )}
-
-        {/* ═══ EMPLOYEE: QUIZ PLAY ═══ */}
-        {role === "employee" && screen === "emp_quiz_play" && activeQuiz && (
-          <div style={{ animation: "fadeIn .4s" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Câu <b style={{ color: C.gold }}>{qIdx + 1}</b>/{activeQuiz.questions.length}{activeQuiz.quizType === "mixed" && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>Kết hợp</span>}</span>
                 <button onClick={() => { if (window.confirm("Thoát bài thi? Tiến trình sẽ không được lưu.")) { setScreen("emp_quizzes"); setActiveQuiz(null); setQActive(false); } }} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>✕ Thoát</button>
               </div>
               <span style={{ fontSize: 14, fontWeight: 700, color: qTimer < 60 ? C.red : qTimer < 180 ? C.orange : C.gold, fontFamily: "monospace", background: "rgba(0,0,0,0.3)", padding: "5px 12px", borderRadius: 8 }}>⏱ {fmtTime(qTimer)}</span>
@@ -6417,5 +6465,4 @@ function Leaderboard({ accounts, results, card, currentUserId, depts, levels }) 
     })}
   </React.Fragment>);
 }
-
 
