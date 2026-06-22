@@ -3210,6 +3210,7 @@ header{padding:6px 8px !important}
                   const name = (formData.name || "").trim(); const empId = (formData.empId || "").trim();
                   if (!name || !empId) { alert("Vui lòng nhập Họ tên và Mã NV"); return; }
                   if (accounts.some(a => a.empId === empId)) { alert("Mã NV \"" + empId + "\" đã tồn tại!"); return; }
+                  if (accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) { alert("Tên nhân viên \"" + name + "\" đã tồn tại trong hệ thống! Hãy đổi tên khác (VD: " + name + " - " + (formData.dept || DEPTS[0]) + ") để tránh lỗi đăng nhập trùng lặp."); return; }
                   const password = (formData.pw || "Kingsmen@2026");
                   if (formData.confirmPw && formData.confirmPw !== password) { alert("Mật khẩu xác nhận không khớp!"); return; }
                   setFormData({ ...formData, _creating: true });
