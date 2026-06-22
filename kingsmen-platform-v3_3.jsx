@@ -158,8 +158,8 @@ const visibleToDept = (item, dept) => { const d = item.depts || ["Tất cả"]; 
 const getBaseName = (title) => {
   if (!title) return "Khác";
   let base = title.trim();
-  // 1. Strip leading numbered prefix: 'Đề 01 ...', 'Đề 06 ...'
-  base = base.replace(/^(?:Đề|Bài|Test|Quiz)\s*\d+\s*[-:]?\s*/i, '');
+  // 1. Strip leading prefix: 'Đề 01 ...', 'Đề ...', 'Test 06 ...'
+  base = base.replace(/^(?:Đề|Bài|Test|Quiz)\s*(?:\d+\s*)?[-:]?\s*/i, '');
   // 2. Iteratively strip trailing difficulty / level suffixes
   let changed = true;
   while (changed) {
@@ -170,12 +170,9 @@ const getBaseName = (title) => {
     ).trim();
     changed = base !== prev;
   }
-  // 3. Strip a trailing bare number only for all-caps style names (e.g. 'ĐỀ HỆ TƯ TƯỞNG 03')
-  //    Avoids wrongly stripping product codes like 'Colormatch 02'
-  const isAllCaps = base === base.toUpperCase() && /[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐƠƯ]/.test(base);
-  if (isAllCaps) {
-    base = base.replace(/\s+\d{1,3}\s*$/, '').trim();
-  }
+  // 3. Strip trailing numbers (e.g. '01', '02') so variations of the same test group together
+  base = base.replace(/\s+\d{1,3}\s*$/, '').trim();
+  
   // 4. Clean trailing dashes/colons
   base = base.replace(/\s*[-:]+\s*$/, '').trim();
   return base || title.trim() || "Khác";
@@ -2938,12 +2935,16 @@ header{padding:6px 8px !important}
                 
                 // Grouping logic
                 const groupsMap = {};
+                const groupsList = [];
                 filteredQ.forEach(q => {
                   const base = getBaseName(q.title);
-                  if (!groupsMap[base]) groupsMap[base] = [];
+                  if (!groupsMap[base]) {
+                    groupsMap[base] = [];
+                    groupsList.push(base);
+                  }
                   groupsMap[base].push(q);
                 });
-                const groups = Object.keys(groupsMap).sort().map(k => ({ baseName: k, quizzes: groupsMap[k] }));
+                const groups = groupsList.map(k => ({ baseName: k, quizzes: groupsMap[k] }));
 
                 if (formData.adminQuizGroup) {
                   const activeGroup = groups.find(g => g.baseName === formData.adminQuizGroup);
@@ -3216,6 +3217,7 @@ header{padding:6px 8px !important}
                   const name = (formData.name || "").trim(); const empId = (formData.empId || "").trim();
                   if (!name || !empId) { alert("Vui lòng nhập Họ tên và Mã NV"); return; }
                   if (accounts.some(a => a.empId === empId)) { alert("Mã NV \"" + empId + "\" đã tồn tại!"); return; }
+                  if (accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) { alert("Tên nhân viên \"" + name + "\" đã tồn tại trong hệ thống! Hãy đổi tên khác (VD: " + name + " - " + (formData.dept || DEPTS[0]) + ") để tránh lỗi đăng nhập trùng lặp."); return; }
                   const password = (formData.pw || "Kingsmen@2026");
                   if (formData.confirmPw && formData.confirmPw !== password) { alert("Mật khẩu xác nhận không khớp!"); return; }
                   setFormData({ ...formData, _creating: true });
@@ -5260,12 +5262,16 @@ header{padding:6px 8px !important}
 
                   {filtered.length === 0 ? <Empty msg={empQuizSearch ? "Không tìm thấy đề kiểm tra nào phù hợp." : empDiffFilter !== "all" || empQFilter !== "all" ? "Không có đề nào phù hợp với bộ lọc." : "Chưa có đề cho phòng ban của bạn."} /> : (() => {
                     const groupsMap = {};
+                    const groupsList = [];
                     filtered.forEach(q => {
                       const base = getBaseName(q.title);
-                      if (!groupsMap[base]) groupsMap[base] = [];
+                      if (!groupsMap[base]) {
+                        groupsMap[base] = [];
+                        groupsList.push(base);
+                      }
                       groupsMap[base].push(q);
                     });
-                    const groups = Object.keys(groupsMap).sort().map(k => ({ baseName: k, quizzes: groupsMap[k] }));
+                    const groups = groupsList.map(k => ({ baseName: k, quizzes: groupsMap[k] }));
 
                     if (formData.empQuizGroup) {
                       const activeGroup = groups.find(g => g.baseName === formData.empQuizGroup);
