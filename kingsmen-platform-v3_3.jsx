@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@supabase/supabase-js";
 
@@ -2120,7 +2120,7 @@ header{padding:6px 8px !important}
 
             {/* Won reward highlight */}
             <div style={{ padding: "18px 24px", borderRadius: 16, background: `linear-gradient(160deg,${C.gold}22,${C.gold}08)`, border: `2px solid ${C.gold}`, marginBottom: 20, animation: "fadeIn 1.2s both" }}>
-              <div style={{ fontSize: 12, color: C.gold, letterSpacing: 2, marginBottom: 8, fontSize: 12 }}>BẠN NHẬN ĐƯỢC</div>
+              <div style={{ fontSize: 12, color: C.gold, letterSpacing: 2, marginBottom: 8 }}>BẠN NHẬN ĐƯỢC</div>
               <div style={{ fontSize: 24, fontWeight: 900, color: C.white, fontFamily: "'Be Vietnam Pro',sans-serif" }}>🎁 {rewardReveal.wonReward}</div>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 6 }}>Liên hệ người tạo thử thách để nhận thưởng!</div>
             </div>
