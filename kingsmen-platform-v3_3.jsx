@@ -5351,7 +5351,7 @@ header{padding:6px 8px !important}
           <div style={{ animation: "fadeIn .4s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Câu <b style={{ color: C.gold }}>{qIdx + 1}</b>/{activeQuiz.questions.length}{activeQuiz.quizType === "mixed" && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>Kết hợp</span>}</span>
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Câu <b style={{ color: C.gold }}>{qIdx + 1}</b>{" / "}{activeQuiz.questions.length}{activeQuiz.quizType === "mixed" && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 5px", borderRadius: 3, background: `${C.purple}22`, color: C.purple }}>Kết hợp</span>}</span>
                 <button onClick={() => { if (window.confirm("Thoát bài thi? Tiến trình sẽ không được lưu.")) { setScreen("emp_quizzes"); setActiveQuiz(null); setQActive(false); } }} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}>✕ Thoát</button>
               </div>
               <span style={{ fontSize: 14, fontWeight: 700, color: qTimer < 60 ? C.red : qTimer < 180 ? C.orange : C.gold, fontFamily: "monospace", background: "rgba(0,0,0,0.3)", padding: "5px 12px", borderRadius: 8 }}>⏱ {fmtTime(qTimer)}</span>
