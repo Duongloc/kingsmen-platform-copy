@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@supabase/supabase-js";
 
@@ -3537,6 +3537,61 @@ header{padding:6px 8px !important}
                 }} disabled={!!formData._sendingReport} style={{ ...btnG, opacity: formData._sendingReport ? 0.6 : 1 }}>
                   {formData._sendingReport ? "⏳ Đang gửi..." : "Gửi ngay bây giờ"}
                 </button>
+              </div>
+            </div>
+
+            {/* Weekly Report Schedule Picker */}
+            <div style={{ ...card, padding: 14, background: "rgba(33, 150, 243, 0.03)", border: "1px solid rgba(33, 150, 243, 0.12)" }}>
+              <div style={{ fontSize: 12, color: "#2196f3", fontWeight: 700, marginBottom: 10 }}>⏰ LỊCH GỬI TỰ ĐỘNG</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Ngày trong tuần</div>
+                  <select
+                    value={formData._schedDay !== undefined ? formData._schedDay : (settings.weeklyReportDay ?? 1)}
+                    onChange={e => setFormData({ ...formData, _schedDay: Number(e.target.value) })}
+                    style={{ ...inp, minWidth: 140, padding: "7px 10px", fontSize: 12 }}
+                  >
+                    {[["1","Thứ Hai"],["2","Thứ Ba"],["3","Thứ Tư"],["4","Thứ Năm"],["5","Thứ Sáu"],["6","Thứ Bảy"],["0","Chủ Nhật"]].map(([v, l]) =>
+                      <option key={v} value={v}>{l}</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Giờ gửi (giờ VN)</div>
+                  <select
+                    value={formData._schedHour !== undefined ? formData._schedHour : (settings.weeklyReportHour ?? 8)}
+                    onChange={e => setFormData({ ...formData, _schedHour: Number(e.target.value) })}
+                    style={{ ...inp, minWidth: 110, padding: "7px 10px", fontSize: 12 }}
+                  >
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <option key={h} value={h}>{String(h).padStart(2,"0")}:00</option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={async () => {
+                  const day  = formData._schedDay  !== undefined ? formData._schedDay  : (settings.weeklyReportDay  ?? 1);
+                  const hour = formData._schedHour !== undefined ? formData._schedHour : (settings.weeklyReportHour ?? 8);
+                  const newSettings = { ...settings, weeklyReportDay: day, weeklyReportHour: hour };
+                  setSettings(newSettings);
+                  await DB.set("km-settings", newSettings);
+                  setFormData({ ...formData, _schedDay: undefined, _schedHour: undefined });
+                  setSaveStatus("saved"); setTimeout(() => setSaveStatus(""), 2000);
+                }} style={{ ...btnG, fontSize: 12, padding: "7px 16px" }}>💾 Lưu lịch</button>
+              </div>
+              {(() => {
+                const dayLabels = { 0: "Chủ Nhật", 1: "Thứ Hai", 2: "Thứ Ba", 3: "Thứ Tư", 4: "Thứ Năm", 5: "Thứ Sáu", 6: "Thứ Bảy" };
+                const d = settings.weeklyReportDay ?? 1;
+                const h = settings.weeklyReportHour ?? 8;
+                return (
+                  <div style={{ marginTop: 10, fontSize: 11, color: settings.autoWeeklyReportEnabled ? "#4caf50" : "rgba(255,255,255,0.3)" }}>
+                    {settings.autoWeeklyReportEnabled
+                      ? `✅ Lịch hiện tại: ${dayLabels[d]} lúc ${String(h).padStart(2,"0")}:00 (giờ Việt Nam)`
+                      : `⏸ Tự động gửi đang TẮT — Lịch: ${dayLabels[d]} lúc ${String(h).padStart(2,"0")}:00`}
+                  </div>
+                );
+              })()}
+              <div style={{ marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.25)" }}>
+                💡 Cron cần chạy mỗi giờ để lịch hoạt động chính xác. Function tự kiểm tra ngày/giờ theo giờ Việt Nam (UTC+7).
               </div>
             </div>
 

@@ -99,6 +99,22 @@ Deno.serve(async (req) => {
       if (!appConfig.autoWeeklyReportEnabled) {
         return new Response(JSON.stringify({ success: true, message: "Automated reports disabled in settings" }), { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       }
+
+      // ── Schedule gate: only send on the configured day + hour (Vietnam UTC+7) ──
+      const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+      const vnNow = new Date(Date.now() + VN_OFFSET_MS);
+      const currentDay  = vnNow.getUTCDay();   // 0=Sun … 6=Sat
+      const currentHour = vnNow.getUTCHours(); // 0–23
+
+      const scheduledDay  = appConfig.weeklyReportDay  ?? 1; // default: Monday
+      const scheduledHour = appConfig.weeklyReportHour ?? 8; // default: 08:00
+
+      if (currentDay !== scheduledDay || currentHour !== scheduledHour) {
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, message: `Not scheduled time. Configured: day=${scheduledDay} hour=${scheduledHour}, Current VN time: day=${currentDay} hour=${currentHour}` }),
+          { status: 200, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // ── 2. SMTP Configuration ──
