@@ -34,3 +34,6 @@ dist-ssr
 .claude
 schema.
 *.sql
+# ...nhưng migration schema thì PHẢI theo dõi, nếu không mỗi lần deploy máy khác
+# lại thiếu bảng/RPC và app gãy im lặng.
+!supabase/migrations/*.sql

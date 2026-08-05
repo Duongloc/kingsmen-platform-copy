@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@supabase/supabase-js";
+import LiveArena from "./src/LiveArena.jsx";
 
 /* ═══════════════════════════════════════════════════════════════
    KINGSMEN TRAINING PLATFORM v3 — Nâng Cao Toàn Diện
@@ -1959,6 +1960,10 @@ ${context.bulletinType === "policy" ? "📋 Chính sách / Quy định" : contex
   const hd = (sz) => ({ fontFamily: "'Be Vietnam Pro',sans-serif", fontSize: sz, fontWeight: 800, color: C.white, lineHeight: 1.3 });
   const tag = (text, color) => <span style={{ fontSize: 10, padding: "5px 10px", borderRadius: 4, background: `${color}22`, color, fontWeight: 600 }}>{text}</span>;
 
+  // Đấu Trường: ai được mở phòng thi đấu. Phải khớp với hàm km_can_host() trong SQL —
+  // đây chỉ là ẩn/hiện nút, chốt chặn thật nằm ở RPC phía server.
+  const canHostLive = !!currentUser && (currentUser.empId === "admin" || currentUser.accRole === "director" || currentUser.accRole === "manager");
+
   if (!ready) return <div style={{ minHeight: "100vh", background: C.dark, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ color: C.gold, fontSize: 18, animation: "pulse 1.5s infinite" }}>Đang tải hệ thống...</div></div>;
 
   var toDriveDirectUrl = function (url) {
@@ -2360,6 +2365,7 @@ header{padding:6px 8px !important}
                 { i: "📊", t: "KẾT QUẢ", s: "emp_results" },
                 { i: "🏆", t: "HẠNG", s: "emp_ranking" },
                 { i: "🎯", t: "THÁCH", s: "emp_challenges" },
+                { i: "🎮", t: "ĐẤU TRƯỜNG", s: "live_arena" },
                 { i: "📋", t: "LỘ TRÌNH", s: "emp_pathway" },
                 { i: "🧠", t: "NLỰC", s: "emp_competency" },
                 { i: "📢", t: "TIN", s: "emp_bulletins" },
@@ -2375,6 +2381,7 @@ header{padding:6px 8px !important}
                 { i: "📚", t: "BÀI HỌC", s: "admin_lessons" },
                 { i: "🤖", t: "ĐỀ THI", s: "admin_quizzes" },
                 { i: "🎯", t: "THỬ THÁCH", s: "admin_challenges" },
+                { i: "🎮", t: "ĐẤU TRƯỜNG", s: "live_arena" },
                 { i: "📢", t: "BẢNG TIN", s: "admin_bulletins" },
                 { i: "📊", t: "NĂNG LỰC", s: "admin_analytics" },
                 { i: "🏆", t: "XẾP HẠNG", s: "admin_ranking" },
@@ -2457,6 +2464,7 @@ header{padding:6px 8px !important}
                 { i: "📚", t: "Bài Học & Kiến Thức", d: knowledge.length + " bài · " + knowledge.filter(function (k2) { return k2.interactive }).length + " đã tạo", s: "admin_lessons" },
                 { i: "🤖", t: "Đề Kiểm Tra", d: quizzes.length + " đề · Claude AI", s: "admin_quizzes" },
                 { i: "🎯", t: "Thử Thách & Lộ Trình", d: "Challenge + Path", s: "admin_challenges" },
+                { i: "🎮", t: "Đấu Trường", d: "Thi đấu live · realtime", s: "live_arena" },
                 { i: "📢", t: "Bảng Tin", d: bulletins.length + " bài đăng", s: "admin_bulletins" },
               ].map(function (c2, ci) {
                 return (
@@ -4578,6 +4586,7 @@ header{padding:6px 8px !important}
                 { i: "🏆", t: "Xếp Hạng", d: "Toàn công ty", s: "emp_ranking" },
                 { i: "🎖️", t: "Huy Hiệu", d: `${getUserBadges(currentUser).length}/${BADGES.length}`, s: "emp_badges" },
                 { i: "🎯", t: "Thử Thách", d: `${challenges.filter(ch => challengeVisibleTo(ch, currentUser)).length} thử thách`, s: "emp_challenges" },
+                { i: "🎮", t: "Đấu Trường", d: canHostLive ? "Thi đấu live · mở phòng" : "Thi đấu live · nhập PIN", s: "live_arena" },
                 { i: "📋", t: "Lộ Trình", d: `${paths.filter(p => { const assigned = (p.assignedTo || []).includes(currentUser.id); const hasProgress = !!(currentUser.pathProgress || {})[p.id]; const deptMatch = (p.depts || []).includes("Tất cả") || (p.depts || []).includes(currentUser.dept); return assigned || hasProgress || deptMatch; }).length} lộ trình`, s: "emp_pathway" },
                 { i: "📢", t: "Bảng Tin", d: `${bulletins.length} bài đăng`, s: "emp_bulletins" },
                 ...(currentUser.accRole === "director" ? [
@@ -6480,6 +6489,19 @@ header{padding:6px 8px !important}
               );
             })()}
           </div>
+        )}
+
+        {/* ═══ ĐẤU TRƯỜNG — Live quiz thi đấu (dùng chung cho admin & nhân viên) ═══ */}
+        {screen === "live_arena" && currentUser && (
+          <LiveArena
+            supabase={supabase}
+            user={currentUser}
+            quizzes={quizzes}
+            canHost={canHostLive}
+            onExit={() => setScreen(role === "admin" ? "admin_home" : "emp_home")}
+            C={C}
+            ui={{ card, btnG, btnO, inp, hd }}
+          />
         )}
 
         {/* ═══ SAVE STATUS TOAST ═══ */}
