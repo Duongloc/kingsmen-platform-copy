@@ -278,7 +278,12 @@ declare v_room public.live_rooms;
 begin
   select * into v_room from public.live_rooms where id = p_room_id;
   if v_room.id is null then raise exception 'Phòng không tồn tại'; end if;
-  if v_room.host_id <> auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
+  -- Kiểm tra host PHẢI dùng "is distinct from", KHÔNG được dùng "<>".
+  -- Khi chưa đăng nhập, auth.uid() là NULL và "host_id <> NULL" cho ra NULL chứ
+  -- không phải TRUE → câu chặn không kích hoạt, người lạ chỉ cần khóa anon
+  -- (vốn công khai trong bundle trình duyệt) là điều khiển được phòng người khác.
+  -- Lỗi này đã từng lọt; giữ nguyên cách viết này ở CẢ 6 hàm điều khiển phòng.
+  if v_room.host_id is distinct from auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
   if v_room.status <> 'lobby' then raise exception 'Trận đã bắt đầu rồi'; end if;
   if not exists (select 1 from public.live_players where room_id = p_room_id) then
     raise exception 'Chưa có người chơi nào vào phòng';
@@ -301,7 +306,7 @@ declare
 begin
   select * into v_room from public.live_rooms where id = p_room_id;
   if v_room.id is null then raise exception 'Phòng không tồn tại'; end if;
-  if v_room.host_id <> auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
+  if v_room.host_id is distinct from auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
   if v_room.status <> 'question' then return; end if;   -- đã reveal rồi → bỏ qua, không lỗi
 
   select s.questions -> v_room.q_idx into v_q
@@ -352,7 +357,8 @@ as $$
 declare v_room public.live_rooms;
 begin
   select * into v_room from public.live_rooms where id = p_room_id;
-  if v_room.host_id <> auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
+  if v_room.id is null then raise exception 'Phòng không tồn tại'; end if;
+  if v_room.host_id is distinct from auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
   update public.live_rooms set status = 'scoreboard' where id = p_room_id;
 end $$;
 
@@ -365,7 +371,7 @@ declare v_room public.live_rooms;
 begin
   select * into v_room from public.live_rooms where id = p_room_id;
   if v_room.id is null then raise exception 'Phòng không tồn tại'; end if;
-  if v_room.host_id <> auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
+  if v_room.host_id is distinct from auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
   if v_room.status = 'ended' then return; end if;
 
   if v_room.q_idx + 1 >= v_room.q_count then
@@ -390,7 +396,7 @@ declare
 begin
   select * into v_room from public.live_rooms where id = p_room_id for update;
   if v_room.id is null then raise exception 'Phòng không tồn tại'; end if;
-  if v_room.host_id <> auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
+  if v_room.host_id is distinct from auth.uid() then raise exception 'Chỉ host được điều khiển phòng'; end if;
 
   if not v_room.xp_awarded then
     for r in
@@ -430,7 +436,7 @@ declare v_room public.live_rooms;
 begin
   select * into v_room from public.live_rooms where id = p_room_id;
   if v_room.id is null then return; end if;
-  if v_room.host_id <> auth.uid() then raise exception 'Chỉ host được hủy phòng'; end if;
+  if v_room.host_id is distinct from auth.uid() then raise exception 'Chỉ host được hủy phòng'; end if;
   if v_room.status = 'ended' then return; end if;
   -- Đã chơi rồi thì kết thúc đàng hoàng (cộng XP), chưa chơi thì xóa sạch.
   if v_room.q_idx >= 0 then
