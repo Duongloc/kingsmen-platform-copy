@@ -2519,6 +2519,7 @@ header{padding:6px 8px !important}
                     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{knowledge.length + " bài · " + knowledge.filter(function (k2) { return k2.interactive }).length + " có interactive"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={function () { setFormData(Object.assign({}, formData, { refreshingK: true })); localStorage.removeItem("kc_knowledge"); DB.get("km-knowledge", [], true).then(function (d) { setKnowledge(d); cacheSet("knowledge", d); setFormData(Object.assign({}, formData, { refreshingK: false })); }); }} style={{ ...btnO, padding: "8px 12px", fontSize: 11, opacity: formData.refreshingK ? 0.5 : 1 }}>{formData.refreshingK ? "⏳..." : "🔄 Cập nhật"}</button>
                     <button onClick={function () { var nid = "k" + Date.now(); updKnowledgeNow([].concat(knowledge, [{ id: nid, title: "Bài mới", content: "", depts: ["Tất cả"], docUrl: "", hasPdf: false, pdfName: "", videoUrl: "", audioUrl: "", images: [], hasVideo: false, videoName: "", createdAt: new Date().toISOString() }])); setSubScreen(nid) }} style={{ ...btnG, padding: "8px 12px", fontSize: 11 }}>{"+ Thêm"}</button>
                     <label style={{ ...btnO, padding: "8px 12px", fontSize: 11, display: "inline-flex", alignItems: "center", cursor: "pointer" }}>{aiLoading ? "⏳" : "📎 File"}<input type="file" accept=".txt,.md,.csv,.pdf" disabled={aiLoading} style={{ display: "none" }} onChange={function (e) { if (e.target.files[0]) { handleFileUpload(e.target.files[0]).then(function (f) { if (f.content && f.content.length > 10) { var nid = "k" + Date.now(); var newK = { id: nid, title: f.title, content: f.content, depts: ["Tất cả"], docUrl: "", videoUrl: "", audioUrl: "", images: [], hasPdf: f.fromPdf || false, hasVideo: false, videoName: "", createdAt: new Date().toISOString() }; updKnowledgeNow([].concat(knowledge, [newK])); if (f.fromPdf && formData.pdfBase64) { DB.set("km-pdf-" + nid, formData.pdfBase64).catch(function () { }) } setSubScreen(nid); } }) } }} /></label>
                     <button onClick={function () { setScreen("admin_home") }} style={{ ...btnO, padding: "8px 12px", fontSize: 11 }}>{"←"}</button>
@@ -2858,7 +2859,10 @@ header{padding:6px 8px !important}
                   <h2 style={hd(22)}>📝 Quản Lý Đề Kiểm Tra</h2>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{quizzes.length} đề · {totalResultsCount || results.length} lượt làm</div>
                 </div>
-                <button onClick={() => setScreen("admin_home")} style={btnO}>← Quay lại</button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => { setFormData({ ...formData, refreshingQ: true }); localStorage.removeItem("kc_quizzes"); DB.get("km-quizzes", [], true).then(d => { setQuizzes(d); cacheSet("quizzes", d); setFormData({ ...formData, refreshingQ: false }); }); }} style={{ ...btnO, opacity: formData.refreshingQ ? 0.5 : 1 }}>{formData.refreshingQ ? "⏳..." : "🔄 Cập nhật"}</button>
+                  <button onClick={() => setScreen("admin_home")} style={btnO}>← Quay lại</button>
+                </div>
               </div>
 
               {/* ── Overview stats ── */}
